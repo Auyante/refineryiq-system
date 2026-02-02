@@ -190,7 +190,7 @@ def validate_and_repair_schema():
                 conn.execute(text("""
                     CREATE TABLE tanks (
                         id SERIAL PRIMARY KEY,
-                        name TEXT,
+                        name TEXT UNIQUE,
                         product TEXT,
                         capacity FLOAT,
                         current_level FLOAT,

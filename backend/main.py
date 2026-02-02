@@ -185,7 +185,13 @@ def create_tables_if_not_exist():
             # 3. LOGÍSTICA
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS tanks (
-                    id SERIAL PRIMARY KEY, name TEXT, product TEXT, capacity FLOAT, current_level FLOAT, status TEXT, last_updated TIMESTAMP DEFAULT NOW()
+                    id SERIAL PRIMARY KEY, 
+                    name TEXT UNIQUE, 
+                    product TEXT, 
+                    capacity FLOAT, 
+                    current_level FLOAT, 
+                    status TEXT, 
+                    last_updated TIMESTAMP DEFAULT NOW()
                 );
             """))
             conn.execute(text("""
@@ -233,7 +239,6 @@ def create_tables_if_not_exist():
             
     except Exception as e:
         logger.critical(f"❌ [BOOT] Error crítico en migración inicial: {e}")
-
 # ==============================================================================
 # 4. SISTEMA DE RESPALDO EN MEMORIA (FAIL-SAFE DATA)
 # ==============================================================================
