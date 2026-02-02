@@ -12,6 +12,12 @@ const Assets = () => {
 
   useEffect(() => {
     fetchAssets();
+    // Recargar datos cada 30 segundos
+    const interval = setInterval(() => {
+      fetchAssets();
+    }, 30000);
+  
+    return () => clearInterval(interval);
   }, []);
 
   const fetchAssets = async () => {

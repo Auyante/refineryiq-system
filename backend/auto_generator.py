@@ -179,31 +179,31 @@ def validate_and_repair_schema():
                 """))
                 logger.info("✅ Tabla 'energy_analysis' reconstruida.")
 
+            # --- 5. REPARACIÓN: TANKS (Error: column "last_updated" does not exist) ---
+            try:
+                conn.execute(text("SELECT last_updated FROM tanks LIMIT 1"))
+            except (ProgrammingError, OperationalError) as e:
+                logger.warning(f"⚠️ Tabla 'tanks' corrupta. Reconstruyendo... Error: {e}")
+                transaction.rollback()
+                transaction = conn.begin()
+                conn.execute(text("DROP TABLE IF EXISTS tanks CASCADE"))
+                conn.execute(text("""
+                    CREATE TABLE tanks (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT,
+                        product TEXT,
+                        capacity FLOAT,
+                        current_level FLOAT,
+                        status TEXT,
+                        last_updated TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                logger.info("✅ Tabla 'tanks' reconstruida exitosamente.")
+            
             # Confirmar cambios de estructura
             transaction.commit()
             logger.info("✅ Esquema de base de datos validado y reparado.")
-             # --- 5. REPARACIÓN: TANKS (Error: column "last_updated" does not exist) ---
-        try:
-            conn.execute(text("SELECT last_updated FROM tanks LIMIT 1"))
-        except (ProgrammingError, OperationalError) as e:
-            logger.warning(f"⚠️ Tabla 'tanks' corrupta. Reconstruyendo... Error: {e}")
-            transaction.rollback()
-            transaction = conn.begin()
-            conn.execute(text("DROP TABLE IF EXISTS tanks CASCADE"))
-            conn.execute(text("""
-                CREATE TABLE tanks (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT,
-                    product TEXT,
-                    capacity FLOAT,
-                    current_level FLOAT,
-                    status TEXT,
-                    last_updated TIMESTAMP DEFAULT NOW()
-                )
-            """))
-            logger.info("✅ Tabla 'tanks' reconstruida exitosamente.")
             
-            transaction.commit()
         except Exception as e:
             logger.error(f"❌ Error crítico durante la reparación del esquema: {e}")
             transaction.rollback()
@@ -358,6 +358,7 @@ def simulate_process_dynamics(conn):
                 "s": new_status, 
                 "id": tid
             })
+
 def manage_alerts_lifecycle(conn):
     """
     Ciclo de vida de alertas:
