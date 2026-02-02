@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-
 import { 
   FiDatabase, FiPackage, FiTag, FiCpu, FiTrendingUp,
   FiAlertTriangle, FiZap, FiBarChart2, FiList, FiGrid,
   FiCheck, FiX, FiAlertCircle, FiThermometer, FiDroplet,
   FiClock, FiActivity
 } from 'react-icons/fi';
-import { API_URL } from '../config'; // Asegúrate que la ruta sea correcta
+import { API_URL } from '../config';
 import axios from 'axios';
+
 const NormalizedDataViewer = () => {
   const [activeTab, setActiveTab] = useState('units');
   const [units, setUnits] = useState([]);
@@ -23,7 +23,7 @@ const NormalizedDataViewer = () => {
     setError(null);
     
     try {
-      // 1. Obtener estadísticas (Fíjate en las comillas invertidas ` `)
+      // 1. Obtener estadísticas
       const statsResponse = await axios.get(`${API_URL}/api/normalized/stats`);
       setStats(statsResponse.data);
 
@@ -49,11 +49,10 @@ const NormalizedDataViewer = () => {
           break;
         default:
           break;
-    }
-// ... resto del código ...
+      }
     } catch (error) {
       console.error('Error fetching normalized data:', error);
-      setError('No se pudo conectar a la API normalizada. ¿Ejecutaste la migración?');
+      setError('No se pudo conectar a la API normalizada. Verifica que el backend esté ejecutando la migración.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +87,7 @@ const NormalizedDataViewer = () => {
           {units.map(unit => (
             <tr key={unit.unit_id}>
               <td><strong style={{ color: '#1F2937' }}>{unit.unit_id}</strong></td>
-              <td>{unit.unit_name}</td>
+              <td>{unit.name || 'Sin nombre'}</td>
               <td>
                 <span style={{
                   padding: '4px 8px',
@@ -98,20 +97,20 @@ const NormalizedDataViewer = () => {
                   fontSize: '12px',
                   fontWeight: '600'
                 }}>
-                  {unit.unit_type}
+                  {unit.type || 'N/A'}
                 </span>
               </td>
               <td>{unit.capacity ? `${unit.capacity.toLocaleString()} bbl/d` : 'N/A'}</td>
               <td>
                 <span style={{
                   padding: '4px 12px',
-                  background: unit.status === 'ACTIVE' ? '#D1FAE5' : '#FEE2E2',
-                  color: unit.status === 'ACTIVE' ? '#065F46' : '#991B1B',
+                  background: (unit.status === 'ACTIVE' || unit.unit_status === 'ACTIVE') ? '#D1FAE5' : '#FEE2E2',
+                  color: (unit.status === 'ACTIVE' || unit.unit_status === 'ACTIVE') ? '#065F46' : '#991B1B',
                   borderRadius: '20px',
                   fontSize: '12px',
                   fontWeight: '600'
                 }}>
-                  {unit.status}
+                  {unit.status || unit.unit_status || 'DESCONOCIDO'}
                 </span>
               </td>
               <td style={{ color: '#6B7280', fontSize: '14px' }}>{unit.description || 'Sin descripción'}</td>
@@ -217,7 +216,7 @@ const NormalizedDataViewer = () => {
                   fontSize: '12px',
                   fontWeight: '600'
                 }}>
-                  {eq.status}
+                  {eq.status || 'DESCONOCIDO'}
                 </span>
               </td>
               <td>{eq.manufacturer || 'N/A'}</td>
@@ -272,13 +271,13 @@ const NormalizedDataViewer = () => {
               <td>
                 <span style={{
                   padding: '4px 8px',
-                  background: row.quality === 192 || row.quality === 1 ? '#D1FAE5' : '#FEF3C7',
-                  color: row.quality === 192 || row.quality === 1 ? '#065F46' : '#92400E',
+                  background: row.quality === 192 ? '#D1FAE5' : '#FEF3C7',
+                  color: row.quality === 192 ? '#065F46' : '#92400E',
                   borderRadius: '4px',
                   fontSize: '11px',
                   fontWeight: '500'
                 }}>
-                  {row.quality === 192 || row.quality === 1 ? '✓ Buena' : '⚠️ Dudosa
+                  {row.quality === 192 ? '✓ Buena' : '⚠️ Dudosa'}
                 </span>
               </td>
             </tr>
@@ -350,9 +349,9 @@ const NormalizedDataViewer = () => {
         <div style={{ background: '#FEF3C7', padding: '1rem', borderRadius: '8px', border: '1px solid #F59E0B' }}>
           <strong style={{ color: '#92400E' }}>Solución:</strong>
           <ol style={{ marginTop: '0.5rem', paddingLeft: '1.5rem', color: '#92400E' }}>
-            <li>Ejecuta primero: <code>python normalization_migration.py</code></li>
-            <li>Actualiza tu <code>main.py</code> con los nuevos endpoints</li>
-            <li>Reinicia el backend: <code>python main.py</code></li>
+            <li>Ejecuta primero: <code>python auto_generator.py</code> para poblar la base de datos</li>
+            <li>Verifica que el backend esté corriendo en: {API_URL}</li>
+            <li>Reinicia el backend si es necesario</li>
           </ol>
         </div>
       </div>
