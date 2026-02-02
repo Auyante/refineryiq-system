@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   FiDroplet, FiPackage, FiAlertCircle, FiRefreshCw, 
-  FiTruck, FiDownload, FiSearch, FiActivity, FiFilter, 
-  FiCheckSquare, FiHash, FiFileText, FiShoppingCart 
+  FiDownload, FiSearch, FiActivity, FiCheckSquare, FiHash, FiFileText, FiShoppingCart, FiTruck 
 } from 'react-icons/fi';
 import { API_URL } from '../config'; // <--- CONEXIÓN CENTRALIZADA
 import '../App.css';
@@ -11,14 +10,8 @@ import '../App.css';
 /**
  * =====================================================================
  * MÓDULO DE GESTIÓN DE SUMINISTROS (Supply.js)
- * Versión: 6.0 Ultimate (Order Generator Integrated) - Cloud Adapted
+ * Versión: 6.0 Ultimate (Cloud Native + Crash Protection)
  * =====================================================================
- * Características Completas:
- * 1. Smart Search (Ignora acentos, mayúsculas, busca SKU).
- * 2. Monitor IoT de Tanques (Tiempo real).
- * 3. Exportación Masiva (Excel/CSV).
- * 4. Generador de Órdenes de Compra (Automático para stock bajo).
- * 5. Responsive Design (Móvil/Desktop).
  */
 
 const Supply = () => {
@@ -41,64 +34,79 @@ const Supply = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       console.log(`📦 Sincronizando inventario desde: ${API_URL}`);
       
       const res = await axios.get(`${API_URL}/api/supplies/data`);
       
-      // Validación robusta para evitar crashes si el backend devuelve null
+      // Validación robusta: Si el backend devuelve null, usamos arrays vacíos
       const safeData = {
-        tanks: Array.isArray(res.data.tanks) ? res.data.tanks : [],
-        inventory: Array.isArray(res.data.inventory) ? res.data.inventory : []
+        tanks: Array.isArray(res.data?.tanks) ? res.data.tanks : [],
+        inventory: Array.isArray(res.data?.inventory) ? res.data.inventory : []
       };
 
       setData(safeData);
-      setError(null);
       setLoading(false);
     } catch (err) {
       console.error("Supply Error:", err);
-      setError("Error de sincronización con almacén central.");
+      // FALLBACK: Datos de emergencia para que la UI no se rompa si falla la red
+      setData({
+        tanks: [
+            {name: "Error Conexión", product: "Sin Datos", capacity: 100, current_level: 0, status: "OFFLINE"}
+        ],
+        inventory: [] 
+      });
+      setError("No se pudo sincronizar con el almacén central. Verifique su conexión.");
       setLoading(false);
     }
   };
 
   // ==========================================
-  // 3. LÓGICA DE NEGOCIO (FILTROS Y ÓRDENES)
+  // 3. LÓGICA DE NEGOCIO (FILTROS Y ACCIONES)
   // ==========================================
   
-  // Filtrado Inteligente
+  // CORRECCIÓN CRÍTICA: BLINDAJE CONTRA NULOS (FIX PANTALLA BLANCA)
   const filteredInventory = data.inventory.filter(item => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      item.item.toLowerCase().includes(term) || 
-      (item.sku && item.sku.toLowerCase().includes(term)) ||
-      item.status.toLowerCase().includes(term);
     
+    // Usamos (valor || "") para asegurar que siempre sea un string antes de .toLowerCase()
+    const itemName = (item.item || "").toLowerCase();
+    const itemSku = (item.sku || "").toLowerCase();
+    const itemStatus = (item.status || "").toLowerCase();
+    
+    const matchesSearch = itemName.includes(term) || itemSku.includes(term) || itemStatus.includes(term);
     const matchesFilter = filterStatus === 'ALL' || item.status === filterStatus;
 
     return matchesSearch && matchesFilter;
   });
 
-  // Generador de Órdenes de Compra (Simulado)
+  // Generador de Órdenes de Compra
   const generatePurchaseOrder = () => {
     const lowStockItems = data.inventory.filter(i => i.status === 'LOW' || i.status === 'CRITICAL');
     if (lowStockItems.length === 0) {
-      alert("No hay ítems con stock bajo para generar orden.");
+      alert("✅ Todo el inventario está en niveles óptimos. No se requiere compra.");
       return;
     }
     
-    const orderText = lowStockItems.map(i => `- ${i.item}: Solicitar ${i.quantity * 2} ${i.unit}`).join('\n');
-    alert(`ORDEN DE COMPRA GENERADA #${Date.now()}\n\nItems requeridos:\n${orderText}`);
+    let message = "ORDEN DE COMPRA GENERADA AUTOMÁTICAMENTE\n----------------------------------------\n";
+    lowStockItems.forEach(i => {
+        message += `[ ] ${i.item} (SKU: ${i.sku || 'N/A'}): Solicitar ${i.quantity * 2} ${i.unit}\n`;
+    });
+    alert(message);
   };
 
   // Exportar a CSV
   const exportToCSV = () => {
-    const headers = "Item,Cantidad,Unidad,Estado\n";
-    const rows = filteredInventory.map(i => `${i.item},${i.quantity},${i.unit},${i.status}`).join("\n");
+    const headers = "Item,SKU,Cantidad,Unidad,Estado\n";
+    const rows = filteredInventory.map(i => 
+        `${i.item || ''},${i.sku || ''},${i.quantity},${i.unit},${i.status}`
+    ).join("\n");
+    
     const blob = new Blob([headers + rows], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `inventario_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `RefineryIQ_Inventario_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
   };
 
@@ -131,7 +139,7 @@ const Supply = () => {
       </div>
 
       {error && (
-        <div className="card" style={{borderLeft:'4px solid #ef4444', color:'#ef4444', display:'flex', alignItems:'center', gap:'10px'}}>
+        <div className="card" style={{borderLeft:'4px solid #ef4444', color:'#ef4444', display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px'}}>
           <FiAlertCircle size={20}/> {error}
         </div>
       )}
@@ -188,7 +196,7 @@ const Supply = () => {
           </div>
         )) : (
           <div className="card" style={{gridColumn:'span 2', textAlign:'center', color:'#94a3b8', fontStyle:'italic'}}>
-            No hay telemetría de tanques disponible.
+            No hay telemetría de tanques disponible en este momento.
           </div>
         )}
       </div>
@@ -201,9 +209,12 @@ const Supply = () => {
         <button 
           onClick={generatePurchaseOrder}
           className="action-button-outline"
-          style={{fontSize:'0.85rem', padding:'8px 12px', display:'flex', alignItems:'center', gap:'6px'}}
+          style={{
+              fontSize:'0.85rem', padding:'10px 16px', display:'flex', alignItems:'center', gap:'8px',
+              border: '1px solid #e2e8f0', borderRadius: '8px', background: 'white', cursor: 'pointer'
+          }}
         >
-          <FiShoppingCart size={16}/> Generar Orden de Compra
+          <FiShoppingCart size={16} color="#3b82f6"/> Generar Orden de Compra
         </button>
       </div>
 
@@ -255,7 +266,7 @@ const Supply = () => {
                         <FiHash size={16} color="#64748b"/>
                       </div>
                       <div>
-                        <div style={{fontWeight:600, color:'#1e293b'}}>{item.item}</div>
+                        <div style={{fontWeight:600, color:'#1e293b'}}>{item.item || "Producto Desconocido"}</div>
                         <div style={{fontSize:'0.75rem', color:'#94a3b8'}}>SKU: {item.sku || `GEN-${idx+100}`}</div>
                       </div>
                     </div>
@@ -271,8 +282,8 @@ const Supply = () => {
                     </span>
                   </td>
                   <td style={{padding:'15px'}}>
-                    <button style={{border:'none', background:'transparent', color:'#3b82f6', cursor:'pointer', fontSize:'0.85rem', fontWeight:600}}>
-                      Ver Detalle
+                    <button style={{border:'none', background:'transparent', color:'#3b82f6', cursor:'pointer', fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'5px'}}>
+                      <FiTruck/> Reponer
                     </button>
                   </td>
                 </tr>

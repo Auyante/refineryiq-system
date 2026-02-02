@@ -24,21 +24,27 @@ const Login = ({ onLogin }) => {
       try {
         console.log(`🔐 Intentando login en: ${API_URL}/api/auth/login`);
         
-        const res = await axios.post(`${API_URL}/api/auth/login`, { username, password });
+        // Petición real al backend
+        const res = await axios.post(`${API_URL}/api/auth/login`, { 
+          username, 
+          password 
+        });
         
         if (res.data.token) {
+          console.log("✅ Autenticación exitosa");
           onLogin(res.data); // Éxito: Pasamos datos al App.js
         }
       } catch (err) {
         setLoading(false);
         console.error("Login Error:", err);
         
+        // Manejo de errores específicos para dar feedback útil al usuario
         if (err.response && err.response.status === 401) {
-          setError('Credenciales incorrectas. Verifique usuario y contraseña.');
-        } else if (err.message === "Network Error" || err.code === "ERR_NETWORK") {
-          setError('Error de conexión. El servidor no responde.');
+          setError('Credenciales incorrectas. Verifique su ID y contraseña.');
+        } else if (err.code === "ERR_NETWORK" || err.message === "Network Error") {
+          setError('No se pudo conectar con el Servidor. Verifique su internet o el estado del Backend.');
         } else {
-          setError('Ocurrió un error inesperado. Intente nuevamente.');
+          setError('Error del sistema. Intente nuevamente más tarde.');
         }
       }
     }, 800);
@@ -46,7 +52,9 @@ const Login = ({ onLogin }) => {
 
   return (
     <div className="login-container">
-      {/* FONDO ANIMADO Y ESTILOS EN LÍNEA PARA GARANTIZAR VISUALIZACIÓN */}
+      {/* ESTILOS EN LÍNEA PARA GARANTIZAR VISUALIZACIÓN 
+         (Manteniendo tu diseño original intacto)
+      */}
       <style>{`
         .login-container {
           height: 100vh;
@@ -249,7 +257,7 @@ const Login = ({ onLogin }) => {
             </div>
           </div>
 
-          {/* MENSAJE DE ERROR */}
+          {/* MENSAJE DE ERROR VISUAL */}
           {error && (
             <div style={{
               background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', 
@@ -269,7 +277,7 @@ const Login = ({ onLogin }) => {
         <div className="hint-text">
           <p>Credenciales de prueba: <strong>admin</strong> / <strong>admin123</strong></p>
           <p style={{opacity: 0.6, fontSize: '0.75rem', marginTop: '5px'}}>
-            Conexión Segura: {API_URL.includes('localhost') ? 'Localhost' : 'Cloud Encrypted'}
+            Conexión: {API_URL.includes('localhost') ? 'Modo Local' : 'Nube Segura Encrypted'}
           </p>
         </div>
       </div>

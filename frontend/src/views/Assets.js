@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiSearch, FiCheckCircle, FiTool, FiBox, FiActivity } from 'react-icons/fi';
-import { API_URL } from '../config'; // <--- IMPORTACIÓN DE LA CONEXIÓN CENTRAL
-import '../App.css'; 
+import { FiSearch, FiCheckCircle, FiTool, FiBox, FiActivity, FiServer, FiAlertTriangle } from 'react-icons/fi';
+import { API_URL } from '../config'; // <--- CONEXIÓN CENTRALIZADA
+import '../App.css';
 
 const Assets = () => {
   const [assets, setAssets] = useState([]);
@@ -11,180 +11,193 @@ const Assets = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchAssets = async () => {
-      try {
-        // Conectando al endpoint de inventario usando la URL dinámica
-        console.log(`🛠️ Cargando activos desde: ${API_URL}`);
-        const res = await axios.get(`${API_URL}/api/assets/overview`);
-        
-        // Validación de seguridad: Aseguramos que sea un array
-        const safeData = Array.isArray(res.data) ? res.data : [];
-        setAssets(safeData);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error cargando activos:", err);
-        setError("No se pudo cargar el inventario de activos.");
-        setLoading(false);
-      }
-    };
-
     fetchAssets();
   }, []);
 
-  // Lógica de filtrado PROTEGIDA (Evita pantalla blanca)
-  // Si equipment_name es null, usa "" para que .toLowerCase() no falle
+  const fetchAssets = async () => {
+    try {
+      setLoading(true);
+      console.log(`🛠️ Cargando inventario de activos desde: ${API_URL}`);
+      
+      const res = await axios.get(`${API_URL}/api/assets/overview`);
+      
+      // Validación de Seguridad: Aseguramos que siempre sea un array
+      const safeData = Array.isArray(res.data) ? res.data : [];
+      setAssets(safeData);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error Assets:", err);
+      setError("No se pudo cargar el catálogo de equipos.");
+      setLoading(false);
+    }
+  };
+
+  // --- FILTRADO SEGURO (PROTECCIÓN ANTI-CRASH) ---
   const filteredAssets = assets.filter(asset => {
-    const name = asset.equipment_name || "";
-    const unit = asset.unit_id || "";
-    const type = asset.equipment_type || "";
+    // Convertimos a string seguro antes de buscar (evita error toLowerCase on null)
+    const name = (asset.equipment_name || "").toLowerCase();
+    const unit = (asset.unit_id || "").toLowerCase();
+    const type = (asset.equipment_type || "").toLowerCase();
+    const id = (asset.equipment_id || "").toLowerCase();
+    
     const searchTerm = filter.toLowerCase();
 
-    return name.toLowerCase().includes(searchTerm) ||
-           unit.toLowerCase().includes(searchTerm) ||
-           type.toLowerCase().includes(searchTerm);
+    return name.includes(searchTerm) || 
+           unit.includes(searchTerm) || 
+           type.includes(searchTerm) ||
+           id.includes(searchTerm);
   });
+
+  if (loading) return (
+    <div className="page-container" style={{display:'flex', justifyContent:'center', alignItems:'center', height:'80vh', flexDirection:'column'}}>
+      <div className="spinner" style={{marginBottom:'20px'}}></div>
+      <p style={{color:'#64748b'}}>Cargando Inventario de Planta...</p>
+    </div>
+  );
 
   return (
     <div className="page-container">
+      {/* HEADER */}
       <div className="page-header">
         <div className="page-title">
           <h1>Inventario de Activos</h1>
-          <p>Monitorización detallada de equipos y sensores</p>
+          <p>Monitorización detallada de equipos y sensores en tiempo real</p>
         </div>
         <div className="status-badge status-success">
-          <FiBox style={{ marginRight: '8px' }} />
-          {assets.length} Equipos Totales
+          <FiServer style={{ marginRight: '8px' }} />
+          {assets.length} Equipos Registrados
         </div>
       </div>
 
-      <div className="card">
-        {/* Barra de Búsqueda y Filtros */}
-        <div className="card-header">
+      {error && (
+        <div className="card" style={{borderLeft:'4px solid #ef4444', color:'#ef4444', display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px'}}>
+          <FiAlertTriangle/> {error}
+        </div>
+      )}
+
+      {/* PANEL PRINCIPAL */}
+      <div className="card" style={{padding:'0', overflow:'hidden'}}>
+        
+        {/* BARRA DE BÚSQUEDA */}
+        <div className="card-header" style={{background:'#f8fafc', borderBottom:'1px solid #e2e8f0', padding:'15px'}}>
           <div className="search-box" style={{ position: 'relative', maxWidth: '400px', width: '100%' }}>
-            <FiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+            <FiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
-              placeholder="Buscar por nombre, ID o unidad..." 
+              placeholder="Buscar por nombre, ID, tipo o unidad..." 
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="search-input"
               style={{
                 width: '100%', padding: '10px 10px 10px 38px', borderRadius: '8px', 
-                border: '1px solid #E5E7EB', outline: 'none', fontSize: '0.95rem'
+                border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem'
               }}
             />
           </div>
         </div>
         
-        {loading ? (
-          <div style={{ padding: '4rem', textAlign: 'center', color: '#6B7280' }}>
-            <div className="spinner" style={{margin: '0 auto 1rem'}}></div>
-            Cargando inventario de planta...
-          </div>
-        ) : error ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#EF4444' }}>
-            {error}
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="modern-table">
-              <thead>
-                <tr>
-                  <th>Equipo</th>
-                  <th>Tipo</th>
-                  <th>Ubicación</th>
-                  <th>Estado Operativo</th>
-                  <th>Lecturas en Tiempo Real</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAssets.length > 0 ? filteredAssets.map((asset, idx) => (
-                  <tr key={idx}>
-                    {/* Columna Nombre */}
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ 
-                          background: '#F3F4F6', padding: '10px', borderRadius: '8px', 
-                          color: '#4B5563'
-                        }}>
-                          <FiBox size={18} />
+        {/* TABLA DE ACTIVOS */}
+        <div className="table-container">
+          <table className="modern-table" style={{width:'100%'}}>
+            <thead>
+              <tr style={{background:'#f1f5f9'}}>
+                <th style={{padding:'15px', textAlign:'left'}}>Equipo / ID</th>
+                <th style={{padding:'15px', textAlign:'left'}}>Tipo</th>
+                <th style={{padding:'15px', textAlign:'left'}}>Ubicación</th>
+                <th style={{padding:'15px', textAlign:'left'}}>Estado</th>
+                <th style={{padding:'15px', textAlign:'left'}}>Lecturas (Sensores)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAssets.length > 0 ? filteredAssets.map((asset, idx) => (
+                <tr key={idx} style={{borderBottom:'1px solid #f1f5f9'}}>
+                  {/* Columna Nombre */}
+                  <td style={{padding:'15px'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ 
+                        background: '#eff6ff', padding: '10px', borderRadius: '8px', 
+                        color: '#3b82f6', display:'flex', alignItems:'center', justifyContent:'center'
+                      }}>
+                        <FiBox size={18} />
+                      </div>
+                      <div>
+                        <div style={{fontWeight: 700, color: '#1e293b'}}>
+                          {asset.equipment_name || "Equipo Sin Nombre"}
                         </div>
-                        <div>
-                          <div style={{fontWeight: 600, color: 'var(--text-main)'}}>
-                            {asset.equipment_name || "Sin Nombre"}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace' }}>
-                            ID: {asset.equipment_id}
-                          </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace', marginTop:'2px' }}>
+                          ID: {asset.equipment_id || "N/A"}
                         </div>
                       </div>
-                    </td>
+                    </div>
+                  </td>
 
-                    {/* Columna Tipo */}
-                    <td>
-                      <span className="badge-pro" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #DBEAFE' }}>
-                        {asset.equipment_type}
+                  {/* Columna Tipo */}
+                  <td style={{padding:'15px'}}>
+                    <span className="badge-pro" style={{ 
+                      background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', 
+                      padding:'4px 8px', borderRadius:'6px', fontSize:'0.8rem', fontWeight:600 
+                    }}>
+                      {asset.equipment_type || "GENÉRICO"}
+                    </span>
+                  </td>
+
+                  {/* Columna Ubicación */}
+                  <td style={{padding:'15px'}}>
+                    <strong style={{ color: '#334155' }}>{asset.unit_id || "PLANTA"}</strong>
+                  </td>
+
+                  {/* Columna Estado */}
+                  <td style={{padding:'15px'}}>
+                    {asset.status === 'OPERATIONAL' ? (
+                      <span className="status-badge status-success" style={{display:'inline-flex', alignItems:'center', gap:'5px'}}>
+                        <FiCheckCircle /> Operativo
                       </span>
-                    </td>
+                    ) : (
+                      <span className="status-badge status-warning" style={{display:'inline-flex', alignItems:'center', gap:'5px'}}>
+                        <FiTool /> Mantenimiento
+                      </span>
+                    )}
+                  </td>
 
-                    {/* Columna Ubicación */}
-                    <td>
-                      <strong style={{ color: '#374151' }}>{asset.unit_id}</strong>
-                    </td>
-
-                    {/* Columna Estado */}
-                    <td>
-                      {asset.status === 'OPERATIONAL' ? (
-                        <span className="status-badge status-success">
-                          <FiCheckCircle /> Operativo
-                        </span>
+                  {/* Columna Sensores (Manejo Seguro de Arrays) */}
+                  <td style={{padding:'15px'}}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {asset.sensors && Array.isArray(asset.sensors) && asset.sensors.length > 0 ? (
+                        asset.sensors.map((sensor, sIdx) => (
+                          <div key={sIdx} style={{ 
+                            padding: '6px 10px', background: '#ffffff', borderRadius: '6px', 
+                            border: '1px solid #e2e8f0', minWidth: '110px',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}>
+                            <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px', display:'flex', alignItems:'center', gap:'4px' }}>
+                              <FiActivity size={10}/> {sensor.tag_name || "TAG"}
+                            </div>
+                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
+                              {sensor.value !== null ? Number(sensor.value).toFixed(2) : '--'} 
+                              <span style={{ fontSize: '0.75rem', fontWeight: 400, marginLeft: '3px', color: '#94a3b8' }}>
+                                {sensor.units}
+                              </span>
+                            </div>
+                          </div>
+                        ))
                       ) : (
-                        <span className="status-badge status-warning">
-                          <FiTool /> Mantenimiento
+                        <span style={{ color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', display:'flex', alignItems:'center', gap:'5px' }}>
+                          <FiActivity style={{opacity:0.5}}/> Sin lecturas
                         </span>
                       )}
-                    </td>
-
-                    {/* Columna Sensores (Datos Vivos) */}
-                    <td>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {asset.sensors && asset.sensors.length > 0 ? (
-                          asset.sensors.map((sensor, sIdx) => (
-                            <div key={sIdx} style={{ 
-                              padding: '4px 8px', background: '#F9FAFB', borderRadius: '6px', 
-                              border: '1px solid #E5E7EB', minWidth: '100px'
-                            }}>
-                              <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '2px' }}>
-                                <FiActivity style={{ marginRight: '4px', verticalAlign: 'middle' }} size={10}/>
-                                {sensor.tag_name}
-                              </div>
-                              <div style={{ fontWeight: 700, color: '#1F2937', fontSize: '0.9rem' }}>
-                                {typeof sensor.value === 'number' ? sensor.value.toFixed(1) : sensor.value} 
-                                <span style={{ fontSize: '0.75rem', fontWeight: 400, marginLeft: '2px', color: '#6B7280' }}>
-                                  {sensor.units}
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <span style={{ color: '#9CA3AF', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                            Sin sensores conectados
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>
-                      No se encontraron equipos que coincidan con "{filter}"
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
+                    <FiSearch size={30} style={{marginBottom:'10px', opacity:0.5}}/>
+                    <p>No se encontraron equipos que coincidan con la búsqueda.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
