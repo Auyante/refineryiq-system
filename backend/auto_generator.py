@@ -31,41 +31,42 @@ except Exception as e:
     exit(1)
 
 # ==============================================================================
-# 2. DEFINICIÓN DE CATÁLOGOS MAESTROS (DATA FACTORY)
+# 2. DEFINICIÓN DE CATÁLOGOS MAESTROS (DATA FACTORY) - ACTUALIZADO
 # ==============================================================================
 
 # Unidades de Proceso (La estructura base de la refinería)
 UNITS_CONFIG = [
-    {"id": "CDU-101", "name": "Destilación Atmosférica", "type": "DISTILLATION", "desc": "Separación primaria de crudo en fracciones."},
-    {"id": "FCC-201", "name": "Craqueo Catalítico Fluidizado", "type": "CRACKING", "desc": "Conversión de hidrocarburos pesados en gasolina."},
-    {"id": "HT-305", "name": "Hidrotratamiento Diesel", "type": "TREATING", "desc": "Eliminación de azufre y contaminantes."},
-    {"id": "ALK-400", "name": "Unidad de Alquilación", "type": "ALKYLATION", "desc": "Producción de componentes de alto octanaje."}
+    {"id": "CDU-101", "name": "Destilación Atmosférica", "type": "DISTILLATION", "desc": "Separación primaria de crudo en fracciones.", "capacity": 150000, "status": "ACTIVE"},
+    {"id": "FCC-201", "name": "Craqueo Catalítico Fluidizado", "type": "CRACKING", "desc": "Conversión de hidrocarburos pesados en gasolina.", "capacity": 120000, "status": "ACTIVE"},
+    {"id": "HT-305", "name": "Hidrotratamiento Diesel", "type": "TREATING", "desc": "Eliminación de azufre y contaminantes.", "capacity": 80000, "status": "ACTIVE"},
+    {"id": "ALK-400", "name": "Unidad de Alquilación", "type": "ALKYLATION", "desc": "Producción de componentes de alto octanaje.", "capacity": 50000, "status": "ACTIVE"}
 ]
 
-# Equipos Industriales (Activos físicos)
+# Equipos Industriales (Activos físicos) - CON FABRICANTES
 EQUIPMENT_CONFIG = [
-    {"id": "PUMP-101", "name": "Bomba Alim. Crudo", "type": "PUMP", "unit": "CDU-101"},
-    {"id": "FURNACE-100", "name": "Horno de Precalentamiento", "type": "FURNACE", "unit": "CDU-101"},
-    {"id": "TOWER-101", "name": "Torre Fraccionadora", "type": "TOWER", "unit": "CDU-101"},
-    {"id": "COMP-201", "name": "Compresor Gas Húmedo", "type": "COMPRESSOR", "unit": "FCC-201"},
-    {"id": "REACT-202", "name": "Reactor Riser", "type": "REACTOR", "unit": "FCC-201"},
-    {"id": "REGEN-203", "name": "Regenerador Catalizador", "type": "VESSEL", "unit": "FCC-201"},
-    {"id": "PUMP-305", "name": "Bomba Carga Diesel", "type": "PUMP", "unit": "HT-305"},
-    {"id": "EXCH-306", "name": "Intercambiador Calor", "type": "EXCHANGER", "unit": "HT-305"},
-    {"id": "VALVE-401", "name": "Válvula Control Ácido", "type": "VALVE", "unit": "ALK-400"}
+    {"id": "PUMP-101", "name": "Bomba Alim. Crudo", "type": "PUMP", "unit": "CDU-101", "manufacturer": "Flowserve"},
+    {"id": "FURNACE-100", "name": "Horno de Precalentamiento", "type": "FURNACE", "unit": "CDU-101", "manufacturer": "Thermax"},
+    {"id": "TOWER-101", "name": "Torre Fraccionadora", "type": "TOWER", "unit": "CDU-101", "manufacturer": "UOP"},
+    {"id": "COMP-201", "name": "Compresor Gas Húmedo", "type": "COMPRESSOR", "unit": "FCC-201", "manufacturer": "Atlas Copco"},
+    {"id": "REACT-202", "name": "Reactor Riser", "type": "REACTOR", "unit": "FCC-201", "manufacturer": "UOP"},
+    {"id": "REGEN-203", "name": "Regenerador Catalizador", "type": "VESSEL", "unit": "FCC-201", "manufacturer": "FLSmidth"},
+    {"id": "PUMP-305", "name": "Bomba Carga Diesel", "type": "PUMP", "unit": "HT-305", "manufacturer": "Sulzer"},
+    {"id": "EXCH-306", "name": "Intercambiador Calor", "type": "EXCHANGER", "unit": "HT-305", "manufacturer": "Alfa Laval"},
+    {"id": "VALVE-401", "name": "Válvula Control Ácido", "type": "VALVE", "unit": "ALK-400", "manufacturer": "Emerson"}
 ]
 
-# Tags / Sensores (Variables de proceso) - CORREGIDO: usamos min_val y max_val
+# Tags / Sensores (Variables de proceso) - INCLUYE CORRIENTE MOTOR
 TAGS_CONFIG = [
-    {"id": "TI-101", "name": "Temp. Salida Horno", "unit": "CDU-101", "uom": "°C", "min_val": 340, "max_val": 360},
-    {"id": "FI-102", "name": "Flujo Carga Crudo", "unit": "CDU-101", "uom": "bpd", "min_val": 9800, "max_val": 10200},
-    {"id": "PI-103", "name": "Presión Torre", "unit": "CDU-101", "uom": "psig", "min_val": 15, "max_val": 25},
-    {"id": "PI-201", "name": "Presión Reactor", "unit": "FCC-201", "uom": "psig", "min_val": 28, "max_val": 32},
-    {"id": "TI-203", "name": "Temp. Regenerador", "unit": "FCC-201", "uom": "°C", "min_val": 680, "max_val": 720},
-    {"id": "LI-305", "name": "Nivel Separador", "unit": "HT-305", "uom": "%", "min_val": 45, "max_val": 55},
-    {"id": "TI-306", "name": "Temp. Reacción HDS", "unit": "HT-305", "uom": "°C", "min_val": 320, "max_val": 350},
-    {"id": "AI-400", "name": "Concentración Ácido", "unit": "ALK-400", "uom": "%", "min_val": 88, "max_val": 92},
-    {"id": "FI-402", "name": "Flujo Isobutano", "unit": "ALK-400", "uom": "bpd", "min_val": 4000, "max_val": 4500}
+    {"id": "TI-101", "name": "Temp. Salida Horno", "unit": "CDU-101", "uom": "°C", "min_val": 340, "max_val": 360, "tag_type": "TEMPERATURE"},
+    {"id": "FI-102", "name": "Flujo Carga Crudo", "unit": "CDU-101", "uom": "bpd", "min_val": 9800, "max_val": 10200, "tag_type": "FLOW"},
+    {"id": "PI-103", "name": "Presión Torre", "unit": "CDU-101", "uom": "psig", "min_val": 15, "max_val": 25, "tag_type": "PRESSURE"},
+    {"id": "II-999", "name": "Corriente Motor", "unit": "CDU-101", "uom": "A", "min_val": 45, "max_val": 55, "tag_type": "CURRENT"},
+    {"id": "PI-201", "name": "Presión Reactor", "unit": "FCC-201", "uom": "psig", "min_val": 28, "max_val": 32, "tag_type": "PRESSURE"},
+    {"id": "TI-203", "name": "Temp. Regenerador", "unit": "FCC-201", "uom": "°C", "min_val": 680, "max_val": 720, "tag_type": "TEMPERATURE"},
+    {"id": "LI-305", "name": "Nivel Separador", "unit": "HT-305", "uom": "%", "min_val": 45, "max_val": 55, "tag_type": "LEVEL"},
+    {"id": "TI-306", "name": "Temp. Reacción HDS", "unit": "HT-305", "uom": "°C", "min_val": 320, "max_val": 350, "tag_type": "TEMPERATURE"},
+    {"id": "AI-400", "name": "Concentración Ácido", "unit": "ALK-400", "uom": "%", "min_val": 88, "max_val": 92, "tag_type": "ANALYTICAL"},
+    {"id": "FI-402", "name": "Flujo Isobutano", "unit": "ALK-400", "uom": "bpd", "min_val": 4000, "max_val": 4500, "tag_type": "FLOW"}
 ]
 
 # Tanques y Productos (Logística)
@@ -77,14 +78,14 @@ TANK_PRODUCTS = {
     "TK-400": {"prod": "Alquilado", "cap": 15000}
 }
 
-# Inventario (Almacén) - CORREGIDO: usamos 'quantity' en lugar de 'qty'
+# Inventario (Almacén)
 INVENTORY_ITEMS = [
-    {"item": "Catalizador FCC-ZSM5", "sku": "CAT-ZSM5", "quantity": 1500, "unit": "kg"},
-    {"item": "Inhibidor de Corrosión", "sku": "CHEM-CORR-01", "quantity": 800, "unit": "L"},
-    {"item": "Sosa Cáustica 50%", "sku": "CHEM-NAOH", "quantity": 2000, "unit": "L"},
-    {"item": "Aceite Lubricante ISO-68", "sku": "LUB-ISO68", "quantity": 45, "unit": "tambor"},
-    {"item": "Empaques Espirales 4\"", "sku": "GSK-SP-04", "quantity": 120, "unit": "pza"},
-    {"item": "Válvula de Seguridad 2\"", "sku": "PSV-02-CS", "quantity": 5, "unit": "pza"}
+    {"item": "Catalizador FCC-ZSM5", "sku": "CAT-ZSM5", "quantity": 1500, "unit": "kg", "status": "OK"},
+    {"item": "Inhibidor de Corrosión", "sku": "CHEM-CORR-01", "quantity": 800, "unit": "L", "status": "OK"},
+    {"item": "Sosa Cáustica 50%", "sku": "CHEM-NAOH", "quantity": 2000, "unit": "L", "status": "LOW"},
+    {"item": "Aceite Lubricante ISO-68", "sku": "LUB-ISO68", "quantity": 45, "unit": "tambor", "status": "OK"},
+    {"item": "Empaques Espirales 4\"", "sku": "GSK-SP-04", "quantity": 120, "unit": "pza", "status": "OK"},
+    {"item": "Válvula de Seguridad 2\"", "sku": "PSV-02-CS", "quantity": 5, "unit": "pza", "status": "CRITICAL"}
 ]
 
 # ==============================================================================
@@ -102,11 +103,11 @@ def validate_and_repair_schema():
     with engine.connect() as conn:
         transaction = conn.begin()
         try:
-            # --- 1. REPARACIÓN: INVENTORY (Error: column "item" does not exist) ---
+            # --- 1. REPARACIÓN: INVENTORY ---
             try:
                 conn.execute(text("SELECT item FROM inventory LIMIT 1"))
             except (ProgrammingError, OperationalError) as e:
-                logger.warning(f"⚠️ Tabla 'inventory' corrupta (Falta columna 'item'). Reconstruyendo... Error: {e}")
+                logger.warning(f"⚠️ Tabla 'inventory' corrupta. Reconstruyendo... Error: {e}")
                 transaction.rollback()
                 transaction = conn.begin()
                 conn.execute(text("DROP TABLE IF EXISTS inventory CASCADE"))
@@ -124,11 +125,17 @@ def validate_and_repair_schema():
                 """))
                 logger.info("✅ Tabla 'inventory' reconstruida exitosamente.")
 
-            # --- 2. REPARACIÓN: PROCESS_TAGS (Error: column "min_val" does not exist) ---
+            # --- 2. REPARACIÓN: PROCESS_TAGS ---
             try:
                 conn.execute(text("SELECT min_val FROM process_tags LIMIT 1"))
+                # Agregar columnas faltantes
+                try:
+                    conn.execute(text("ALTER TABLE process_tags ADD COLUMN IF NOT EXISTS tag_type TEXT DEFAULT 'GENERAL'"))
+                    conn.execute(text("ALTER TABLE process_tags ADD COLUMN IF NOT EXISTS is_critical BOOLEAN DEFAULT FALSE"))
+                except:
+                    pass
             except (ProgrammingError, OperationalError) as e:
-                logger.warning(f"⚠️ Tabla 'process_tags' corrupta (Faltan límites). Reconstruyendo... Error: {e}")
+                logger.warning(f"⚠️ Tabla 'process_tags' corrupta. Reconstruyendo... Error: {e}")
                 transaction.rollback()
                 transaction = conn.begin()
                 conn.execute(text("DROP TABLE IF EXISTS process_tags CASCADE"))
@@ -140,52 +147,52 @@ def validate_and_repair_schema():
                         engineering_units TEXT,
                         min_val FLOAT,
                         max_val FLOAT,
-                        description TEXT
+                        description TEXT,
+                        tag_type TEXT DEFAULT 'GENERAL',
+                        is_critical BOOLEAN DEFAULT FALSE
                     )
                 """))
                 logger.info("✅ Tabla 'process_tags' reconstruida exitosamente.")
 
-            # --- 3. REPARACIÓN: PROCESS_UNITS (Error: column "description" does not exist) ---
+            # --- 3. REPARACIÓN: PROCESS_UNITS ---
             try:
-                conn.execute(text("SELECT description FROM process_units LIMIT 1"))
+                conn.execute(text("SELECT name FROM process_units LIMIT 1"))
+                # Agregar columnas faltantes
+                try:
+                    conn.execute(text("ALTER TABLE process_units ADD COLUMN IF NOT EXISTS capacity FLOAT"))
+                    conn.execute(text("ALTER TABLE process_units ADD COLUMN IF NOT EXISTS unit_status TEXT DEFAULT 'ACTIVE'"))
+                except:
+                    pass
             except (ProgrammingError, OperationalError) as e:
                 logger.warning(f"⚠️ Tabla 'process_units' obsoleta. Migrando... Error: {e}")
                 transaction.rollback()
                 transaction = conn.begin()
-                conn.execute(text("ALTER TABLE process_units ADD COLUMN IF NOT EXISTS description TEXT"))
-                logger.info("✅ Tabla 'process_units' migrada.")
-
-            # --- 4. REPARACIÓN: ENERGY_ANALYSIS (Error: column "consumption_kwh" missing) ---
-            try:
-                conn.execute(text("SELECT consumption_kwh FROM energy_analysis LIMIT 1"))
-            except (ProgrammingError, OperationalError) as e:
-                logger.warning(f"⚠️ Tabla 'energy_analysis' obsoleta. Reconstruyendo... Error: {e}")
-                transaction.rollback()
-                transaction = conn.begin()
-                conn.execute(text("DROP TABLE IF EXISTS energy_analysis CASCADE"))
+                conn.execute(text("DROP TABLE IF EXISTS process_units CASCADE"))
                 conn.execute(text("""
-                    CREATE TABLE energy_analysis (
-                        id SERIAL PRIMARY KEY,
-                        unit_id TEXT,
-                        efficiency_score FLOAT,
-                        consumption_kwh FLOAT,
-                        savings_potential FLOAT,
-                        recommendation TEXT,
-                        analysis_date TIMESTAMP DEFAULT NOW(),
-                        status TEXT
+                    CREATE TABLE process_units (
+                        unit_id TEXT PRIMARY KEY,
+                        name TEXT,
+                        type TEXT,
+                        description TEXT,
+                        capacity FLOAT,
+                        unit_status TEXT DEFAULT 'ACTIVE'
                     )
                 """))
-                logger.info("✅ Tabla 'energy_analysis' reconstruida.")
+                logger.info("✅ Tabla 'process_units' migrada.")
 
-            # --- 5. REPARACIÓN: TANKS (Error: column "last_updated" does not exist) ---
+            # --- 4. REPARACIÓN: EQUIPMENT ---
+            try:
+                conn.execute(text("SELECT manufacturer FROM equipment LIMIT 1"))
+            except (ProgrammingError, OperationalError) as e:
+                logger.warning(f"⚠️ Tabla 'equipment' sin columna 'manufacturer'. Migrando... Error: {e}")
+                transaction.rollback()
+                transaction = conn.begin()
+                conn.execute(text("ALTER TABLE equipment ADD COLUMN IF NOT EXISTS manufacturer TEXT"))
+                logger.info("✅ Tabla 'equipment' migrada.")
+
+            # --- 5. REPARACIÓN: TANKS ---
             try:
                 conn.execute(text("SELECT last_updated FROM tanks LIMIT 1"))
-                # Intentar agregar restricción UNIQUE si no existe
-                try:
-                    conn.execute(text("ALTER TABLE tanks ADD CONSTRAINT IF NOT EXISTS tanks_name_unique UNIQUE (name)"))
-                    logger.info("✅ Restricción UNIQUE agregada a 'tanks.name'.")
-                except Exception as e:
-                    logger.warning(f"⚠️ No se pudo agregar restricción UNIQUE a tanks: {e}")
             except (ProgrammingError, OperationalError) as e:
                 logger.warning(f"⚠️ Tabla 'tanks' corrupta. Reconstruyendo... Error: {e}")
                 transaction.rollback()
@@ -213,63 +220,81 @@ def validate_and_repair_schema():
             raise e
 
 # ==============================================================================
-# 4. POBLADO DE DATOS MAESTROS (MASTER DATA)
+# 4. POBLADO DE DATOS MAESTROS (MASTER DATA) - ACTUALIZADO
 # ==============================================================================
 
 def seed_master_data(conn):
     """Inserta los datos estáticos (Unidades, Equipos, Tags, Inventario Base)"""
     logger.info("🌱 Sembrando datos maestros...")
     
-    # 1. Unidades
+    # 1. Unidades (CON NOMBRES Y CAPACIDADES)
     for u in UNITS_CONFIG:
         conn.execute(text("""
-            INSERT INTO process_units (unit_id, name, type, description)
-            VALUES (:uid, :name, :type, :desc)
+            INSERT INTO process_units (unit_id, name, type, description, capacity, unit_status)
+            VALUES (:uid, :name, :type, :desc, :cap, :status)
             ON CONFLICT (unit_id) DO UPDATE SET 
                 name = EXCLUDED.name, 
-                description = EXCLUDED.description
-        """), {"uid": u["id"], "name": u["name"], "type": u["type"], "desc": u["desc"]})
+                description = EXCLUDED.description,
+                capacity = EXCLUDED.capacity,
+                unit_status = EXCLUDED.unit_status
+        """), {
+            "uid": u["id"], 
+            "name": u["name"], 
+            "type": u["type"], 
+            "desc": u["desc"],
+            "cap": u.get("capacity", 0),
+            "status": u.get("status", "ACTIVE")
+        })
 
-    # 2. Equipos
+    # 2. Equipos (CON FABRICANTES)
     for eq in EQUIPMENT_CONFIG:
         conn.execute(text("""
-            INSERT INTO equipment (equipment_id, equipment_name, equipment_type, unit_id, status)
-            VALUES (:id, :name, :type, :unit, 'OPERATIONAL')
+            INSERT INTO equipment (equipment_id, equipment_name, equipment_type, unit_id, status, manufacturer)
+            VALUES (:id, :name, :type, :unit, 'OPERATIONAL', :manufacturer)
             ON CONFLICT (equipment_id) DO UPDATE SET 
                 equipment_name = EXCLUDED.equipment_name,
-                unit_id = EXCLUDED.unit_id
-        """), eq)
+                unit_id = EXCLUDED.unit_id,
+                manufacturer = EXCLUDED.manufacturer
+        """), {
+            "id": eq["id"],
+            "name": eq["name"],
+            "type": eq["type"],
+            "unit": eq["unit"],
+            "manufacturer": eq.get("manufacturer", "Desconocido")
+        })
 
-    # 3. Tags (Sensores) - CORREGIDO: usamos min_val y max_val
+    # 3. Tags (Sensores) - INCLUYE CORRIENTE MOTOR
     for tag in TAGS_CONFIG:
         conn.execute(text("""
-            INSERT INTO process_tags (tag_id, tag_name, unit_id, engineering_units, min_val, max_val)
-            VALUES (:id, :name, :unit, :uom, :min_val, :max_val)
+            INSERT INTO process_tags (tag_id, tag_name, unit_id, engineering_units, min_val, max_val, tag_type)
+            VALUES (:id, :name, :unit, :uom, :min_val, :max_val, :tag_type)
             ON CONFLICT (tag_id) DO UPDATE SET 
-                min_val = EXCLUDED.min_val,
-                max_val = EXCLUDED.max_val
+                tag_name = EXCLUDED.tag_name,
+                tag_type = EXCLUDED.tag_type
         """), {
             "id": tag["id"], 
             "name": tag["name"], 
             "unit": tag["unit"], 
             "uom": tag["uom"], 
             "min_val": tag["min_val"], 
-            "max_val": tag["max_val"]
+            "max_val": tag["max_val"],
+            "tag_type": tag.get("tag_type", "GENERAL")
         })
 
-    # 4. Inventario (Fix para "Producto Desconocido")
+    # 4. Inventario
     for inv in INVENTORY_ITEMS:
         # Verificamos si existe por SKU
         exists = conn.execute(text("SELECT id FROM inventory WHERE sku = :sku"), {"sku": inv["sku"]}).scalar()
         if not exists:
             conn.execute(text("""
-                INSERT INTO inventory (item, sku, quantity, unit, status)
-                VALUES (:item, :sku, :quantity, :unit, 'OK')
+                INSERT INTO inventory (item, sku, quantity, unit, status, location)
+                VALUES (:item, :sku, :quantity, :unit, :status, 'Almacén Central')
             """), {
                 "item": inv["item"], 
                 "sku": inv["sku"], 
                 "quantity": inv["quantity"], 
-                "unit": inv["unit"]
+                "unit": inv["unit"],
+                "status": inv["status"]
             })
 
 # ==============================================================================
@@ -280,21 +305,25 @@ def simulate_process_dynamics(conn):
     """Genera datos de sensores, KPIs y movimiento de tanques."""
     logger.info("⚡ Simulando dinámica de planta...")
     
-    # A. Sensores (Process Data)
+    # A. Sensores (Process Data) - CON MEJOR CALIDAD
     for tag in TAGS_CONFIG:
         # Generar valor con ruido gaussiano
         center = (tag["min_val"] + tag["max_val"]) / 2
         sigma = (tag["max_val"] - tag["min_val"]) / 6
         val = random.gauss(center, sigma)
         
+        # 80% de probabilidad de buena calidad, 20% dudosa
+        quality = 192 if random.random() > 0.2 else 128
+        
         conn.execute(text("""
             INSERT INTO process_data (timestamp, unit_id, tag_id, value, quality)
-            VALUES (:ts, :uid, :tid, :val, 192)
+            VALUES (:ts, :uid, :tid, :val, :quality)
         """), {
             "ts": datetime.now(), 
             "uid": tag["unit"], 
             "tid": tag["id"], 
-            "val": round(val, 2)
+            "val": round(val, 2),
+            "quality": quality
         })
 
     # B. KPIs de Producción (Dashboard)
@@ -313,41 +342,25 @@ def simulate_process_dynamics(conn):
             "th": round(thru, 0)
         })
 
-    # C. Dinámica de Tanques (Suben y bajan suavemente)
+    # C. Dinámica de Tanques
     tanks = conn.execute(text("SELECT id, name, capacity, current_level, status FROM tanks")).fetchall()
     
     if not tanks:
         # Inicializar si vacío
         for name, info in TANK_PRODUCTS.items():
-            # Primero verificar si ya existe
-            existing = conn.execute(text("SELECT id FROM tanks WHERE name = :name"), {"name": name}).fetchone()
-            if existing:
-                # Actualizar si existe
-                conn.execute(text("""
-                    UPDATE tanks SET product = :p, capacity = :c, current_level = :l, 
-                    status = 'STABLE', last_updated = NOW() 
-                    WHERE id = :id
-                """), {
-                    "id": existing[0],
-                    "p": info['prod'], 
-                    "c": info['cap'], 
-                    "l": info['cap'] * 0.6
-                })
-            else:
-                # Insertar si no existe
-                conn.execute(text("""
-                    INSERT INTO tanks (name, product, capacity, current_level, status, last_updated)
-                    VALUES (:n, :p, :c, :l, 'STABLE', NOW())
-                """), {
-                    "n": name, 
-                    "p": info['prod'], 
-                    "c": info['cap'], 
-                    "l": info['cap'] * 0.6
-                })
+            conn.execute(text("""
+                INSERT INTO tanks (name, product, capacity, current_level, status, last_updated)
+                VALUES (:n, :p, :c, :l, 'STABLE', NOW())
+            """), {
+                "n": name, 
+                "p": info['prod'], 
+                "c": info['cap'], 
+                "l": info['cap'] * 0.6
+            })
     else:
         for t in tanks:
             tid, tname, cap, level, status = t
-            delta = cap * 0.015  # 1.5% de cambio
+            delta = cap * 0.015
             
             new_lvl = level
             new_status = status
@@ -379,7 +392,6 @@ def manage_alerts_lifecycle(conn):
     Ciclo de vida de alertas:
     1. Reconoce automáticamente alertas viejas (Self-Healing).
     2. Genera nuevas alertas ocasionalmente.
-    Esto arregla que la 'Salud de Activos' se quede en 0.
     """
     logger.info("⚠️ Gestionando alertas...")
     
@@ -420,7 +432,7 @@ def backfill_missing_history(conn):
     logger.info("🕰️ Verificando historial de 24h...")
     count = conn.execute(text("SELECT COUNT(*) FROM kpis WHERE timestamp > NOW() - INTERVAL '24 hours'")).scalar()
     
-    if count < 20:  # Si hay muy pocos datos
+    if count < 20:
         logger.info("   ↳ Generando historial retroactivo...")
         now = datetime.now()
         for i in range(24):

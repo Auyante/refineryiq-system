@@ -272,13 +272,13 @@ const NormalizedDataViewer = () => {
               <td>
                 <span style={{
                   padding: '4px 8px',
-                  background: row.quality === 1 ? '#D1FAE5' : '#FEF3C7',
-                  color: row.quality === 1 ? '#065F46' : '#92400E',
+                  background: row.quality === 192 || row.quality === 1 ? '#D1FAE5' : '#FEF3C7',
+                  color: row.quality === 192 || row.quality === 1 ? '#065F46' : '#92400E',
                   borderRadius: '4px',
                   fontSize: '11px',
                   fontWeight: '500'
                 }}>
-                  {row.quality === 1 ? '✓ Buena' : '⚠️ Dudosa'}
+                  {row.quality === 192 || row.quality === 1 ? '✓ Buena' : '⚠️ Dudosa
                 </span>
               </td>
             </tr>

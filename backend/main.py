@@ -166,19 +166,38 @@ def create_tables_if_not_exist():
             # 1. USUARIOS
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY, username TEXT UNIQUE, hashed_password TEXT, full_name TEXT, role TEXT, created_at TIMESTAMP DEFAULT NOW()
+                    id SERIAL PRIMARY KEY, 
+                    username TEXT UNIQUE, 
+                    hashed_password TEXT, 
+                    full_name TEXT, 
+                    role TEXT, 
+                    created_at TIMESTAMP DEFAULT NOW()
                 );
             """))
 
             # 2. OPERACIONES
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS kpis (
-                    id SERIAL PRIMARY KEY, timestamp TIMESTAMP, unit_id TEXT, energy_efficiency FLOAT, throughput FLOAT, quality_score FLOAT, maintenance_score FLOAT
+                    id SERIAL PRIMARY KEY, 
+                    timestamp TIMESTAMP, 
+                    unit_id TEXT, 
+                    energy_efficiency FLOAT, 
+                    throughput FLOAT, 
+                    quality_score FLOAT, 
+                    maintenance_score FLOAT
                 );
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS alerts (
-                    id SERIAL PRIMARY KEY, timestamp TIMESTAMP, unit_id TEXT, tag_id TEXT, value FLOAT, threshold FLOAT, severity TEXT, message TEXT, acknowledged BOOLEAN DEFAULT FALSE
+                    id SERIAL PRIMARY KEY, 
+                    timestamp TIMESTAMP, 
+                    unit_id TEXT, 
+                    tag_id TEXT, 
+                    value FLOAT, 
+                    threshold FLOAT, 
+                    severity TEXT, 
+                    message TEXT, 
+                    acknowledged BOOLEAN DEFAULT FALSE
                 );
             """))
             
@@ -196,41 +215,85 @@ def create_tables_if_not_exist():
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS inventory (
-                    id SERIAL PRIMARY KEY, item TEXT, sku TEXT UNIQUE, quantity FLOAT, unit TEXT, status TEXT, location TEXT, last_updated TIMESTAMP DEFAULT NOW()
+                    id SERIAL PRIMARY KEY, 
+                    item TEXT, 
+                    sku TEXT UNIQUE, 
+                    quantity FLOAT, 
+                    unit TEXT, 
+                    status TEXT, 
+                    location TEXT, 
+                    last_updated TIMESTAMP DEFAULT NOW()
                 );
             """))
             
             # 4. NORMALIZACIÓN
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS process_units (
-                    unit_id TEXT PRIMARY KEY, name TEXT, type TEXT, description TEXT
+                    unit_id TEXT PRIMARY KEY, 
+                    name TEXT, 
+                    type TEXT, 
+                    description TEXT,
+                    capacity FLOAT,
+                    unit_status TEXT DEFAULT 'ACTIVE'
                 );
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS process_tags (
-                    tag_id TEXT PRIMARY KEY, tag_name TEXT, unit_id TEXT, engineering_units TEXT, min_val FLOAT, max_val FLOAT, description TEXT
+                    tag_id TEXT PRIMARY KEY, 
+                    tag_name TEXT, 
+                    unit_id TEXT, 
+                    engineering_units TEXT, 
+                    min_val FLOAT, 
+                    max_val FLOAT, 
+                    description TEXT,
+                    tag_type TEXT DEFAULT 'GENERAL',
+                    is_critical BOOLEAN DEFAULT FALSE
                 );
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS equipment (
-                    equipment_id TEXT PRIMARY KEY, equipment_name TEXT, equipment_type TEXT, unit_id TEXT, status TEXT, installation_date TIMESTAMP
+                    equipment_id TEXT PRIMARY KEY, 
+                    equipment_name TEXT, 
+                    equipment_type TEXT, 
+                    unit_id TEXT, 
+                    status TEXT, 
+                    manufacturer TEXT,
+                    installation_date TIMESTAMP
                 );
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS process_data (
-                    id SERIAL PRIMARY KEY, timestamp TIMESTAMP, unit_id TEXT, tag_id TEXT, value FLOAT, quality INTEGER
+                    id SERIAL PRIMARY KEY, 
+                    timestamp TIMESTAMP, 
+                    unit_id TEXT, 
+                    tag_id TEXT, 
+                    value FLOAT, 
+                    quality INTEGER
                 );
             """))
             
             # 5. ML & ENERGY
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS maintenance_predictions (
-                    id SERIAL PRIMARY KEY, equipment_id TEXT, failure_probability FLOAT, prediction TEXT, recommendation TEXT, timestamp TIMESTAMP, confidence FLOAT
+                    id SERIAL PRIMARY KEY, 
+                    equipment_id TEXT, 
+                    failure_probability FLOAT, 
+                    prediction TEXT, 
+                    recommendation TEXT, 
+                    timestamp TIMESTAMP, 
+                    confidence FLOAT
                 );
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS energy_analysis (
-                    id SERIAL PRIMARY KEY, unit_id TEXT, efficiency_score FLOAT, consumption_kwh FLOAT, savings_potential FLOAT, recommendation TEXT, analysis_date TIMESTAMP, status TEXT
+                    id SERIAL PRIMARY KEY, 
+                    unit_id TEXT, 
+                    efficiency_score FLOAT, 
+                    consumption_kwh FLOAT, 
+                    savings_potential FLOAT, 
+                    recommendation TEXT, 
+                    analysis_date TIMESTAMP, 
+                    status TEXT
                 );
             """))
             
