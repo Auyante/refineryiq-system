@@ -6,7 +6,7 @@ import {
   FiCheck, FiX, FiAlertCircle, FiThermometer, FiDroplet,
   FiClock, FiActivity
 } from 'react-icons/fi';
-
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 const NormalizedDataViewer = () => {
   const [activeTab, setActiveTab] = useState('units');
   const [units, setUnits] = useState([]);
@@ -22,34 +22,34 @@ const NormalizedDataViewer = () => {
     setError(null);
     
     try {
-      // Obtener estadísticas
-      const statsResponse = await axios.get('http://192.168.1.108:8000/api/normalized/stats');
+      // 1. Obtener estadísticas (Fíjate en las comillas invertidas ` `)
+      const statsResponse = await axios.get(`${API_URL}/api/normalized/stats`);
       setStats(statsResponse.data);
 
-      // Obtener datos según la pestaña activa
+      // 2. Obtener datos según la pestaña activa
       switch (activeTab) {
         case 'units':
-          const unitsResponse = await axios.get('http://192.168.1.108:8000/api/normalized/units');
+          const unitsResponse = await axios.get(`${API_URL}/api/normalized/units`);
           setUnits(unitsResponse.data);
           break;
         case 'tags':
-          const tagsResponse = await axios.get('http://192.168.1.108:8000/api/normalized/tags');
+          const tagsResponse = await axios.get(`${API_URL}/api/normalized/tags`);
           setTags(tagsResponse.data);
           break;
         case 'equipment':
-          const eqResponse = await axios.get('http://192.168.1.108:8000/api/normalized/equipment');
+          const eqResponse = await axios.get(`${API_URL}/api/normalized/equipment`);
           setEquipment(eqResponse.data);
           break;
         case 'enriched':
-          const enrichedResponse = await axios.get('http://192.168.1.108:8000/api/normalized/process-data/enriched?limit=50');
+          const enrichedResponse = await axios.get(`${API_URL}/api/normalized/process-data/enriched?limit=50`);
           setEnrichedData(enrichedResponse.data);
           break;
         case 'stats':
-          // Ya tenemos stats
           break;
         default:
           break;
-      }
+    }
+// ... resto del código ...
     } catch (error) {
       console.error('Error fetching normalized data:', error);
       setError('No se pudo conectar a la API normalizada. ¿Ejecutaste la migración?');

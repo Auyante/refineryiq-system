@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiAlertTriangle, FiCheckCircle, FiClock, FiFilter } from 'react-icons/fi';
-
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 const Alerts = () => {
   const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
-    axios.get('http://192.168.1.108:8000/api/alerts/history')
+    // Usar comillas invertidas ` `
+    axios.get(`${API_URL}/api/alerts/history`)
       .then(res => setAlerts(res.data))
       .catch(err => console.error(err));
-  }, []);
+}, []);
 
   return (
     <div className="page-container">

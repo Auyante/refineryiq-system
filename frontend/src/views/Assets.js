@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FiSearch, FiCheckCircle, FiTool } from 'react-icons/fi';
 import '../App.css'; // Importando estilos globales
-
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 const Assets = () => {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -10,13 +10,13 @@ const Assets = () => {
 
   useEffect(() => {
     // Conectando al endpoint de inventario
-    axios.get('http://192.168.1.108:8000/api/assets/overview')
+    axios.get(`${API_URL}/api/assets/overview`)
       .then(res => {
-        setAssets(res.data);
+       setAssets(res.data);
         setLoading(false);
       })
       .catch(err => {
-        console.error("Error cargando activos:", err);
+       console.error("Error cargando activos:", err);
         setLoading(false);
       });
   }, []);

@@ -56,8 +56,39 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Configuración - según lo detectado por detect_postgres.py
-DATABASE_URL = "postgresql://postgres:307676@localhost:5432/refineryiq"
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+# ==============================================================================
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+# ==============================================================================
+# CONEXIÓN INTELIGENTE (Detecta Nube vs Casa)
+# ==============================================================================
+
+# 1. BUSCAR LA VARIABLE:
+#    El código pregunta: "¿Existe una variable 'DATABASE_URL' en el sistema?"
+#    - SI ESTAMOS EN RENDER: Sí existe, y tomará la URL externa automáticamente.
+#    - SI ESTAMOS EN TU PC: No existe, así que usará la que está después de la coma (localhost).
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:307676@localhost:5432/refineryiq")
+
+# 2. PARCHE PARA RENDER:
+#    Render a veces entrega la URL como "postgres://", pero Python necesita "postgresql://"
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# 3. CREAR EL MOTOR:
+engine = create_engine(DATABASE_URL)
+
+# 4. PREPARAR SESIÓN:
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+# ==============================================================================
 
 # Modelos EXISTENTES
 class ProcessData(BaseModel):
@@ -1085,18 +1116,11 @@ async def generate_daily_report():
         return HTMLResponse(content=f"Error generando reporte: {str(e)}", status_code=500)
 
 if __name__ == "__main__":
+    # Imprimimos localhost para no confundir
     print("\n" + "="*60)
-    print("🚀 REFINERYIQ BACKEND - VERSION 2.0")
+    print("🚀 REFINERYIQ BACKEND - INICIANDO MODO LOCAL")
     print("="*60)
-    print("Endpoints principales:")
-    print("  http://192.168.1.108:8000/              - Estado del sistema")
-    print("  http://192.168.1.108:8000/api/kpis      - KPIs en tiempo real")
-    print("  http://192.168.1.108:8000/api/alerts    - Alertas del sistema")
-    print("  http://192.168.1.108:8000/docs          - Documentación API")
-    print("\nEndpoints de normalización:")
-    print("  http://192.168.1.108:8000/api/normalized/units  - Unidades")
-    print("  http://192.168.1.108:8000/api/normalized/tags   - Variables")
-    print("  http://192.168.1.108:8000/api/normalized/stats  - Estadísticas BD")
+    print("Docs: http://localhost:8000/docs")
     print("="*60 + "\n")
     
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

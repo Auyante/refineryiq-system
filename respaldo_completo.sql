@@ -1,0 +1,8786 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict jV8INA0A5pVZLwfQQXdLuKwIjp2ZS0sIdnA3iqHLplyeOF0BzTozhfUNN21DILe
+
+-- Dumped from database version 18.1
+-- Dumped by pg_dump version 18.1
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: alert_severity; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.alert_severity (
+    severity_code character varying(10) NOT NULL,
+    severity_name character varying(50) NOT NULL,
+    color_hex character varying(7),
+    icon_name character varying(50),
+    response_time_minutes integer,
+    notification_required boolean DEFAULT true,
+    auto_escalate boolean DEFAULT false,
+    description text
+);
+
+
+ALTER TABLE public.alert_severity OWNER TO postgres;
+
+--
+-- Name: alerts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.alerts (
+    id integer NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now(),
+    unit_id character varying(20),
+    tag_id character varying(50),
+    message text,
+    severity character varying(10),
+    acknowledged boolean DEFAULT false,
+    acknowledged_at timestamp with time zone,
+    acknowledged_by character varying(50),
+    value double precision,
+    threshold double precision
+);
+
+
+ALTER TABLE public.alerts OWNER TO postgres;
+
+--
+-- Name: process_tags; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_tags (
+    tag_id character varying(50) NOT NULL,
+    tag_name character varying(100) NOT NULL,
+    description text,
+    unit_id character varying(20),
+    tag_type character varying(50),
+    engineering_units character varying(20),
+    data_type character varying(20) DEFAULT 'FLOAT'::character varying,
+    min_value double precision,
+    max_value double precision,
+    normal_range_min double precision,
+    normal_range_max double precision,
+    critical_threshold double precision,
+    is_critical boolean DEFAULT false,
+    sampling_rate integer DEFAULT 1,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.process_tags OWNER TO postgres;
+
+--
+-- Name: process_units; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_units (
+    unit_id character varying(20) NOT NULL,
+    unit_name character varying(100) NOT NULL,
+    unit_type character varying(50) NOT NULL,
+    description text,
+    capacity double precision,
+    location character varying(100),
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    metadata jsonb DEFAULT '{}'::jsonb
+);
+
+
+ALTER TABLE public.process_units OWNER TO postgres;
+
+--
+-- Name: alerts_enriched; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.alerts_enriched AS
+ SELECT a.id,
+    a."timestamp",
+    a.unit_id,
+    pu.unit_name,
+    a.tag_id,
+    pt.tag_name,
+    a.value,
+    a.threshold,
+    a.severity,
+    asev.severity_name,
+    asev.color_hex,
+    a.message,
+    a.acknowledged,
+    (a.value - a.threshold) AS deviation,
+        CASE
+            WHEN (a.value > a.threshold) THEN 'ABOVE'::text
+            WHEN (a.value < a.threshold) THEN 'BELOW'::text
+            ELSE 'EQUAL'::text
+        END AS deviation_direction
+   FROM (((public.alerts a
+     LEFT JOIN public.process_units pu ON (((a.unit_id)::text = (pu.unit_id)::text)))
+     LEFT JOIN public.process_tags pt ON (((a.tag_id)::text = (pt.tag_id)::text)))
+     LEFT JOIN public.alert_severity asev ON (((a.severity)::text = (asev.severity_code)::text)))
+  ORDER BY a."timestamp" DESC;
+
+
+ALTER VIEW public.alerts_enriched OWNER TO postgres;
+
+--
+-- Name: alerts_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.alerts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.alerts_id_seq OWNER TO postgres;
+
+--
+-- Name: alerts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.alerts_id_seq OWNED BY public.alerts.id;
+
+
+--
+-- Name: backup_process_data_20260122_174830; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.backup_process_data_20260122_174830 (
+    id integer,
+    "time" timestamp with time zone,
+    unit_id character varying(20),
+    tag_id character varying(50),
+    value double precision,
+    quality integer,
+    created_at timestamp with time zone
+);
+
+
+ALTER TABLE public.backup_process_data_20260122_174830 OWNER TO postgres;
+
+--
+-- Name: backup_process_data_20260131_142318; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.backup_process_data_20260131_142318 (
+    id integer,
+    "time" timestamp with time zone,
+    unit_id character varying(20),
+    tag_id character varying(50),
+    value double precision,
+    quality integer,
+    created_at timestamp with time zone
+);
+
+
+ALTER TABLE public.backup_process_data_20260131_142318 OWNER TO postgres;
+
+--
+-- Name: backup_process_data_20260131_142629; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.backup_process_data_20260131_142629 (
+    id integer,
+    "time" timestamp with time zone,
+    unit_id character varying(20),
+    tag_id character varying(50),
+    value double precision,
+    quality integer,
+    created_at timestamp with time zone
+);
+
+
+ALTER TABLE public.backup_process_data_20260131_142629 OWNER TO postgres;
+
+--
+-- Name: efficiency_status; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.efficiency_status (
+    status_code character varying(20) NOT NULL,
+    status_name character varying(50) NOT NULL,
+    min_score double precision,
+    max_score double precision,
+    color_hex character varying(7),
+    icon_name character varying(50),
+    description text
+);
+
+
+ALTER TABLE public.efficiency_status OWNER TO postgres;
+
+--
+-- Name: energy_analysis; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.energy_analysis (
+    id integer NOT NULL,
+    unit_id character varying(20),
+    analysis_date date,
+    avg_energy_consumption double precision,
+    benchmark double precision,
+    target double precision,
+    efficiency_score double precision,
+    status character varying(20),
+    inefficiencies jsonb,
+    recommendations jsonb,
+    estimated_savings double precision,
+    "timestamp" timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.energy_analysis OWNER TO postgres;
+
+--
+-- Name: energy_analysis_enriched; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.energy_analysis_enriched AS
+ SELECT ea.id,
+    ea.unit_id,
+    pu.unit_name,
+    ea.analysis_date,
+    ea.avg_energy_consumption,
+    ea.benchmark,
+    ea.target,
+    ea.efficiency_score,
+    ea.status,
+    es.status_name,
+    es.color_hex,
+    ea.inefficiencies,
+    ea.recommendations,
+    ea.estimated_savings,
+    ea."timestamp",
+    round(((((ea.benchmark - ea.avg_energy_consumption) / NULLIF(ea.benchmark, (0)::double precision)) * (100)::double precision))::numeric, 2) AS improvement_percentage
+   FROM ((public.energy_analysis ea
+     LEFT JOIN public.process_units pu ON (((ea.unit_id)::text = (pu.unit_id)::text)))
+     LEFT JOIN public.efficiency_status es ON (((ea.status)::text = (es.status_code)::text)))
+  ORDER BY ea.analysis_date DESC, ea.unit_id;
+
+
+ALTER VIEW public.energy_analysis_enriched OWNER TO postgres;
+
+--
+-- Name: energy_analysis_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.energy_analysis_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.energy_analysis_id_seq OWNER TO postgres;
+
+--
+-- Name: energy_analysis_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.energy_analysis_id_seq OWNED BY public.energy_analysis.id;
+
+
+--
+-- Name: equipment; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.equipment (
+    equipment_id character varying(50) NOT NULL,
+    equipment_name character varying(100) NOT NULL,
+    equipment_type character varying(50) NOT NULL,
+    unit_id character varying(20),
+    manufacturer character varying(100),
+    model character varying(100),
+    serial_number character varying(100),
+    installation_date date,
+    maintenance_interval integer,
+    last_maintenance_date date,
+    operating_hours double precision DEFAULT 0,
+    status character varying(20) DEFAULT 'OPERATIONAL'::character varying,
+    specifications jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.equipment OWNER TO postgres;
+
+--
+-- Name: inventory; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.inventory (
+    id integer NOT NULL,
+    item_name character varying(100),
+    category character varying(50),
+    quantity integer,
+    min_level integer,
+    location character varying(50)
+);
+
+
+ALTER TABLE public.inventory OWNER TO postgres;
+
+--
+-- Name: inventory_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.inventory_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.inventory_id_seq OWNER TO postgres;
+
+--
+-- Name: inventory_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.inventory_id_seq OWNED BY public.inventory.id;
+
+
+--
+-- Name: kpis; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kpis (
+    id integer NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now(),
+    unit_id character varying(20) NOT NULL,
+    energy_efficiency double precision,
+    throughput double precision,
+    quality_score double precision,
+    maintenance_score double precision
+);
+
+
+ALTER TABLE public.kpis OWNER TO postgres;
+
+--
+-- Name: kpis_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.kpis_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.kpis_id_seq OWNER TO postgres;
+
+--
+-- Name: kpis_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.kpis_id_seq OWNED BY public.kpis.id;
+
+
+--
+-- Name: maintenance_predictions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.maintenance_predictions (
+    id integer NOT NULL,
+    equipment_id character varying(50),
+    equipment_type character varying(50),
+    unit_id character varying(20),
+    failure_probability double precision,
+    prediction character varying(50),
+    confidence double precision,
+    recommendation text,
+    "timestamp" timestamp with time zone DEFAULT now(),
+    features jsonb
+);
+
+
+ALTER TABLE public.maintenance_predictions OWNER TO postgres;
+
+--
+-- Name: maintenance_predictions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.maintenance_predictions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.maintenance_predictions_id_seq OWNER TO postgres;
+
+--
+-- Name: maintenance_predictions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.maintenance_predictions_id_seq OWNED BY public.maintenance_predictions.id;
+
+
+--
+-- Name: process_data; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.process_data (
+    id integer NOT NULL,
+    "timestamp" timestamp with time zone CONSTRAINT process_data_time_not_null NOT NULL,
+    unit_id character varying(20) NOT NULL,
+    tag_id character varying(50) NOT NULL,
+    value double precision NOT NULL,
+    quality integer DEFAULT 1,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.process_data OWNER TO postgres;
+
+--
+-- Name: process_data_enriched; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.process_data_enriched AS
+ SELECT pd.id,
+    pd."timestamp",
+    pd.unit_id,
+    pu.unit_name,
+    pd.tag_id,
+    pt.tag_name,
+    pd.value,
+    pd.quality,
+    pt.engineering_units,
+    pt.tag_type
+   FROM ((public.process_data pd
+     LEFT JOIN public.process_units pu ON (((pd.unit_id)::text = (pu.unit_id)::text)))
+     LEFT JOIN public.process_tags pt ON (((pd.tag_id)::text = (pt.tag_id)::text)))
+  ORDER BY pd."timestamp" DESC;
+
+
+ALTER VIEW public.process_data_enriched OWNER TO postgres;
+
+--
+-- Name: process_data_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.process_data_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.process_data_id_seq OWNER TO postgres;
+
+--
+-- Name: process_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.process_data_id_seq OWNED BY public.process_data.id;
+
+
+--
+-- Name: tanks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tanks (
+    id integer NOT NULL,
+    name character varying(50),
+    product character varying(50),
+    current_level double precision,
+    capacity double precision,
+    status character varying(20)
+);
+
+
+ALTER TABLE public.tanks OWNER TO postgres;
+
+--
+-- Name: tanks_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.tanks_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.tanks_id_seq OWNER TO postgres;
+
+--
+-- Name: tanks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.tanks_id_seq OWNED BY public.tanks.id;
+
+
+--
+-- Name: alerts id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.alerts ALTER COLUMN id SET DEFAULT nextval('public.alerts_id_seq'::regclass);
+
+
+--
+-- Name: energy_analysis id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.energy_analysis ALTER COLUMN id SET DEFAULT nextval('public.energy_analysis_id_seq'::regclass);
+
+
+--
+-- Name: inventory id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory ALTER COLUMN id SET DEFAULT nextval('public.inventory_id_seq'::regclass);
+
+
+--
+-- Name: kpis id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kpis ALTER COLUMN id SET DEFAULT nextval('public.kpis_id_seq'::regclass);
+
+
+--
+-- Name: maintenance_predictions id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.maintenance_predictions ALTER COLUMN id SET DEFAULT nextval('public.maintenance_predictions_id_seq'::regclass);
+
+
+--
+-- Name: process_data id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_data ALTER COLUMN id SET DEFAULT nextval('public.process_data_id_seq'::regclass);
+
+
+--
+-- Name: tanks id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tanks ALTER COLUMN id SET DEFAULT nextval('public.tanks_id_seq'::regclass);
+
+
+--
+-- Data for Name: alert_severity; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.alert_severity (severity_code, severity_name, color_hex, icon_name, response_time_minutes, notification_required, auto_escalate, description) FROM stdin;
+HIGH	Alta	#FF0000	alert-triangle	15	t	t	Requiere acción inmediata
+MEDIUM	Media	#FFA500	alert-circle	60	t	f	Requiere atención pronto
+LOW	Baja	#FFFF00	info	240	f	f	Monitorear
+INFO	Informativa	#3B82F6	info	0	f	f	Solo informativa
+\.
+
+
+--
+-- Data for Name: alerts; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.alerts (id, "timestamp", unit_id, tag_id, message, severity, acknowledged, acknowledged_at, acknowledged_by, value, threshold) FROM stdin;
+2	2026-01-16 08:52:37.174329-04	CDU-101	PRESS_TOWER	PresiÃ³n fuera de rango normal	MEDIUM	f	\N	\N	\N	\N
+3	2026-01-16 08:54:55.229978-04	FCC-201	TEMP_REACTOR	Temperatura elevada en reactor FCC	MEDIUM	f	\N	\N	\N	\N
+4	2026-01-16 08:54:55.229978-04	CDU-101	PRESS_TOWER	PresiÃ³n fuera de rango normal	MEDIUM	f	\N	\N	\N	\N
+1	2026-01-16 08:52:37.174329-04	FCC-201	TEMP_REACTOR	Temperatura elevada en reactor FCC	MEDIUM	t	\N	\N	\N	\N
+5	2026-01-30 16:11:38.837752-04	FCC-201	CATALYST_ACT	Vibración en Bomba de Alimentación	MEDIUM	t	\N	\N	177.8527188250007	90
+6	2026-01-31 06:11:38.978375-04	CDU-101	FLOW_FEED	Fuga detectada en brida	HIGH	t	\N	\N	122.27424668871203	90
+7	2026-01-31 11:11:38.978375-04	CDU-101	FLOW_FEED	Fuga detectada en brida	HIGH	t	\N	\N	159.64871442091135	90
+8	2026-01-31 01:11:38.978375-04	HT-301	TEMP_HYDRO	Nivel Bajo en Tanque de Retorno	LOW	t	\N	\N	151.40012453628808	90
+9	2026-01-30 20:11:38.978375-04	HT-301	H2_PRESS	Vibración en Bomba de Alimentación	MEDIUM	t	\N	\N	172.06596903863704	90
+10	2026-01-30 09:11:38.978375-04	CDU-101	PRESS_TOWER	Presión Crítica en Reactor	HIGH	t	\N	\N	181.1670056868919	90
+11	2026-01-30 19:11:38.978375-04	FCC-201	TEMP_REACTOR	Nivel Bajo en Tanque de Retorno	LOW	f	\N	\N	184.95650142890844	90
+12	2026-01-31 13:11:39.06341-04	CDU-101	PRESS_TOWER	Presión Crítica en Reactor	HIGH	f	\N	\N	139.43211284022095	90
+13	2026-01-30 09:11:39.06341-04	FCC-201	CATALYST_ACT	Presión Crítica en Reactor	HIGH	f	\N	\N	131.46558330281354	90
+14	2026-01-30 23:11:39.06341-04	FCC-201	TEMP_REACTOR	Fuga detectada en brida	HIGH	t	\N	\N	113.82024657294312	90
+\.
+
+
+--
+-- Data for Name: backup_process_data_20260122_174830; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.backup_process_data_20260122_174830 (id, "time", unit_id, tag_id, value, quality, created_at) FROM stdin;
+1	2026-01-16 13:03:27.796152-04	CDU-101	TEMP_TOWER	435.48	1	2026-01-16 09:03:31.52595-04
+2	2026-01-16 13:03:27.796232-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 09:03:31.52595-04
+3	2026-01-16 13:03:27.796255-04	CDU-101	FLOW_FEED	9105.04	1	2026-01-16 09:03:31.52595-04
+4	2026-01-16 13:03:27.796279-04	FCC-201	TEMP_REACTOR	345.33	1	2026-01-16 09:03:31.52595-04
+5	2026-01-16 13:03:27.796298-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 09:03:31.52595-04
+6	2026-01-16 13:03:27.796314-04	HT-301	TEMP_HYDRO	368.4	1	2026-01-16 09:03:31.52595-04
+7	2026-01-16 13:03:27.796332-04	HT-301	H2_PRESS	5.21	1	2026-01-16 09:03:31.52595-04
+8	2026-01-16 13:03:37.936045-04	CDU-101	TEMP_TOWER	397.79	1	2026-01-16 09:03:38.321619-04
+9	2026-01-16 13:03:37.936083-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:03:38.321619-04
+10	2026-01-16 13:03:37.936101-04	CDU-101	FLOW_FEED	11275.67	1	2026-01-16 09:03:38.321619-04
+11	2026-01-16 13:03:37.936115-04	FCC-201	TEMP_REACTOR	314.58	1	2026-01-16 09:03:38.321619-04
+12	2026-01-16 13:03:37.936131-04	FCC-201	CATALYST_ACT	94.92	1	2026-01-16 09:03:38.321619-04
+13	2026-01-16 13:03:37.936146-04	HT-301	TEMP_HYDRO	359.23	1	2026-01-16 09:03:38.321619-04
+14	2026-01-16 13:03:37.936159-04	HT-301	H2_PRESS	2.06	1	2026-01-16 09:03:38.321619-04
+15	2026-01-16 13:03:43.388523-04	CDU-101	TEMP_TOWER	453.53	1	2026-01-16 09:03:43.858564-04
+16	2026-01-16 13:03:43.388561-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 09:03:43.858564-04
+17	2026-01-16 13:03:43.388576-04	CDU-101	FLOW_FEED	9838.36	1	2026-01-16 09:03:43.858564-04
+18	2026-01-16 13:03:43.388591-04	FCC-201	TEMP_REACTOR	429.06	1	2026-01-16 09:03:43.858564-04
+19	2026-01-16 13:03:43.388605-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 09:03:43.858564-04
+20	2026-01-16 13:03:43.388619-04	HT-301	TEMP_HYDRO	475.95	1	2026-01-16 09:03:43.858564-04
+21	2026-01-16 13:03:43.388632-04	HT-301	H2_PRESS	4.36	1	2026-01-16 09:03:43.858564-04
+22	2026-01-16 13:03:48.903758-04	CDU-101	TEMP_TOWER	356.4	1	2026-01-16 09:03:49.102551-04
+23	2026-01-16 13:03:48.903801-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 09:03:49.102551-04
+24	2026-01-16 13:03:48.903817-04	CDU-101	FLOW_FEED	10528.7	1	2026-01-16 09:03:49.102551-04
+25	2026-01-16 13:03:48.903832-04	FCC-201	TEMP_REACTOR	475.5	1	2026-01-16 09:03:49.102551-04
+26	2026-01-16 13:03:48.903847-04	FCC-201	CATALYST_ACT	75.08	1	2026-01-16 09:03:49.102551-04
+27	2026-01-16 13:03:48.903862-04	HT-301	TEMP_HYDRO	341.99	1	2026-01-16 09:03:49.102551-04
+28	2026-01-16 13:03:48.903876-04	HT-301	H2_PRESS	4.96	1	2026-01-16 09:03:49.102551-04
+29	2026-01-16 13:04:04.159565-04	CDU-101	TEMP_TOWER	456.83	1	2026-01-16 09:04:04.629963-04
+30	2026-01-16 13:04:04.159602-04	CDU-101	PRESS_TOWER	5.33	1	2026-01-16 09:04:04.629963-04
+31	2026-01-16 13:04:04.159617-04	CDU-101	FLOW_FEED	8429.92	1	2026-01-16 09:04:04.629963-04
+32	2026-01-16 13:04:04.159631-04	FCC-201	TEMP_REACTOR	385.4	1	2026-01-16 09:04:04.629963-04
+33	2026-01-16 13:04:04.159646-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 09:04:04.629963-04
+34	2026-01-16 13:04:04.15966-04	HT-301	TEMP_HYDRO	351.18	1	2026-01-16 09:04:04.629963-04
+35	2026-01-16 13:04:04.159673-04	HT-301	H2_PRESS	5.31	1	2026-01-16 09:04:04.629963-04
+36	2026-01-16 13:04:19.688307-04	CDU-101	TEMP_TOWER	366.68	1	2026-01-16 09:04:20.267735-04
+37	2026-01-16 13:04:19.688343-04	CDU-101	PRESS_TOWER	4.44	1	2026-01-16 09:04:20.267735-04
+38	2026-01-16 13:04:19.688358-04	CDU-101	FLOW_FEED	9195.83	1	2026-01-16 09:04:20.267735-04
+39	2026-01-16 13:04:19.688372-04	FCC-201	TEMP_REACTOR	459.55	1	2026-01-16 09:04:20.267735-04
+40	2026-01-16 13:04:19.688387-04	FCC-201	CATALYST_ACT	90.44	1	2026-01-16 09:04:20.267735-04
+41	2026-01-16 13:04:19.6884-04	HT-301	TEMP_HYDRO	467.3	1	2026-01-16 09:04:20.267735-04
+42	2026-01-16 13:04:19.688413-04	HT-301	H2_PRESS	4.65	1	2026-01-16 09:04:20.267735-04
+43	2026-01-16 13:04:35.320255-04	CDU-101	TEMP_TOWER	479.73	1	2026-01-16 09:04:35.819354-04
+44	2026-01-16 13:04:35.320295-04	CDU-101	PRESS_TOWER	2.99	1	2026-01-16 09:04:35.819354-04
+45	2026-01-16 13:04:35.32031-04	CDU-101	FLOW_FEED	10685.03	1	2026-01-16 09:04:35.819354-04
+46	2026-01-16 13:04:35.320325-04	FCC-201	TEMP_REACTOR	414.4	1	2026-01-16 09:04:35.819354-04
+47	2026-01-16 13:04:35.320339-04	FCC-201	CATALYST_ACT	77.37	1	2026-01-16 09:04:35.819354-04
+48	2026-01-16 13:04:35.320353-04	HT-301	TEMP_HYDRO	477.04	1	2026-01-16 09:04:35.819354-04
+49	2026-01-16 13:04:35.320366-04	HT-301	H2_PRESS	2	1	2026-01-16 09:04:35.819354-04
+50	2026-01-16 13:04:50.868351-04	CDU-101	TEMP_TOWER	303.02	1	2026-01-16 09:04:51.32927-04
+51	2026-01-16 13:04:50.868388-04	CDU-101	PRESS_TOWER	4.58	1	2026-01-16 09:04:51.32927-04
+52	2026-01-16 13:04:50.868404-04	CDU-101	FLOW_FEED	8059.54	1	2026-01-16 09:04:51.32927-04
+53	2026-01-16 13:04:50.868418-04	FCC-201	TEMP_REACTOR	483.08	1	2026-01-16 09:04:51.32927-04
+54	2026-01-16 13:04:50.868432-04	FCC-201	CATALYST_ACT	94.46	1	2026-01-16 09:04:51.32927-04
+55	2026-01-16 13:04:50.868445-04	HT-301	TEMP_HYDRO	311.64	1	2026-01-16 09:04:51.32927-04
+56	2026-01-16 13:04:50.868458-04	HT-301	H2_PRESS	2.33	1	2026-01-16 09:04:51.32927-04
+57	2026-01-16 13:05:06.363567-04	CDU-101	TEMP_TOWER	427.64	1	2026-01-16 09:05:06.8233-04
+58	2026-01-16 13:05:06.363607-04	CDU-101	PRESS_TOWER	4.29	1	2026-01-16 09:05:06.8233-04
+59	2026-01-16 13:05:06.363622-04	CDU-101	FLOW_FEED	10755.15	1	2026-01-16 09:05:06.8233-04
+60	2026-01-16 13:05:06.363637-04	FCC-201	TEMP_REACTOR	408.77	1	2026-01-16 09:05:06.8233-04
+61	2026-01-16 13:05:06.363652-04	FCC-201	CATALYST_ACT	82.69	1	2026-01-16 09:05:06.8233-04
+62	2026-01-16 13:05:06.363665-04	HT-301	TEMP_HYDRO	347.47	1	2026-01-16 09:05:06.8233-04
+63	2026-01-16 13:05:06.363679-04	HT-301	H2_PRESS	5.37	1	2026-01-16 09:05:06.8233-04
+64	2026-01-16 13:05:21.875534-04	CDU-101	TEMP_TOWER	490.62	1	2026-01-16 09:05:22.349777-04
+65	2026-01-16 13:05:21.875572-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:22.349777-04
+66	2026-01-16 13:05:21.875587-04	CDU-101	FLOW_FEED	8355.27	1	2026-01-16 09:05:22.349777-04
+67	2026-01-16 13:05:21.875601-04	FCC-201	TEMP_REACTOR	442.57	1	2026-01-16 09:05:22.349777-04
+68	2026-01-16 13:05:21.875615-04	FCC-201	CATALYST_ACT	85.81	1	2026-01-16 09:05:22.349777-04
+69	2026-01-16 13:05:21.875628-04	HT-301	TEMP_HYDRO	386.37	1	2026-01-16 09:05:22.349777-04
+70	2026-01-16 13:05:21.875641-04	HT-301	H2_PRESS	4.31	1	2026-01-16 09:05:22.349777-04
+71	2026-01-16 13:05:37.37748-04	CDU-101	TEMP_TOWER	333.44	1	2026-01-16 09:05:37.967847-04
+72	2026-01-16 13:05:37.377522-04	CDU-101	PRESS_TOWER	2.45	1	2026-01-16 09:05:37.967847-04
+73	2026-01-16 13:05:37.377536-04	CDU-101	FLOW_FEED	10805.98	1	2026-01-16 09:05:37.967847-04
+74	2026-01-16 13:05:37.37755-04	FCC-201	TEMP_REACTOR	458.05	1	2026-01-16 09:05:37.967847-04
+75	2026-01-16 13:05:37.377564-04	FCC-201	CATALYST_ACT	85.74	1	2026-01-16 09:05:37.967847-04
+76	2026-01-16 13:05:37.377578-04	HT-301	TEMP_HYDRO	391.3	1	2026-01-16 09:05:37.967847-04
+77	2026-01-16 13:05:37.377591-04	HT-301	H2_PRESS	2.36	1	2026-01-16 09:05:37.967847-04
+78	2026-01-16 13:05:43.000343-04	CDU-101	TEMP_TOWER	442.57	1	2026-01-16 09:05:43.248149-04
+79	2026-01-16 13:05:43.000392-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:43.248149-04
+80	2026-01-16 13:05:43.00041-04	CDU-101	FLOW_FEED	10437.42	1	2026-01-16 09:05:43.248149-04
+81	2026-01-16 13:05:43.000427-04	FCC-201	TEMP_REACTOR	480.26	1	2026-01-16 09:05:43.248149-04
+82	2026-01-16 13:05:43.000442-04	FCC-201	CATALYST_ACT	89.69	1	2026-01-16 09:05:43.248149-04
+83	2026-01-16 13:05:43.000456-04	HT-301	TEMP_HYDRO	408.16	1	2026-01-16 09:05:43.248149-04
+84	2026-01-16 13:05:43.000471-04	HT-301	H2_PRESS	3.27	1	2026-01-16 09:05:43.248149-04
+85	2026-01-16 13:05:48.280753-04	CDU-101	TEMP_TOWER	384	1	2026-01-16 09:05:48.779269-04
+86	2026-01-16 13:05:48.280803-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 09:05:48.779269-04
+87	2026-01-16 13:05:48.280823-04	CDU-101	FLOW_FEED	8976.87	1	2026-01-16 09:05:48.779269-04
+88	2026-01-16 13:05:48.280837-04	FCC-201	TEMP_REACTOR	323.18	1	2026-01-16 09:05:48.779269-04
+89	2026-01-16 13:05:48.280852-04	FCC-201	CATALYST_ACT	90.7	1	2026-01-16 09:05:48.779269-04
+90	2026-01-16 13:05:48.280865-04	HT-301	TEMP_HYDRO	390.97	1	2026-01-16 09:05:48.779269-04
+91	2026-01-16 13:05:48.280879-04	HT-301	H2_PRESS	4.68	1	2026-01-16 09:05:48.779269-04
+92	2026-01-16 13:05:53.87347-04	CDU-101	TEMP_TOWER	309.65	1	2026-01-16 09:05:54.117406-04
+93	2026-01-16 13:05:53.873506-04	CDU-101	PRESS_TOWER	5.29	1	2026-01-16 09:05:54.117406-04
+94	2026-01-16 13:05:53.873521-04	CDU-101	FLOW_FEED	9258.11	1	2026-01-16 09:05:54.117406-04
+95	2026-01-16 13:05:53.873535-04	FCC-201	TEMP_REACTOR	421.63	1	2026-01-16 09:05:54.117406-04
+96	2026-01-16 13:05:53.873549-04	FCC-201	CATALYST_ACT	82.13	1	2026-01-16 09:05:54.117406-04
+97	2026-01-16 13:05:53.873563-04	HT-301	TEMP_HYDRO	354.51	1	2026-01-16 09:05:54.117406-04
+98	2026-01-16 13:05:53.873576-04	HT-301	H2_PRESS	4.04	1	2026-01-16 09:05:54.117406-04
+99	2026-01-16 13:05:59.145385-04	CDU-101	TEMP_TOWER	388.25	1	2026-01-16 09:05:59.607303-04
+100	2026-01-16 13:05:59.14543-04	CDU-101	PRESS_TOWER	4.2	1	2026-01-16 09:05:59.607303-04
+101	2026-01-16 13:05:59.145445-04	CDU-101	FLOW_FEED	8840.85	1	2026-01-16 09:05:59.607303-04
+102	2026-01-16 13:05:59.14546-04	FCC-201	TEMP_REACTOR	492.24	1	2026-01-16 09:05:59.607303-04
+103	2026-01-16 13:05:59.145475-04	FCC-201	CATALYST_ACT	85.85	1	2026-01-16 09:05:59.607303-04
+104	2026-01-16 13:05:59.145489-04	HT-301	TEMP_HYDRO	364.03	1	2026-01-16 09:05:59.607303-04
+105	2026-01-16 13:05:59.145504-04	HT-301	H2_PRESS	2.98	1	2026-01-16 09:05:59.607303-04
+106	2026-01-16 13:06:14.635842-04	CDU-101	TEMP_TOWER	472.18	1	2026-01-16 09:06:15.215849-04
+107	2026-01-16 13:06:14.635883-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 09:06:15.215849-04
+108	2026-01-16 13:06:14.635897-04	CDU-101	FLOW_FEED	8743.92	1	2026-01-16 09:06:15.215849-04
+109	2026-01-16 13:06:14.635912-04	FCC-201	TEMP_REACTOR	348.66	1	2026-01-16 09:06:15.215849-04
+110	2026-01-16 13:06:14.635928-04	FCC-201	CATALYST_ACT	92.68	1	2026-01-16 09:06:15.215849-04
+111	2026-01-16 13:06:14.635942-04	HT-301	TEMP_HYDRO	483.55	1	2026-01-16 09:06:15.215849-04
+112	2026-01-16 13:06:14.635957-04	HT-301	H2_PRESS	5.96	1	2026-01-16 09:06:15.215849-04
+113	2026-01-16 13:06:30.29029-04	CDU-101	TEMP_TOWER	333.59	1	2026-01-16 09:06:30.769451-04
+114	2026-01-16 13:06:30.290339-04	CDU-101	PRESS_TOWER	2.68	1	2026-01-16 09:06:30.769451-04
+115	2026-01-16 13:06:30.290355-04	CDU-101	FLOW_FEED	9582.04	1	2026-01-16 09:06:30.769451-04
+116	2026-01-16 13:06:30.290372-04	FCC-201	TEMP_REACTOR	405.3	1	2026-01-16 09:06:30.769451-04
+117	2026-01-16 13:06:30.290529-04	FCC-201	CATALYST_ACT	80.92	1	2026-01-16 09:06:30.769451-04
+118	2026-01-16 13:06:30.290588-04	HT-301	TEMP_HYDRO	479.09	1	2026-01-16 09:06:30.769451-04
+119	2026-01-16 13:06:30.290606-04	HT-301	H2_PRESS	3.72	1	2026-01-16 09:06:30.769451-04
+120	2026-01-16 13:06:47.61827-04	CDU-101	TEMP_TOWER	378.53	1	2026-01-16 09:06:48.355057-04
+121	2026-01-16 13:06:47.618312-04	CDU-101	PRESS_TOWER	2.05	1	2026-01-16 09:06:48.355057-04
+122	2026-01-16 13:06:47.618327-04	CDU-101	FLOW_FEED	10238.43	1	2026-01-16 09:06:48.355057-04
+123	2026-01-16 13:06:47.618341-04	FCC-201	TEMP_REACTOR	321.98	1	2026-01-16 09:06:48.355057-04
+124	2026-01-16 13:06:47.618355-04	FCC-201	CATALYST_ACT	79.9	1	2026-01-16 09:06:48.355057-04
+125	2026-01-16 13:06:47.618369-04	HT-301	TEMP_HYDRO	417.85	1	2026-01-16 09:06:48.355057-04
+126	2026-01-16 13:06:47.618384-04	HT-301	H2_PRESS	3.82	1	2026-01-16 09:06:48.355057-04
+127	2026-01-16 13:07:03.794913-04	CDU-101	TEMP_TOWER	334.77	1	2026-01-16 09:07:04.49108-04
+128	2026-01-16 13:07:03.794971-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 09:07:04.49108-04
+129	2026-01-16 13:07:03.794987-04	CDU-101	FLOW_FEED	11549.86	1	2026-01-16 09:07:04.49108-04
+130	2026-01-16 13:07:03.795002-04	FCC-201	TEMP_REACTOR	422.26	1	2026-01-16 09:07:04.49108-04
+131	2026-01-16 13:07:03.795017-04	FCC-201	CATALYST_ACT	94.48	1	2026-01-16 09:07:04.49108-04
+132	2026-01-16 13:07:03.795032-04	HT-301	TEMP_HYDRO	478.98	1	2026-01-16 09:07:04.49108-04
+133	2026-01-16 13:07:03.795047-04	HT-301	H2_PRESS	5.57	1	2026-01-16 09:07:04.49108-04
+134	2026-01-16 13:07:09.568115-04	CDU-101	TEMP_TOWER	493.75	1	2026-01-16 09:07:10.346155-04
+135	2026-01-16 13:07:09.568161-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 09:07:10.346155-04
+136	2026-01-16 13:07:09.568178-04	CDU-101	FLOW_FEED	11461.91	1	2026-01-16 09:07:10.346155-04
+137	2026-01-16 13:07:09.568193-04	FCC-201	TEMP_REACTOR	443.98	1	2026-01-16 09:07:10.346155-04
+138	2026-01-16 13:07:09.568207-04	FCC-201	CATALYST_ACT	77.45	1	2026-01-16 09:07:10.346155-04
+139	2026-01-16 13:07:09.568221-04	HT-301	TEMP_HYDRO	371.12	1	2026-01-16 09:07:10.346155-04
+140	2026-01-16 13:07:09.568236-04	HT-301	H2_PRESS	5.92	1	2026-01-16 09:07:10.346155-04
+141	2026-01-16 13:07:15.433081-04	CDU-101	TEMP_TOWER	318.86	1	2026-01-16 09:07:16.950729-04
+142	2026-01-16 13:07:15.433122-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 09:07:16.950729-04
+143	2026-01-16 13:07:15.433138-04	CDU-101	FLOW_FEED	11754.8	1	2026-01-16 09:07:16.950729-04
+144	2026-01-16 13:07:15.433152-04	FCC-201	TEMP_REACTOR	343.47	1	2026-01-16 09:07:16.950729-04
+145	2026-01-16 13:07:15.433166-04	FCC-201	CATALYST_ACT	93.61	1	2026-01-16 09:07:16.950729-04
+146	2026-01-16 13:07:15.43318-04	HT-301	TEMP_HYDRO	363.35	1	2026-01-16 09:07:16.950729-04
+147	2026-01-16 13:07:15.433193-04	HT-301	H2_PRESS	3.32	1	2026-01-16 09:07:16.950729-04
+148	2026-01-16 13:07:22.094229-04	CDU-101	TEMP_TOWER	431.69	1	2026-01-16 09:07:22.480409-04
+149	2026-01-16 13:07:22.094272-04	CDU-101	PRESS_TOWER	5.87	1	2026-01-16 09:07:22.480409-04
+150	2026-01-16 13:07:22.094287-04	CDU-101	FLOW_FEED	8430.56	1	2026-01-16 09:07:22.480409-04
+151	2026-01-16 13:07:22.094301-04	FCC-201	TEMP_REACTOR	358.1	1	2026-01-16 09:07:22.480409-04
+152	2026-01-16 13:07:22.094316-04	FCC-201	CATALYST_ACT	89.99	1	2026-01-16 09:07:22.480409-04
+153	2026-01-16 13:07:22.094331-04	HT-301	TEMP_HYDRO	416.68	1	2026-01-16 09:07:22.480409-04
+154	2026-01-16 13:07:22.094346-04	HT-301	H2_PRESS	2.41	1	2026-01-16 09:07:22.480409-04
+155	2026-01-16 13:07:27.523222-04	CDU-101	TEMP_TOWER	413.8	1	2026-01-16 09:07:28.425936-04
+156	2026-01-16 13:07:27.523273-04	CDU-101	PRESS_TOWER	4.11	1	2026-01-16 09:07:28.425936-04
+157	2026-01-16 13:07:27.52329-04	CDU-101	FLOW_FEED	9971.59	1	2026-01-16 09:07:28.425936-04
+158	2026-01-16 13:07:27.523306-04	FCC-201	TEMP_REACTOR	416.38	1	2026-01-16 09:07:28.425936-04
+159	2026-01-16 13:07:27.523321-04	FCC-201	CATALYST_ACT	79.92	1	2026-01-16 09:07:28.425936-04
+160	2026-01-16 13:07:27.523335-04	HT-301	TEMP_HYDRO	346.31	1	2026-01-16 09:07:28.425936-04
+161	2026-01-16 13:07:27.52335-04	HT-301	H2_PRESS	3.74	1	2026-01-16 09:07:28.425936-04
+162	2026-01-16 13:07:33.475271-04	CDU-101	TEMP_TOWER	444.63	1	2026-01-16 09:07:34.115338-04
+163	2026-01-16 13:07:33.475357-04	CDU-101	PRESS_TOWER	5.83	1	2026-01-16 09:07:34.115338-04
+164	2026-01-16 13:07:33.475375-04	CDU-101	FLOW_FEED	8845.99	1	2026-01-16 09:07:34.115338-04
+165	2026-01-16 13:07:33.475396-04	FCC-201	TEMP_REACTOR	336.78	1	2026-01-16 09:07:34.115338-04
+166	2026-01-16 13:07:33.475413-04	FCC-201	CATALYST_ACT	86.57	1	2026-01-16 09:07:34.115338-04
+167	2026-01-16 13:07:33.475429-04	HT-301	TEMP_HYDRO	467.39	1	2026-01-16 09:07:34.115338-04
+168	2026-01-16 13:07:33.475444-04	HT-301	H2_PRESS	5.77	1	2026-01-16 09:07:34.115338-04
+169	2026-01-16 13:07:39.183374-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 09:07:39.911031-04
+170	2026-01-16 13:07:39.183418-04	CDU-101	PRESS_TOWER	5.81	1	2026-01-16 09:07:39.911031-04
+171	2026-01-16 13:07:39.183437-04	CDU-101	FLOW_FEED	8899.33	1	2026-01-16 09:07:39.911031-04
+172	2026-01-16 13:07:39.183455-04	FCC-201	TEMP_REACTOR	469.41	1	2026-01-16 09:07:39.911031-04
+173	2026-01-16 13:07:39.183472-04	FCC-201	CATALYST_ACT	86.83	1	2026-01-16 09:07:39.911031-04
+174	2026-01-16 13:07:39.183487-04	HT-301	TEMP_HYDRO	323.03	1	2026-01-16 09:07:39.911031-04
+175	2026-01-16 13:07:39.183504-04	HT-301	H2_PRESS	4.62	1	2026-01-16 09:07:39.911031-04
+176	2026-01-16 13:07:44.958668-04	CDU-101	TEMP_TOWER	398.26	1	2026-01-16 09:07:45.348886-04
+177	2026-01-16 13:07:44.958718-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:07:45.348886-04
+178	2026-01-16 13:07:44.958736-04	CDU-101	FLOW_FEED	11037.5	1	2026-01-16 09:07:45.348886-04
+179	2026-01-16 13:07:44.958751-04	FCC-201	TEMP_REACTOR	430.01	1	2026-01-16 09:07:45.348886-04
+180	2026-01-16 13:07:44.958767-04	FCC-201	CATALYST_ACT	87.51	1	2026-01-16 09:07:45.348886-04
+181	2026-01-16 13:07:44.958782-04	HT-301	TEMP_HYDRO	368.2	1	2026-01-16 09:07:45.348886-04
+182	2026-01-16 13:07:44.958797-04	HT-301	H2_PRESS	3.26	1	2026-01-16 09:07:45.348886-04
+183	2026-01-16 10:03:56.951451-04	CDU-101	TEMP_TOWER	352.4	1	2026-01-16 10:03:57.667213-04
+184	2026-01-16 10:03:56.951774-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:03:57.667213-04
+185	2026-01-16 10:03:56.951827-04	CDU-101	FLOW_FEED	8101.68	1	2026-01-16 10:03:57.667213-04
+186	2026-01-16 10:03:56.95189-04	FCC-201	TEMP_REACTOR	497.97	1	2026-01-16 10:03:57.667213-04
+187	2026-01-16 10:03:56.951911-04	FCC-201	CATALYST_ACT	94.76	1	2026-01-16 10:03:57.667213-04
+188	2026-01-16 10:03:56.951929-04	HT-301	TEMP_HYDRO	356.4	1	2026-01-16 10:03:57.667213-04
+189	2026-01-16 10:03:56.951946-04	HT-301	H2_PRESS	33.98	1	2026-01-16 10:03:57.667213-04
+190	2026-01-16 10:04:02.976793-04	CDU-101	TEMP_TOWER	389.18	1	2026-01-16 10:04:03.183112-04
+191	2026-01-16 10:04:02.976852-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 10:04:03.183112-04
+192	2026-01-16 10:04:02.976872-04	CDU-101	FLOW_FEED	8839.96	1	2026-01-16 10:04:03.183112-04
+193	2026-01-16 10:04:02.976891-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:04:03.183112-04
+194	2026-01-16 10:04:02.976908-04	FCC-201	CATALYST_ACT	70.53	1	2026-01-16 10:04:03.183112-04
+195	2026-01-16 10:04:02.976926-04	HT-301	TEMP_HYDRO	332.45	1	2026-01-16 10:04:03.183112-04
+196	2026-01-16 10:04:02.976943-04	HT-301	H2_PRESS	32.84	1	2026-01-16 10:04:03.183112-04
+197	2026-01-16 10:04:08.207836-04	CDU-101	TEMP_TOWER	449.22	1	2026-01-16 10:04:08.66787-04
+198	2026-01-16 10:04:08.207884-04	CDU-101	PRESS_TOWER	3.88	1	2026-01-16 10:04:08.66787-04
+199	2026-01-16 10:04:08.207901-04	CDU-101	FLOW_FEED	9971.64	1	2026-01-16 10:04:08.66787-04
+200	2026-01-16 10:04:08.207917-04	FCC-201	TEMP_REACTOR	537.07	1	2026-01-16 10:04:08.66787-04
+201	2026-01-16 10:04:08.207933-04	FCC-201	CATALYST_ACT	76.2	1	2026-01-16 10:04:08.66787-04
+202	2026-01-16 10:04:08.207949-04	HT-301	TEMP_HYDRO	316.88	1	2026-01-16 10:04:08.66787-04
+203	2026-01-16 10:04:08.207965-04	HT-301	H2_PRESS	31.9	1	2026-01-16 10:04:08.66787-04
+204	2026-01-16 10:04:13.689478-04	CDU-101	TEMP_TOWER	369.09	1	2026-01-16 10:04:13.880748-04
+205	2026-01-16 10:04:13.689536-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 10:04:13.880748-04
+206	2026-01-16 10:04:13.689554-04	CDU-101	FLOW_FEED	11499.85	1	2026-01-16 10:04:13.880748-04
+207	2026-01-16 10:04:13.689573-04	FCC-201	TEMP_REACTOR	524.42	1	2026-01-16 10:04:13.880748-04
+208	2026-01-16 10:04:13.689589-04	FCC-201	CATALYST_ACT	83.31	1	2026-01-16 10:04:13.880748-04
+209	2026-01-16 10:04:13.689607-04	HT-301	TEMP_HYDRO	334.86	1	2026-01-16 10:04:13.880748-04
+210	2026-01-16 10:04:13.689623-04	HT-301	H2_PRESS	40.68	1	2026-01-16 10:04:13.880748-04
+211	2026-01-16 10:04:18.930435-04	CDU-101	TEMP_TOWER	405.79	1	2026-01-16 10:04:19.382986-04
+212	2026-01-16 10:04:18.930487-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:04:19.382986-04
+213	2026-01-16 10:04:18.930504-04	CDU-101	FLOW_FEED	9173.64	1	2026-01-16 10:04:19.382986-04
+214	2026-01-16 10:04:18.930521-04	FCC-201	TEMP_REACTOR	492.44	1	2026-01-16 10:04:19.382986-04
+215	2026-01-16 10:04:18.930537-04	FCC-201	CATALYST_ACT	86.29	1	2026-01-16 10:04:19.382986-04
+216	2026-01-16 10:04:18.930553-04	HT-301	TEMP_HYDRO	377.21	1	2026-01-16 10:04:19.382986-04
+217	2026-01-16 10:04:18.930569-04	HT-301	H2_PRESS	33.84	1	2026-01-16 10:04:19.382986-04
+218	2026-01-16 10:04:24.413697-04	CDU-101	TEMP_TOWER	383.77	1	2026-01-16 10:04:24.630658-04
+219	2026-01-16 10:04:24.413758-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:04:24.630658-04
+220	2026-01-16 10:04:24.413779-04	CDU-101	FLOW_FEED	11237.41	1	2026-01-16 10:04:24.630658-04
+221	2026-01-16 10:04:24.413798-04	FCC-201	TEMP_REACTOR	502.57	1	2026-01-16 10:04:24.630658-04
+222	2026-01-16 10:04:24.413816-04	FCC-201	CATALYST_ACT	83.18	1	2026-01-16 10:04:24.630658-04
+223	2026-01-16 10:04:24.413833-04	HT-301	TEMP_HYDRO	334.96	1	2026-01-16 10:04:24.630658-04
+224	2026-01-16 10:04:24.413851-04	HT-301	H2_PRESS	38	1	2026-01-16 10:04:24.630658-04
+225	2026-01-16 10:04:29.659097-04	CDU-101	TEMP_TOWER	354.1	1	2026-01-16 10:04:32.305584-04
+226	2026-01-16 10:04:29.659148-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:04:32.305584-04
+227	2026-01-16 10:04:29.659166-04	CDU-101	FLOW_FEED	10091.16	1	2026-01-16 10:04:32.305584-04
+228	2026-01-16 10:04:29.659183-04	FCC-201	TEMP_REACTOR	516.98	1	2026-01-16 10:04:32.305584-04
+229	2026-01-16 10:04:29.659199-04	FCC-201	CATALYST_ACT	84.63	1	2026-01-16 10:04:32.305584-04
+230	2026-01-16 10:04:29.659215-04	HT-301	TEMP_HYDRO	334.78	1	2026-01-16 10:04:32.305584-04
+231	2026-01-16 10:04:29.659231-04	HT-301	H2_PRESS	44.93	1	2026-01-16 10:04:32.305584-04
+232	2026-01-16 10:04:37.580101-04	CDU-101	TEMP_TOWER	371.11	1	2026-01-16 10:04:39.787697-04
+233	2026-01-16 10:04:37.580162-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:04:39.787697-04
+234	2026-01-16 10:04:37.580184-04	CDU-101	FLOW_FEED	11918.59	1	2026-01-16 10:04:39.787697-04
+235	2026-01-16 10:04:37.580203-04	FCC-201	TEMP_REACTOR	504.79	1	2026-01-16 10:04:39.787697-04
+236	2026-01-16 10:04:37.580221-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:04:39.787697-04
+237	2026-01-16 10:04:37.580241-04	HT-301	TEMP_HYDRO	322.2	1	2026-01-16 10:04:39.787697-04
+238	2026-01-16 10:04:37.580258-04	HT-301	H2_PRESS	40.24	1	2026-01-16 10:04:39.787697-04
+239	2026-01-16 10:04:44.815766-04	CDU-101	TEMP_TOWER	356.47	1	2026-01-16 10:04:45.292572-04
+240	2026-01-16 10:04:44.815818-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:04:45.292572-04
+241	2026-01-16 10:04:44.815835-04	CDU-101	FLOW_FEED	9365.71	1	2026-01-16 10:04:45.292572-04
+242	2026-01-16 10:04:44.815853-04	FCC-201	TEMP_REACTOR	496.02	1	2026-01-16 10:04:45.292572-04
+243	2026-01-16 10:04:44.81587-04	FCC-201	CATALYST_ACT	81.78	1	2026-01-16 10:04:45.292572-04
+244	2026-01-16 10:04:44.815888-04	HT-301	TEMP_HYDRO	312.36	1	2026-01-16 10:04:45.292572-04
+245	2026-01-16 10:04:44.815905-04	HT-301	H2_PRESS	42.39	1	2026-01-16 10:04:45.292572-04
+246	2026-01-16 10:04:50.800003-04	CDU-101	TEMP_TOWER	374.89	1	2026-01-16 10:04:50.997676-04
+247	2026-01-16 10:04:50.800052-04	CDU-101	PRESS_TOWER	4.24	1	2026-01-16 10:04:50.997676-04
+248	2026-01-16 10:04:50.800069-04	CDU-101	FLOW_FEED	9224.41	1	2026-01-16 10:04:50.997676-04
+249	2026-01-16 10:04:50.800085-04	FCC-201	TEMP_REACTOR	522.83	1	2026-01-16 10:04:50.997676-04
+250	2026-01-16 10:04:50.8001-04	FCC-201	CATALYST_ACT	79.22	1	2026-01-16 10:04:50.997676-04
+251	2026-01-16 10:04:50.800116-04	HT-301	TEMP_HYDRO	357.95	1	2026-01-16 10:04:50.997676-04
+252	2026-01-16 10:04:50.800131-04	HT-301	H2_PRESS	43.84	1	2026-01-16 10:04:50.997676-04
+253	2026-01-16 10:04:56.332522-04	CDU-101	TEMP_TOWER	409.43	1	2026-01-16 10:04:56.807144-04
+254	2026-01-16 10:04:56.332571-04	CDU-101	PRESS_TOWER	4.67	1	2026-01-16 10:04:56.807144-04
+255	2026-01-16 10:04:56.332588-04	CDU-101	FLOW_FEED	11449.48	1	2026-01-16 10:04:56.807144-04
+256	2026-01-16 10:04:56.332605-04	FCC-201	TEMP_REACTOR	522.96	1	2026-01-16 10:04:56.807144-04
+257	2026-01-16 10:04:56.33262-04	FCC-201	CATALYST_ACT	92.11	1	2026-01-16 10:04:56.807144-04
+258	2026-01-16 10:04:56.332636-04	HT-301	TEMP_HYDRO	365.18	1	2026-01-16 10:04:56.807144-04
+259	2026-01-16 10:04:56.332651-04	HT-301	H2_PRESS	44.66	1	2026-01-16 10:04:56.807144-04
+260	2026-01-16 10:05:01.856374-04	CDU-101	TEMP_TOWER	380.36	1	2026-01-16 10:05:02.0562-04
+261	2026-01-16 10:05:01.856431-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:05:02.0562-04
+262	2026-01-16 10:05:01.856448-04	CDU-101	FLOW_FEED	10762.63	1	2026-01-16 10:05:02.0562-04
+263	2026-01-16 10:05:01.856465-04	FCC-201	TEMP_REACTOR	543.58	1	2026-01-16 10:05:02.0562-04
+264	2026-01-16 10:05:01.856481-04	FCC-201	CATALYST_ACT	80.5	1	2026-01-16 10:05:02.0562-04
+265	2026-01-16 10:05:01.856496-04	HT-301	TEMP_HYDRO	353.13	1	2026-01-16 10:05:02.0562-04
+266	2026-01-16 10:05:01.856512-04	HT-301	H2_PRESS	48.92	1	2026-01-16 10:05:02.0562-04
+267	2026-01-16 10:05:07.092786-04	CDU-101	TEMP_TOWER	421.19	1	2026-01-16 10:05:07.554772-04
+268	2026-01-16 10:05:07.092852-04	CDU-101	PRESS_TOWER	3.42	1	2026-01-16 10:05:07.554772-04
+269	2026-01-16 10:05:07.092872-04	CDU-101	FLOW_FEED	10480.45	1	2026-01-16 10:05:07.554772-04
+270	2026-01-16 10:05:07.092891-04	FCC-201	TEMP_REACTOR	484.44	1	2026-01-16 10:05:07.554772-04
+271	2026-01-16 10:05:07.09291-04	FCC-201	CATALYST_ACT	93.59	1	2026-01-16 10:05:07.554772-04
+272	2026-01-16 10:05:07.092928-04	HT-301	TEMP_HYDRO	361.22	1	2026-01-16 10:05:07.554772-04
+273	2026-01-16 10:05:07.092945-04	HT-301	H2_PRESS	31.74	1	2026-01-16 10:05:07.554772-04
+274	2026-01-16 10:05:12.597506-04	CDU-101	TEMP_TOWER	361.86	1	2026-01-16 10:05:12.798954-04
+275	2026-01-16 10:05:12.597555-04	CDU-101	PRESS_TOWER	3.24	1	2026-01-16 10:05:12.798954-04
+276	2026-01-16 10:05:12.597572-04	CDU-101	FLOW_FEED	10781.3	1	2026-01-16 10:05:12.798954-04
+277	2026-01-16 10:05:12.597588-04	FCC-201	TEMP_REACTOR	546.37	1	2026-01-16 10:05:12.798954-04
+278	2026-01-16 10:05:12.597604-04	FCC-201	CATALYST_ACT	82.09	1	2026-01-16 10:05:12.798954-04
+279	2026-01-16 10:05:12.597619-04	HT-301	TEMP_HYDRO	308.08	1	2026-01-16 10:05:12.798954-04
+280	2026-01-16 10:05:12.597635-04	HT-301	H2_PRESS	33.77	1	2026-01-16 10:05:12.798954-04
+281	2026-01-16 10:05:17.833446-04	CDU-101	TEMP_TOWER	383.75	1	2026-01-16 10:05:24.183624-04
+282	2026-01-16 10:05:17.833512-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:05:24.183624-04
+283	2026-01-16 10:05:17.833534-04	CDU-101	FLOW_FEED	11317.5	1	2026-01-16 10:05:24.183624-04
+284	2026-01-16 10:05:17.833554-04	FCC-201	TEMP_REACTOR	505.08	1	2026-01-16 10:05:24.183624-04
+285	2026-01-16 10:05:17.83357-04	FCC-201	CATALYST_ACT	85.24	1	2026-01-16 10:05:24.183624-04
+286	2026-01-16 10:05:17.833589-04	HT-301	TEMP_HYDRO	346.26	1	2026-01-16 10:05:24.183624-04
+287	2026-01-16 10:05:17.833604-04	HT-301	H2_PRESS	46.76	1	2026-01-16 10:05:24.183624-04
+289	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:44.636139-04
+288	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:45.344061-04
+290	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:45.344061-04
+291	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:44.636139-04
+292	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:45.344061-04
+293	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:44.636139-04
+294	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:45.344061-04
+295	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:44.636139-04
+296	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:45.344061-04
+297	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:44.636139-04
+298	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:45.344061-04
+299	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:44.636139-04
+300	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:45.344061-04
+301	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:44.636139-04
+302	2026-01-16 10:05:52.463743-04	CDU-101	TEMP_TOWER	375.66	1	2026-01-16 10:05:53.012388-04
+303	2026-01-16 10:05:52.463943-04	CDU-101	PRESS_TOWER	4.52	1	2026-01-16 10:05:53.012388-04
+304	2026-01-16 10:05:52.463976-04	CDU-101	FLOW_FEED	9252.66	1	2026-01-16 10:05:53.012388-04
+305	2026-01-16 10:05:52.463996-04	FCC-201	TEMP_REACTOR	542.38	1	2026-01-16 10:05:53.012388-04
+306	2026-01-16 10:05:52.464013-04	FCC-201	CATALYST_ACT	81.93	1	2026-01-16 10:05:53.012388-04
+307	2026-01-16 10:05:52.464032-04	HT-301	TEMP_HYDRO	337.31	1	2026-01-16 10:05:53.012388-04
+308	2026-01-16 10:05:52.464048-04	HT-301	H2_PRESS	43.02	1	2026-01-16 10:05:53.012388-04
+309	2026-01-16 10:05:58.111733-04	CDU-101	TEMP_TOWER	397.95	1	2026-01-16 10:05:58.344071-04
+310	2026-01-16 10:05:58.111783-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:05:58.344071-04
+311	2026-01-16 10:05:58.1118-04	CDU-101	FLOW_FEED	8888.16	1	2026-01-16 10:05:58.344071-04
+312	2026-01-16 10:05:58.111816-04	FCC-201	TEMP_REACTOR	547.7	1	2026-01-16 10:05:58.344071-04
+313	2026-01-16 10:05:58.111832-04	FCC-201	CATALYST_ACT	87.63	1	2026-01-16 10:05:58.344071-04
+314	2026-01-16 10:05:58.111848-04	HT-301	TEMP_HYDRO	300.26	1	2026-01-16 10:05:58.344071-04
+315	2026-01-16 10:05:58.111863-04	HT-301	H2_PRESS	32.03	1	2026-01-16 10:05:58.344071-04
+316	2026-01-16 10:06:03.430558-04	CDU-101	TEMP_TOWER	409.01	1	2026-01-16 10:06:04.000085-04
+317	2026-01-16 10:06:03.430607-04	CDU-101	PRESS_TOWER	4.87	1	2026-01-16 10:06:04.000085-04
+318	2026-01-16 10:06:03.430624-04	CDU-101	FLOW_FEED	9647.13	1	2026-01-16 10:06:04.000085-04
+319	2026-01-16 10:06:03.430641-04	FCC-201	TEMP_REACTOR	516.9	1	2026-01-16 10:06:04.000085-04
+320	2026-01-16 10:06:03.430656-04	FCC-201	CATALYST_ACT	72.41	1	2026-01-16 10:06:04.000085-04
+321	2026-01-16 10:06:03.430672-04	HT-301	TEMP_HYDRO	328.27	1	2026-01-16 10:06:04.000085-04
+322	2026-01-16 10:06:03.430687-04	HT-301	H2_PRESS	35.33	1	2026-01-16 10:06:04.000085-04
+323	2026-01-16 10:06:10.167356-04	CDU-101	TEMP_TOWER	356.97	1	2026-01-16 10:06:12.378024-04
+324	2026-01-16 10:06:10.167418-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:06:12.378024-04
+325	2026-01-16 10:06:10.167437-04	CDU-101	FLOW_FEED	10333.11	1	2026-01-16 10:06:12.378024-04
+326	2026-01-16 10:06:10.167455-04	FCC-201	TEMP_REACTOR	484.88	1	2026-01-16 10:06:12.378024-04
+327	2026-01-16 10:06:10.167471-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:06:12.378024-04
+328	2026-01-16 10:06:10.167488-04	HT-301	TEMP_HYDRO	356.65	1	2026-01-16 10:06:12.378024-04
+329	2026-01-16 10:06:10.167504-04	HT-301	H2_PRESS	46.64	1	2026-01-16 10:06:12.378024-04
+330	2026-01-16 10:06:17.544049-04	CDU-101	TEMP_TOWER	422.8	1	2026-01-16 10:06:18.007316-04
+331	2026-01-16 10:06:17.544113-04	CDU-101	PRESS_TOWER	4.72	1	2026-01-16 10:06:18.007316-04
+332	2026-01-16 10:06:17.544131-04	CDU-101	FLOW_FEED	8988.96	1	2026-01-16 10:06:18.007316-04
+333	2026-01-16 10:06:17.544151-04	FCC-201	TEMP_REACTOR	510.25	1	2026-01-16 10:06:18.007316-04
+334	2026-01-16 10:06:17.544167-04	FCC-201	CATALYST_ACT	79.17	1	2026-01-16 10:06:18.007316-04
+335	2026-01-16 10:06:17.544182-04	HT-301	TEMP_HYDRO	352.5	1	2026-01-16 10:06:18.007316-04
+336	2026-01-16 10:06:17.544197-04	HT-301	H2_PRESS	38.57	1	2026-01-16 10:06:18.007316-04
+337	2026-01-16 10:06:23.066147-04	CDU-101	TEMP_TOWER	397.65	1	2026-01-16 10:06:23.270319-04
+338	2026-01-16 10:06:23.0662-04	CDU-101	PRESS_TOWER	4.14	1	2026-01-16 10:06:23.270319-04
+339	2026-01-16 10:06:23.066218-04	CDU-101	FLOW_FEED	9919.81	1	2026-01-16 10:06:23.270319-04
+340	2026-01-16 10:06:23.066234-04	FCC-201	TEMP_REACTOR	521.78	1	2026-01-16 10:06:23.270319-04
+341	2026-01-16 10:06:23.06625-04	FCC-201	CATALYST_ACT	71.31	1	2026-01-16 10:06:23.270319-04
+342	2026-01-16 10:06:23.066266-04	HT-301	TEMP_HYDRO	352.76	1	2026-01-16 10:06:23.270319-04
+343	2026-01-16 10:06:23.066281-04	HT-301	H2_PRESS	31.37	1	2026-01-16 10:06:23.270319-04
+344	2026-01-16 10:06:28.343391-04	CDU-101	TEMP_TOWER	435.81	1	2026-01-16 10:06:30.208065-04
+345	2026-01-16 10:06:28.343451-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:06:30.208065-04
+346	2026-01-16 10:06:28.343469-04	CDU-101	FLOW_FEED	9693.91	1	2026-01-16 10:06:30.208065-04
+347	2026-01-16 10:06:28.343486-04	FCC-201	TEMP_REACTOR	484.64	1	2026-01-16 10:06:30.208065-04
+348	2026-01-16 10:06:28.343505-04	FCC-201	CATALYST_ACT	85.37	1	2026-01-16 10:06:30.208065-04
+349	2026-01-16 10:06:28.343522-04	HT-301	TEMP_HYDRO	354.08	1	2026-01-16 10:06:30.208065-04
+350	2026-01-16 10:06:28.343539-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:06:30.208065-04
+351	2026-01-16 10:06:35.541447-04	CDU-101	TEMP_TOWER	375.52	1	2026-01-16 10:06:35.731474-04
+352	2026-01-16 10:06:35.541497-04	CDU-101	PRESS_TOWER	4.96	1	2026-01-16 10:06:35.731474-04
+353	2026-01-16 10:06:35.541514-04	CDU-101	FLOW_FEED	8197.28	1	2026-01-16 10:06:35.731474-04
+354	2026-01-16 10:06:35.54153-04	FCC-201	TEMP_REACTOR	527.99	1	2026-01-16 10:06:35.731474-04
+355	2026-01-16 10:06:35.541546-04	FCC-201	CATALYST_ACT	71.91	1	2026-01-16 10:06:35.731474-04
+356	2026-01-16 10:06:35.541562-04	HT-301	TEMP_HYDRO	333.35	1	2026-01-16 10:06:35.731474-04
+357	2026-01-16 10:06:35.541577-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:06:35.731474-04
+358	2026-01-16 10:06:40.871166-04	CDU-101	TEMP_TOWER	402.13	1	2026-01-16 10:06:41.369528-04
+359	2026-01-16 10:06:40.871217-04	CDU-101	PRESS_TOWER	3.92	1	2026-01-16 10:06:41.369528-04
+360	2026-01-16 10:06:40.871234-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:06:41.369528-04
+361	2026-01-16 10:06:40.871251-04	FCC-201	TEMP_REACTOR	539.43	1	2026-01-16 10:06:41.369528-04
+362	2026-01-16 10:06:40.871266-04	FCC-201	CATALYST_ACT	92.01	1	2026-01-16 10:06:41.369528-04
+363	2026-01-16 10:06:40.871282-04	HT-301	TEMP_HYDRO	348.91	1	2026-01-16 10:06:41.369528-04
+364	2026-01-16 10:06:40.871297-04	HT-301	H2_PRESS	37.72	1	2026-01-16 10:06:41.369528-04
+365	2026-01-16 10:06:46.410855-04	CDU-101	TEMP_TOWER	389.91	1	2026-01-16 10:06:46.618844-04
+366	2026-01-16 10:06:46.410904-04	CDU-101	PRESS_TOWER	4.73	1	2026-01-16 10:06:46.618844-04
+367	2026-01-16 10:06:46.410921-04	CDU-101	FLOW_FEED	10060.59	1	2026-01-16 10:06:46.618844-04
+368	2026-01-16 10:06:46.410937-04	FCC-201	TEMP_REACTOR	511.43	1	2026-01-16 10:06:46.618844-04
+369	2026-01-16 10:06:46.410952-04	FCC-201	CATALYST_ACT	91.93	1	2026-01-16 10:06:46.618844-04
+370	2026-01-16 10:06:46.410968-04	HT-301	TEMP_HYDRO	306.19	1	2026-01-16 10:06:46.618844-04
+371	2026-01-16 10:06:46.410983-04	HT-301	H2_PRESS	32.45	1	2026-01-16 10:06:46.618844-04
+372	2026-01-16 10:06:51.656548-04	CDU-101	TEMP_TOWER	414.53	1	2026-01-16 10:06:52.462667-04
+373	2026-01-16 10:06:51.656651-04	CDU-101	PRESS_TOWER	3.48	1	2026-01-16 10:06:52.462667-04
+374	2026-01-16 10:06:51.656671-04	CDU-101	FLOW_FEED	8093.31	1	2026-01-16 10:06:52.462667-04
+375	2026-01-16 10:06:51.656688-04	FCC-201	TEMP_REACTOR	521.92	1	2026-01-16 10:06:52.462667-04
+376	2026-01-16 10:06:51.656706-04	FCC-201	CATALYST_ACT	71.81	1	2026-01-16 10:06:52.462667-04
+377	2026-01-16 10:06:51.656723-04	HT-301	TEMP_HYDRO	337.82	1	2026-01-16 10:06:52.462667-04
+378	2026-01-16 10:06:51.656741-04	HT-301	H2_PRESS	48.36	1	2026-01-16 10:06:52.462667-04
+379	2026-01-16 10:06:57.530123-04	CDU-101	TEMP_TOWER	405.08	1	2026-01-16 10:06:58.679192-04
+380	2026-01-16 10:06:57.530237-04	CDU-101	PRESS_TOWER	2.71	1	2026-01-16 10:06:58.679192-04
+381	2026-01-16 10:06:57.530258-04	CDU-101	FLOW_FEED	10827.77	1	2026-01-16 10:06:58.679192-04
+382	2026-01-16 10:06:57.530279-04	FCC-201	TEMP_REACTOR	484.33	1	2026-01-16 10:06:58.679192-04
+383	2026-01-16 10:06:57.5303-04	FCC-201	CATALYST_ACT	93.03	1	2026-01-16 10:06:58.679192-04
+384	2026-01-16 10:06:57.530318-04	HT-301	TEMP_HYDRO	315.81	1	2026-01-16 10:06:58.679192-04
+385	2026-01-16 10:06:57.530337-04	HT-301	H2_PRESS	39.38	1	2026-01-16 10:06:58.679192-04
+386	2026-01-16 10:07:03.71444-04	CDU-101	TEMP_TOWER	435.11	1	2026-01-16 10:07:04.195054-04
+387	2026-01-16 10:07:03.714488-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:07:04.195054-04
+388	2026-01-16 10:07:03.714505-04	CDU-101	FLOW_FEED	8180.01	1	2026-01-16 10:07:04.195054-04
+389	2026-01-16 10:07:03.714522-04	FCC-201	TEMP_REACTOR	486.04	1	2026-01-16 10:07:04.195054-04
+390	2026-01-16 10:07:03.714537-04	FCC-201	CATALYST_ACT	87.04	1	2026-01-16 10:07:04.195054-04
+391	2026-01-16 10:07:03.714553-04	HT-301	TEMP_HYDRO	367.67	1	2026-01-16 10:07:04.195054-04
+392	2026-01-16 10:07:03.714568-04	HT-301	H2_PRESS	42.49	1	2026-01-16 10:07:04.195054-04
+393	2026-01-16 10:07:09.311177-04	CDU-101	TEMP_TOWER	412.37	1	2026-01-16 10:07:11.161039-04
+394	2026-01-16 10:07:09.311253-04	CDU-101	PRESS_TOWER	2.51	1	2026-01-16 10:07:11.161039-04
+395	2026-01-16 10:07:09.311271-04	CDU-101	FLOW_FEED	10679.76	1	2026-01-16 10:07:11.161039-04
+396	2026-01-16 10:07:09.311289-04	FCC-201	TEMP_REACTOR	519.01	1	2026-01-16 10:07:11.161039-04
+397	2026-01-16 10:07:09.311305-04	FCC-201	CATALYST_ACT	82.98	1	2026-01-16 10:07:11.161039-04
+398	2026-01-16 10:07:09.311324-04	HT-301	TEMP_HYDRO	378.81	1	2026-01-16 10:07:11.161039-04
+399	2026-01-16 10:07:09.31134-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:07:11.161039-04
+400	2026-01-16 10:07:16.35775-04	CDU-101	TEMP_TOWER	395.38	1	2026-01-16 10:07:16.865005-04
+401	2026-01-16 10:07:16.357815-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:07:16.865005-04
+402	2026-01-16 10:07:16.357835-04	CDU-101	FLOW_FEED	8029.76	1	2026-01-16 10:07:16.865005-04
+403	2026-01-16 10:07:16.357855-04	FCC-201	TEMP_REACTOR	495.99	1	2026-01-16 10:07:16.865005-04
+404	2026-01-16 10:07:16.357873-04	FCC-201	CATALYST_ACT	91.47	1	2026-01-16 10:07:16.865005-04
+405	2026-01-16 10:07:16.357892-04	HT-301	TEMP_HYDRO	340.32	1	2026-01-16 10:07:16.865005-04
+406	2026-01-16 10:07:16.35791-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:07:16.865005-04
+407	2026-01-16 10:07:21.905408-04	CDU-101	TEMP_TOWER	386.93	1	2026-01-16 10:07:22.224812-04
+408	2026-01-16 10:07:21.905455-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:07:22.224812-04
+409	2026-01-16 10:07:21.905472-04	CDU-101	FLOW_FEED	10315.72	1	2026-01-16 10:07:22.224812-04
+410	2026-01-16 10:07:21.905488-04	FCC-201	TEMP_REACTOR	490.09	1	2026-01-16 10:07:22.224812-04
+411	2026-01-16 10:07:21.905503-04	FCC-201	CATALYST_ACT	84.97	1	2026-01-16 10:07:22.224812-04
+412	2026-01-16 10:07:21.905519-04	HT-301	TEMP_HYDRO	343.96	1	2026-01-16 10:07:22.224812-04
+413	2026-01-16 10:07:21.905535-04	HT-301	H2_PRESS	33.3	1	2026-01-16 10:07:22.224812-04
+414	2026-01-16 10:07:27.357213-04	CDU-101	TEMP_TOWER	361.05	1	2026-01-16 10:07:27.835577-04
+415	2026-01-16 10:07:27.357272-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:07:27.835577-04
+416	2026-01-16 10:07:27.357292-04	CDU-101	FLOW_FEED	9837.49	1	2026-01-16 10:07:27.835577-04
+417	2026-01-16 10:07:27.35731-04	FCC-201	TEMP_REACTOR	494.78	1	2026-01-16 10:07:27.835577-04
+418	2026-01-16 10:07:27.357329-04	FCC-201	CATALYST_ACT	78.74	1	2026-01-16 10:07:27.835577-04
+419	2026-01-16 10:07:27.357347-04	HT-301	TEMP_HYDRO	327.25	1	2026-01-16 10:07:27.835577-04
+420	2026-01-16 10:07:27.357362-04	HT-301	H2_PRESS	32.07	1	2026-01-16 10:07:27.835577-04
+421	2026-01-16 10:07:32.87251-04	CDU-101	TEMP_TOWER	354.64	1	2026-01-16 10:07:35.629481-04
+422	2026-01-16 10:07:32.872573-04	CDU-101	PRESS_TOWER	3.57	1	2026-01-16 10:07:35.629481-04
+423	2026-01-16 10:07:32.872592-04	CDU-101	FLOW_FEED	9684.81	1	2026-01-16 10:07:35.629481-04
+424	2026-01-16 10:07:32.872609-04	FCC-201	TEMP_REACTOR	495.75	1	2026-01-16 10:07:35.629481-04
+425	2026-01-16 10:07:32.872625-04	FCC-201	CATALYST_ACT	72.72	1	2026-01-16 10:07:35.629481-04
+426	2026-01-16 10:07:32.872642-04	HT-301	TEMP_HYDRO	347.5	1	2026-01-16 10:07:35.629481-04
+427	2026-01-16 10:07:32.872658-04	HT-301	H2_PRESS	30.47	1	2026-01-16 10:07:35.629481-04
+428	2026-01-16 10:07:41.648851-04	CDU-101	TEMP_TOWER	390	1	2026-01-16 10:07:43.316851-04
+429	2026-01-16 10:07:41.648904-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:07:43.316851-04
+430	2026-01-16 10:07:41.648922-04	CDU-101	FLOW_FEED	10851.8	1	2026-01-16 10:07:43.316851-04
+431	2026-01-16 10:07:41.648941-04	FCC-201	TEMP_REACTOR	513.28	1	2026-01-16 10:07:43.316851-04
+432	2026-01-16 10:07:41.648957-04	FCC-201	CATALYST_ACT	78.97	1	2026-01-16 10:07:43.316851-04
+433	2026-01-16 10:07:41.648973-04	HT-301	TEMP_HYDRO	376.79	1	2026-01-16 10:07:43.316851-04
+434	2026-01-16 10:07:41.64899-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:07:43.316851-04
+435	2026-01-16 10:07:48.479585-04	CDU-101	TEMP_TOWER	391.32	1	2026-01-16 10:07:48.676279-04
+436	2026-01-16 10:07:48.479634-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:07:48.676279-04
+437	2026-01-16 10:07:48.479653-04	CDU-101	FLOW_FEED	11281.66	1	2026-01-16 10:07:48.676279-04
+438	2026-01-16 10:07:48.47967-04	FCC-201	TEMP_REACTOR	499.79	1	2026-01-16 10:07:48.676279-04
+439	2026-01-16 10:07:48.479685-04	FCC-201	CATALYST_ACT	83.13	1	2026-01-16 10:07:48.676279-04
+440	2026-01-16 10:07:48.479701-04	HT-301	TEMP_HYDRO	333.8	1	2026-01-16 10:07:48.676279-04
+441	2026-01-16 10:07:48.479716-04	HT-301	H2_PRESS	48.58	1	2026-01-16 10:07:48.676279-04
+442	2026-01-16 10:07:53.700453-04	CDU-101	TEMP_TOWER	422.67	1	2026-01-16 10:07:54.26598-04
+443	2026-01-16 10:07:53.700501-04	CDU-101	PRESS_TOWER	2.74	1	2026-01-16 10:07:54.26598-04
+444	2026-01-16 10:07:53.700519-04	CDU-101	FLOW_FEED	8007.86	1	2026-01-16 10:07:54.26598-04
+445	2026-01-16 10:07:53.700535-04	FCC-201	TEMP_REACTOR	507.45	1	2026-01-16 10:07:54.26598-04
+446	2026-01-16 10:07:53.700551-04	FCC-201	CATALYST_ACT	76.97	1	2026-01-16 10:07:54.26598-04
+447	2026-01-16 10:07:53.700567-04	HT-301	TEMP_HYDRO	316.26	1	2026-01-16 10:07:54.26598-04
+448	2026-01-16 10:07:53.700583-04	HT-301	H2_PRESS	32.17	1	2026-01-16 10:07:54.26598-04
+449	2026-01-16 10:07:59.318598-04	CDU-101	TEMP_TOWER	354.04	1	2026-01-16 10:07:59.574921-04
+450	2026-01-16 10:07:59.318661-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:07:59.574921-04
+451	2026-01-16 10:07:59.318681-04	CDU-101	FLOW_FEED	8760.45	1	2026-01-16 10:07:59.574921-04
+452	2026-01-16 10:07:59.318698-04	FCC-201	TEMP_REACTOR	508.73	1	2026-01-16 10:07:59.574921-04
+453	2026-01-16 10:07:59.318714-04	FCC-201	CATALYST_ACT	82.38	1	2026-01-16 10:07:59.574921-04
+454	2026-01-16 10:07:59.318733-04	HT-301	TEMP_HYDRO	353.31	1	2026-01-16 10:07:59.574921-04
+455	2026-01-16 10:07:59.318751-04	HT-301	H2_PRESS	43.91	1	2026-01-16 10:07:59.574921-04
+456	2026-01-16 10:08:04.6145-04	CDU-101	TEMP_TOWER	399.19	1	2026-01-16 10:08:05.151103-04
+457	2026-01-16 10:08:04.61456-04	CDU-101	PRESS_TOWER	2.97	1	2026-01-16 10:08:05.151103-04
+458	2026-01-16 10:08:04.614581-04	CDU-101	FLOW_FEED	9812.59	1	2026-01-16 10:08:05.151103-04
+459	2026-01-16 10:08:04.6146-04	FCC-201	TEMP_REACTOR	548.21	1	2026-01-16 10:08:05.151103-04
+460	2026-01-16 10:08:04.614617-04	FCC-201	CATALYST_ACT	90.3	1	2026-01-16 10:08:05.151103-04
+461	2026-01-16 10:08:04.614633-04	HT-301	TEMP_HYDRO	334.66	1	2026-01-16 10:08:05.151103-04
+462	2026-01-16 10:08:04.614649-04	HT-301	H2_PRESS	48.03	1	2026-01-16 10:08:05.151103-04
+463	2026-01-16 10:08:10.264078-04	CDU-101	TEMP_TOWER	431.23	1	2026-01-16 10:08:10.458495-04
+464	2026-01-16 10:08:10.264139-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:08:10.458495-04
+465	2026-01-16 10:08:10.26416-04	CDU-101	FLOW_FEED	11517.95	1	2026-01-16 10:08:10.458495-04
+466	2026-01-16 10:08:10.26418-04	FCC-201	TEMP_REACTOR	547.43	1	2026-01-16 10:08:10.458495-04
+467	2026-01-16 10:08:10.264196-04	FCC-201	CATALYST_ACT	84.28	1	2026-01-16 10:08:10.458495-04
+468	2026-01-16 10:08:10.264212-04	HT-301	TEMP_HYDRO	311.19	1	2026-01-16 10:08:10.458495-04
+469	2026-01-16 10:08:10.264227-04	HT-301	H2_PRESS	42.88	1	2026-01-16 10:08:10.458495-04
+470	2026-01-16 10:08:15.494727-04	CDU-101	TEMP_TOWER	380.68	1	2026-01-16 10:08:15.975589-04
+471	2026-01-16 10:08:15.494785-04	CDU-101	PRESS_TOWER	4.81	1	2026-01-16 10:08:15.975589-04
+472	2026-01-16 10:08:15.494803-04	CDU-101	FLOW_FEED	11878.68	1	2026-01-16 10:08:15.975589-04
+473	2026-01-16 10:08:15.49482-04	FCC-201	TEMP_REACTOR	510.84	1	2026-01-16 10:08:15.975589-04
+474	2026-01-16 10:08:15.494836-04	FCC-201	CATALYST_ACT	79.51	1	2026-01-16 10:08:15.975589-04
+475	2026-01-16 10:08:15.494853-04	HT-301	TEMP_HYDRO	371.52	1	2026-01-16 10:08:15.975589-04
+476	2026-01-16 10:08:15.494869-04	HT-301	H2_PRESS	47.32	1	2026-01-16 10:08:15.975589-04
+477	2026-01-16 10:08:21.027572-04	CDU-101	TEMP_TOWER	352.61	1	2026-01-16 10:08:21.244106-04
+478	2026-01-16 10:08:21.027619-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:08:21.244106-04
+479	2026-01-16 10:08:21.027637-04	CDU-101	FLOW_FEED	9103.04	1	2026-01-16 10:08:21.244106-04
+480	2026-01-16 10:08:21.027653-04	FCC-201	TEMP_REACTOR	480.04	1	2026-01-16 10:08:21.244106-04
+481	2026-01-16 10:08:21.027668-04	FCC-201	CATALYST_ACT	78.85	1	2026-01-16 10:08:21.244106-04
+482	2026-01-16 10:08:21.027683-04	HT-301	TEMP_HYDRO	376.51	1	2026-01-16 10:08:21.244106-04
+483	2026-01-16 10:08:21.027698-04	HT-301	H2_PRESS	38.93	1	2026-01-16 10:08:21.244106-04
+484	2026-01-16 10:08:32.018724-04	CDU-101	TEMP_TOWER	350.05	1	2026-01-16 10:08:34.47269-04
+485	2026-01-16 10:08:32.018787-04	CDU-101	PRESS_TOWER	2.53	1	2026-01-16 10:08:34.47269-04
+486	2026-01-16 10:08:32.018806-04	CDU-101	FLOW_FEED	9107.47	1	2026-01-16 10:08:34.47269-04
+487	2026-01-16 10:08:32.018826-04	FCC-201	TEMP_REACTOR	549.46	1	2026-01-16 10:08:34.47269-04
+488	2026-01-16 10:08:32.018842-04	FCC-201	CATALYST_ACT	82.26	1	2026-01-16 10:08:34.47269-04
+489	2026-01-16 10:08:32.018858-04	HT-301	TEMP_HYDRO	367.86	1	2026-01-16 10:08:34.47269-04
+490	2026-01-16 10:08:32.018874-04	HT-301	H2_PRESS	30.82	1	2026-01-16 10:08:34.47269-04
+491	2026-01-16 10:08:39.516184-04	CDU-101	TEMP_TOWER	419.2	1	2026-01-16 10:08:41.73235-04
+492	2026-01-16 10:08:39.516234-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:08:41.73235-04
+493	2026-01-16 10:08:39.516252-04	CDU-101	FLOW_FEED	9954	1	2026-01-16 10:08:41.73235-04
+494	2026-01-16 10:08:39.516268-04	FCC-201	TEMP_REACTOR	538.09	1	2026-01-16 10:08:41.73235-04
+495	2026-01-16 10:08:39.516284-04	FCC-201	CATALYST_ACT	72.78	1	2026-01-16 10:08:41.73235-04
+496	2026-01-16 10:08:39.516299-04	HT-301	TEMP_HYDRO	344.33	1	2026-01-16 10:08:41.73235-04
+497	2026-01-16 10:08:39.516314-04	HT-301	H2_PRESS	44.75	1	2026-01-16 10:08:41.73235-04
+498	2026-01-16 10:08:46.777615-04	CDU-101	TEMP_TOWER	379.07	1	2026-01-16 10:08:47.310346-04
+499	2026-01-16 10:08:46.777682-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 10:08:47.310346-04
+500	2026-01-16 10:08:46.777702-04	CDU-101	FLOW_FEED	10959.22	1	2026-01-16 10:08:47.310346-04
+501	2026-01-16 10:08:46.77772-04	FCC-201	TEMP_REACTOR	529.49	1	2026-01-16 10:08:47.310346-04
+502	2026-01-16 10:08:46.777741-04	FCC-201	CATALYST_ACT	85.67	1	2026-01-16 10:08:47.310346-04
+503	2026-01-16 10:08:46.777759-04	HT-301	TEMP_HYDRO	323.17	1	2026-01-16 10:08:47.310346-04
+504	2026-01-16 10:08:46.777776-04	HT-301	H2_PRESS	39.39	1	2026-01-16 10:08:47.310346-04
+505	2026-01-16 10:08:52.347689-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 10:08:52.542953-04
+506	2026-01-16 10:08:52.347737-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:52.542953-04
+507	2026-01-16 10:08:52.347754-04	CDU-101	FLOW_FEED	10036.84	1	2026-01-16 10:08:52.542953-04
+508	2026-01-16 10:08:52.347771-04	FCC-201	TEMP_REACTOR	529.18	1	2026-01-16 10:08:52.542953-04
+509	2026-01-16 10:08:52.347786-04	FCC-201	CATALYST_ACT	72.93	1	2026-01-16 10:08:52.542953-04
+510	2026-01-16 10:08:52.347801-04	HT-301	TEMP_HYDRO	362.29	1	2026-01-16 10:08:52.542953-04
+511	2026-01-16 10:08:52.347816-04	HT-301	H2_PRESS	36.72	1	2026-01-16 10:08:52.542953-04
+512	2026-01-16 10:08:57.58111-04	CDU-101	TEMP_TOWER	384.32	1	2026-01-16 10:08:58.030458-04
+513	2026-01-16 10:08:57.58117-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:58.030458-04
+514	2026-01-16 10:08:57.581189-04	CDU-101	FLOW_FEED	11213.62	1	2026-01-16 10:08:58.030458-04
+515	2026-01-16 10:08:57.581208-04	FCC-201	TEMP_REACTOR	505	1	2026-01-16 10:08:58.030458-04
+516	2026-01-16 10:08:57.581225-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:08:58.030458-04
+517	2026-01-16 10:08:57.581241-04	HT-301	TEMP_HYDRO	361.41	1	2026-01-16 10:08:58.030458-04
+518	2026-01-16 10:08:57.581257-04	HT-301	H2_PRESS	46.75	1	2026-01-16 10:08:58.030458-04
+519	2026-01-16 10:09:03.065275-04	CDU-101	TEMP_TOWER	427.32	1	2026-01-16 10:09:03.294004-04
+520	2026-01-16 10:09:03.065334-04	CDU-101	PRESS_TOWER	3.68	1	2026-01-16 10:09:03.294004-04
+521	2026-01-16 10:09:03.065354-04	CDU-101	FLOW_FEED	9069.18	1	2026-01-16 10:09:03.294004-04
+522	2026-01-16 10:09:03.065371-04	FCC-201	TEMP_REACTOR	514.13	1	2026-01-16 10:09:03.294004-04
+523	2026-01-16 10:09:03.065388-04	FCC-201	CATALYST_ACT	87.65	1	2026-01-16 10:09:03.294004-04
+524	2026-01-16 10:09:03.065404-04	HT-301	TEMP_HYDRO	330.91	1	2026-01-16 10:09:03.294004-04
+525	2026-01-16 10:09:03.065421-04	HT-301	H2_PRESS	49.02	1	2026-01-16 10:09:03.294004-04
+526	2026-01-16 10:09:08.32823-04	CDU-101	TEMP_TOWER	440.56	1	2026-01-16 10:09:08.794526-04
+527	2026-01-16 10:09:08.328293-04	CDU-101	PRESS_TOWER	4.08	1	2026-01-16 10:09:08.794526-04
+528	2026-01-16 10:09:08.328311-04	CDU-101	FLOW_FEED	11141.67	1	2026-01-16 10:09:08.794526-04
+529	2026-01-16 10:09:08.328328-04	FCC-201	TEMP_REACTOR	509.71	1	2026-01-16 10:09:08.794526-04
+530	2026-01-16 10:09:08.328343-04	FCC-201	CATALYST_ACT	83.15	1	2026-01-16 10:09:08.794526-04
+531	2026-01-16 10:09:08.328359-04	HT-301	TEMP_HYDRO	347.87	1	2026-01-16 10:09:08.794526-04
+532	2026-01-16 10:09:08.328374-04	HT-301	H2_PRESS	38.51	1	2026-01-16 10:09:08.794526-04
+533	2026-01-16 10:09:13.822302-04	CDU-101	TEMP_TOWER	359.04	1	2026-01-16 10:09:14.017219-04
+534	2026-01-16 10:09:13.82236-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:09:14.017219-04
+535	2026-01-16 10:09:13.82238-04	CDU-101	FLOW_FEED	10843.84	1	2026-01-16 10:09:14.017219-04
+536	2026-01-16 10:09:13.822397-04	FCC-201	TEMP_REACTOR	502.31	1	2026-01-16 10:09:14.017219-04
+537	2026-01-16 10:09:13.822414-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:09:14.017219-04
+538	2026-01-16 10:09:13.822429-04	HT-301	TEMP_HYDRO	326.07	1	2026-01-16 10:09:14.017219-04
+539	2026-01-16 10:09:13.822446-04	HT-301	H2_PRESS	47.76	1	2026-01-16 10:09:14.017219-04
+540	2026-01-16 10:09:19.041548-04	CDU-101	TEMP_TOWER	367.47	1	2026-01-16 10:09:19.57813-04
+541	2026-01-16 10:09:19.041619-04	CDU-101	PRESS_TOWER	4.17	1	2026-01-16 10:09:19.57813-04
+542	2026-01-16 10:09:19.041638-04	CDU-101	FLOW_FEED	11647.95	1	2026-01-16 10:09:19.57813-04
+543	2026-01-16 10:09:19.041656-04	FCC-201	TEMP_REACTOR	497.24	1	2026-01-16 10:09:19.57813-04
+544	2026-01-16 10:09:19.041675-04	FCC-201	CATALYST_ACT	74.56	1	2026-01-16 10:09:19.57813-04
+545	2026-01-16 10:09:19.041692-04	HT-301	TEMP_HYDRO	308.17	1	2026-01-16 10:09:19.57813-04
+546	2026-01-16 10:09:19.041708-04	HT-301	H2_PRESS	32.8	1	2026-01-16 10:09:19.57813-04
+547	2026-01-16 10:09:26.728146-04	CDU-101	TEMP_TOWER	394.08	1	2026-01-16 10:09:27.257851-04
+548	2026-01-16 10:09:26.728208-04	CDU-101	PRESS_TOWER	3	1	2026-01-16 10:09:27.257851-04
+549	2026-01-16 10:09:26.728228-04	CDU-101	FLOW_FEED	9999.6	1	2026-01-16 10:09:27.257851-04
+550	2026-01-16 10:09:26.728246-04	FCC-201	TEMP_REACTOR	511.66	1	2026-01-16 10:09:27.257851-04
+551	2026-01-16 10:09:26.728264-04	FCC-201	CATALYST_ACT	78.12	1	2026-01-16 10:09:27.257851-04
+552	2026-01-16 10:09:26.728282-04	HT-301	TEMP_HYDRO	308.16	1	2026-01-16 10:09:27.257851-04
+553	2026-01-16 10:09:26.728297-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:09:27.257851-04
+554	2026-01-16 10:09:32.433019-04	CDU-101	TEMP_TOWER	411.53	1	2026-01-16 10:09:33.051715-04
+555	2026-01-16 10:09:32.434329-04	CDU-101	PRESS_TOWER	4.02	1	2026-01-16 10:09:33.051715-04
+556	2026-01-16 10:09:32.4344-04	CDU-101	FLOW_FEED	9732.85	1	2026-01-16 10:09:33.051715-04
+557	2026-01-16 10:09:32.434422-04	FCC-201	TEMP_REACTOR	535.04	1	2026-01-16 10:09:33.051715-04
+558	2026-01-16 10:09:32.434441-04	FCC-201	CATALYST_ACT	74.52	1	2026-01-16 10:09:33.051715-04
+559	2026-01-16 10:09:32.434458-04	HT-301	TEMP_HYDRO	337.35	1	2026-01-16 10:09:33.051715-04
+560	2026-01-16 10:09:32.434477-04	HT-301	H2_PRESS	32.13	1	2026-01-16 10:09:33.051715-04
+561	2026-01-16 10:09:38.154915-04	CDU-101	TEMP_TOWER	417.95	1	2026-01-16 10:09:38.573307-04
+562	2026-01-16 10:09:38.154979-04	CDU-101	PRESS_TOWER	2.62	1	2026-01-16 10:09:38.573307-04
+563	2026-01-16 10:09:38.155-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:09:38.573307-04
+564	2026-01-16 10:09:38.15502-04	FCC-201	TEMP_REACTOR	512.54	1	2026-01-16 10:09:38.573307-04
+565	2026-01-16 10:09:38.155038-04	FCC-201	CATALYST_ACT	93.44	1	2026-01-16 10:09:38.573307-04
+566	2026-01-16 10:09:38.155055-04	HT-301	TEMP_HYDRO	331.92	1	2026-01-16 10:09:38.573307-04
+567	2026-01-16 10:09:38.155071-04	HT-301	H2_PRESS	39.82	1	2026-01-16 10:09:38.573307-04
+568	2026-01-16 10:09:43.743069-04	CDU-101	TEMP_TOWER	396.23	1	2026-01-16 10:09:44.473329-04
+569	2026-01-16 10:09:43.743134-04	CDU-101	PRESS_TOWER	3.76	1	2026-01-16 10:09:44.473329-04
+570	2026-01-16 10:09:43.743155-04	CDU-101	FLOW_FEED	10844.6	1	2026-01-16 10:09:44.473329-04
+571	2026-01-16 10:09:43.743174-04	FCC-201	TEMP_REACTOR	546.25	1	2026-01-16 10:09:44.473329-04
+572	2026-01-16 10:09:43.74319-04	FCC-201	CATALYST_ACT	89.77	1	2026-01-16 10:09:44.473329-04
+573	2026-01-16 10:09:43.743206-04	HT-301	TEMP_HYDRO	307.64	1	2026-01-16 10:09:44.473329-04
+574	2026-01-16 10:09:43.743221-04	HT-301	H2_PRESS	47.3	1	2026-01-16 10:09:44.473329-04
+575	2026-01-16 10:09:49.517626-04	CDU-101	TEMP_TOWER	436.52	1	2026-01-16 10:09:50.268867-04
+576	2026-01-16 10:09:49.517681-04	CDU-101	PRESS_TOWER	3.91	1	2026-01-16 10:09:50.268867-04
+577	2026-01-16 10:09:49.517699-04	CDU-101	FLOW_FEED	8288.3	1	2026-01-16 10:09:50.268867-04
+578	2026-01-16 10:09:49.517717-04	FCC-201	TEMP_REACTOR	545.04	1	2026-01-16 10:09:50.268867-04
+579	2026-01-16 10:09:49.517734-04	FCC-201	CATALYST_ACT	87.86	1	2026-01-16 10:09:50.268867-04
+580	2026-01-16 10:09:49.517751-04	HT-301	TEMP_HYDRO	317.1	1	2026-01-16 10:09:50.268867-04
+581	2026-01-16 10:09:49.517769-04	HT-301	H2_PRESS	37.75	1	2026-01-16 10:09:50.268867-04
+582	2026-01-16 10:09:55.383658-04	CDU-101	TEMP_TOWER	412.12	1	2026-01-16 10:09:56.078164-04
+583	2026-01-16 10:09:55.383717-04	CDU-101	PRESS_TOWER	4.34	1	2026-01-16 10:09:56.078164-04
+584	2026-01-16 10:09:55.383735-04	CDU-101	FLOW_FEED	10666.12	1	2026-01-16 10:09:56.078164-04
+585	2026-01-16 10:09:55.383754-04	FCC-201	TEMP_REACTOR	514.42	1	2026-01-16 10:09:56.078164-04
+586	2026-01-16 10:09:55.383771-04	FCC-201	CATALYST_ACT	78.62	1	2026-01-16 10:09:56.078164-04
+587	2026-01-16 10:09:55.383788-04	HT-301	TEMP_HYDRO	369.58	1	2026-01-16 10:09:56.078164-04
+588	2026-01-16 10:09:55.383803-04	HT-301	H2_PRESS	38.41	1	2026-01-16 10:09:56.078164-04
+589	2026-01-16 10:10:01.172685-04	CDU-101	TEMP_TOWER	430.63	1	2026-01-16 10:10:01.959461-04
+590	2026-01-16 10:10:01.172749-04	CDU-101	PRESS_TOWER	3.22	1	2026-01-16 10:10:01.959461-04
+591	2026-01-16 10:10:01.172769-04	CDU-101	FLOW_FEED	9679.78	1	2026-01-16 10:10:01.959461-04
+592	2026-01-16 10:10:01.172788-04	FCC-201	TEMP_REACTOR	491.99	1	2026-01-16 10:10:01.959461-04
+593	2026-01-16 10:10:01.172804-04	FCC-201	CATALYST_ACT	75.05	1	2026-01-16 10:10:01.959461-04
+594	2026-01-16 10:10:01.172821-04	HT-301	TEMP_HYDRO	362.35	1	2026-01-16 10:10:01.959461-04
+595	2026-01-16 10:10:01.172837-04	HT-301	H2_PRESS	48.29	1	2026-01-16 10:10:01.959461-04
+596	2026-01-16 10:10:07.453342-04	CDU-101	TEMP_TOWER	398.65	1	2026-01-16 10:10:09.175854-04
+597	2026-01-16 10:10:07.453401-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:10:09.175854-04
+598	2026-01-16 10:10:07.453419-04	CDU-101	FLOW_FEED	9660.72	1	2026-01-16 10:10:09.175854-04
+599	2026-01-16 10:10:07.453437-04	FCC-201	TEMP_REACTOR	519.1	1	2026-01-16 10:10:09.175854-04
+600	2026-01-16 10:10:07.453453-04	FCC-201	CATALYST_ACT	83.93	1	2026-01-16 10:10:09.175854-04
+601	2026-01-16 10:10:07.453469-04	HT-301	TEMP_HYDRO	325.93	1	2026-01-16 10:10:09.175854-04
+602	2026-01-16 10:10:07.453484-04	HT-301	H2_PRESS	44.51	1	2026-01-16 10:10:09.175854-04
+603	2026-01-16 10:10:14.263994-04	CDU-101	TEMP_TOWER	401.98	1	2026-01-16 10:10:14.602756-04
+604	2026-01-16 10:10:14.264055-04	CDU-101	PRESS_TOWER	2.89	1	2026-01-16 10:10:14.602756-04
+605	2026-01-16 10:10:14.264074-04	CDU-101	FLOW_FEED	9734.2	1	2026-01-16 10:10:14.602756-04
+606	2026-01-16 10:10:14.264092-04	FCC-201	TEMP_REACTOR	502.21	1	2026-01-16 10:10:14.602756-04
+607	2026-01-16 10:10:14.264109-04	FCC-201	CATALYST_ACT	71.14	1	2026-01-16 10:10:14.602756-04
+608	2026-01-16 10:10:14.264127-04	HT-301	TEMP_HYDRO	356.23	1	2026-01-16 10:10:14.602756-04
+609	2026-01-16 10:10:14.264143-04	HT-301	H2_PRESS	30.61	1	2026-01-16 10:10:14.602756-04
+610	2026-01-16 10:10:19.702369-04	CDU-101	TEMP_TOWER	388.23	1	2026-01-16 10:10:20.276746-04
+611	2026-01-16 10:10:19.702425-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:10:20.276746-04
+612	2026-01-16 10:10:19.702442-04	CDU-101	FLOW_FEED	10559.28	1	2026-01-16 10:10:20.276746-04
+613	2026-01-16 10:10:19.702459-04	FCC-201	TEMP_REACTOR	534.34	1	2026-01-16 10:10:20.276746-04
+614	2026-01-16 10:10:19.702475-04	FCC-201	CATALYST_ACT	90.06	1	2026-01-16 10:10:20.276746-04
+615	2026-01-16 10:10:19.702491-04	HT-301	TEMP_HYDRO	308.75	1	2026-01-16 10:10:20.276746-04
+616	2026-01-16 10:10:19.702507-04	HT-301	H2_PRESS	38.2	1	2026-01-16 10:10:20.276746-04
+617	2026-01-16 10:10:25.39917-04	CDU-101	TEMP_TOWER	406.84	1	2026-01-16 10:10:25.788487-04
+618	2026-01-16 10:10:25.399227-04	CDU-101	PRESS_TOWER	3.56	1	2026-01-16 10:10:25.788487-04
+619	2026-01-16 10:10:25.399246-04	CDU-101	FLOW_FEED	10291.69	1	2026-01-16 10:10:25.788487-04
+620	2026-01-16 10:10:25.399263-04	FCC-201	TEMP_REACTOR	481.65	1	2026-01-16 10:10:25.788487-04
+621	2026-01-16 10:10:25.399279-04	FCC-201	CATALYST_ACT	77.4	1	2026-01-16 10:10:25.788487-04
+622	2026-01-16 10:10:25.399296-04	HT-301	TEMP_HYDRO	314.25	1	2026-01-16 10:10:25.788487-04
+623	2026-01-16 10:10:25.399312-04	HT-301	H2_PRESS	37.23	1	2026-01-16 10:10:25.788487-04
+624	2026-01-16 10:10:30.898369-04	CDU-101	TEMP_TOWER	410.52	1	2026-01-16 10:10:31.546032-04
+625	2026-01-16 10:10:30.898444-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:10:31.546032-04
+626	2026-01-16 10:10:30.898465-04	CDU-101	FLOW_FEED	11087.77	1	2026-01-16 10:10:31.546032-04
+627	2026-01-16 10:10:30.898484-04	FCC-201	TEMP_REACTOR	487.2	1	2026-01-16 10:10:31.546032-04
+628	2026-01-16 10:10:30.898502-04	FCC-201	CATALYST_ACT	82.46	1	2026-01-16 10:10:31.546032-04
+629	2026-01-16 10:10:30.898519-04	HT-301	TEMP_HYDRO	345.89	1	2026-01-16 10:10:31.546032-04
+630	2026-01-16 10:10:30.898536-04	HT-301	H2_PRESS	37.99	1	2026-01-16 10:10:31.546032-04
+631	2026-01-16 10:10:36.626385-04	CDU-101	TEMP_TOWER	365.5	1	2026-01-16 10:10:36.904497-04
+632	2026-01-16 10:10:36.626437-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:10:36.904497-04
+633	2026-01-16 10:10:36.626454-04	CDU-101	FLOW_FEED	9603.14	1	2026-01-16 10:10:36.904497-04
+634	2026-01-16 10:10:36.626472-04	FCC-201	TEMP_REACTOR	515.26	1	2026-01-16 10:10:36.904497-04
+635	2026-01-16 10:10:36.626487-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 10:10:36.904497-04
+636	2026-01-16 10:10:36.626504-04	HT-301	TEMP_HYDRO	306.97	1	2026-01-16 10:10:36.904497-04
+637	2026-01-16 10:10:36.626521-04	HT-301	H2_PRESS	31.17	1	2026-01-16 10:10:36.904497-04
+638	2026-01-16 10:10:41.937432-04	CDU-101	TEMP_TOWER	438.93	1	2026-01-16 10:10:42.485514-04
+639	2026-01-16 10:10:41.937493-04	CDU-101	PRESS_TOWER	4.63	1	2026-01-16 10:10:42.485514-04
+640	2026-01-16 10:10:41.937513-04	CDU-101	FLOW_FEED	8685.25	1	2026-01-16 10:10:42.485514-04
+641	2026-01-16 10:10:41.93753-04	FCC-201	TEMP_REACTOR	543.37	1	2026-01-16 10:10:42.485514-04
+642	2026-01-16 10:10:41.937548-04	FCC-201	CATALYST_ACT	79.91	1	2026-01-16 10:10:42.485514-04
+643	2026-01-16 10:10:41.937566-04	HT-301	TEMP_HYDRO	354.33	1	2026-01-16 10:10:42.485514-04
+644	2026-01-16 10:10:41.937584-04	HT-301	H2_PRESS	30.19	1	2026-01-16 10:10:42.485514-04
+645	2026-01-16 10:10:47.548803-04	CDU-101	TEMP_TOWER	354.38	1	2026-01-16 10:10:48.188065-04
+646	2026-01-16 10:10:47.548871-04	CDU-101	PRESS_TOWER	4.55	1	2026-01-16 10:10:48.188065-04
+647	2026-01-16 10:10:47.548889-04	CDU-101	FLOW_FEED	8589.09	1	2026-01-16 10:10:48.188065-04
+648	2026-01-16 10:10:47.548907-04	FCC-201	TEMP_REACTOR	534.62	1	2026-01-16 10:10:48.188065-04
+649	2026-01-16 10:10:47.548923-04	FCC-201	CATALYST_ACT	84.66	1	2026-01-16 10:10:48.188065-04
+650	2026-01-16 10:10:47.54894-04	HT-301	TEMP_HYDRO	359.7	1	2026-01-16 10:10:48.188065-04
+651	2026-01-16 10:10:47.548957-04	HT-301	H2_PRESS	42.57	1	2026-01-16 10:10:48.188065-04
+652	2026-01-16 10:10:53.249152-04	CDU-101	TEMP_TOWER	364.57	1	2026-01-16 10:10:54.766173-04
+653	2026-01-16 10:10:53.249217-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:10:54.766173-04
+654	2026-01-16 10:10:53.249237-04	CDU-101	FLOW_FEED	8482.94	1	2026-01-16 10:10:54.766173-04
+655	2026-01-16 10:10:53.249256-04	FCC-201	TEMP_REACTOR	505.02	1	2026-01-16 10:10:54.766173-04
+656	2026-01-16 10:10:53.249273-04	FCC-201	CATALYST_ACT	88.07	1	2026-01-16 10:10:54.766173-04
+657	2026-01-16 10:10:53.249292-04	HT-301	TEMP_HYDRO	358.76	1	2026-01-16 10:10:54.766173-04
+658	2026-01-16 10:10:53.249309-04	HT-301	H2_PRESS	36.92	1	2026-01-16 10:10:54.766173-04
+659	2026-01-16 10:11:00.012543-04	CDU-101	TEMP_TOWER	352.79	1	2026-01-16 10:11:00.345359-04
+660	2026-01-16 10:11:00.012603-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:11:00.345359-04
+661	2026-01-16 10:11:00.012624-04	CDU-101	FLOW_FEED	8288.23	1	2026-01-16 10:11:00.345359-04
+662	2026-01-16 10:11:00.012642-04	FCC-201	TEMP_REACTOR	527.23	1	2026-01-16 10:11:00.345359-04
+663	2026-01-16 10:11:00.012658-04	FCC-201	CATALYST_ACT	70.65	1	2026-01-16 10:11:00.345359-04
+664	2026-01-16 10:11:00.012675-04	HT-301	TEMP_HYDRO	308.32	1	2026-01-16 10:11:00.345359-04
+665	2026-01-16 10:11:00.012692-04	HT-301	H2_PRESS	34.55	1	2026-01-16 10:11:00.345359-04
+666	2026-01-16 10:11:05.426656-04	CDU-101	TEMP_TOWER	359.96	1	2026-01-16 10:11:05.959417-04
+667	2026-01-16 10:11:05.426709-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:11:05.959417-04
+668	2026-01-16 10:11:05.426726-04	CDU-101	FLOW_FEED	11029.8	1	2026-01-16 10:11:05.959417-04
+669	2026-01-16 10:11:05.426742-04	FCC-201	TEMP_REACTOR	488.54	1	2026-01-16 10:11:05.959417-04
+670	2026-01-16 10:11:05.426758-04	FCC-201	CATALYST_ACT	83.4	1	2026-01-16 10:11:05.959417-04
+671	2026-01-16 10:11:05.426774-04	HT-301	TEMP_HYDRO	342.4	1	2026-01-16 10:11:05.959417-04
+672	2026-01-16 10:11:05.42679-04	HT-301	H2_PRESS	47.82	1	2026-01-16 10:11:05.959417-04
+673	2026-01-16 10:11:11.007003-04	CDU-101	TEMP_TOWER	434.59	1	2026-01-16 10:11:11.258225-04
+674	2026-01-16 10:11:11.007067-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:11:11.258225-04
+675	2026-01-16 10:11:11.007088-04	CDU-101	FLOW_FEED	10612.94	1	2026-01-16 10:11:11.258225-04
+676	2026-01-16 10:11:11.007107-04	FCC-201	TEMP_REACTOR	545.96	1	2026-01-16 10:11:11.258225-04
+677	2026-01-16 10:11:11.007125-04	FCC-201	CATALYST_ACT	77.1	1	2026-01-16 10:11:11.258225-04
+678	2026-01-16 10:11:11.007143-04	HT-301	TEMP_HYDRO	327.44	1	2026-01-16 10:11:11.258225-04
+679	2026-01-16 10:11:11.007161-04	HT-301	H2_PRESS	41.21	1	2026-01-16 10:11:11.258225-04
+680	2026-01-16 10:22:31.026173-04	CDU-101	TEMP_TOWER	358.98	1	2026-01-16 10:22:33.358948-04
+681	2026-01-16 10:22:31.026253-04	CDU-101	PRESS_TOWER	3.08	1	2026-01-16 10:22:33.358948-04
+682	2026-01-16 10:22:31.026279-04	CDU-101	FLOW_FEED	10326.75	1	2026-01-16 10:22:33.358948-04
+683	2026-01-16 10:22:31.026301-04	FCC-201	TEMP_REACTOR	531.72	1	2026-01-16 10:22:33.358948-04
+684	2026-01-16 10:22:31.02632-04	FCC-201	CATALYST_ACT	85.4	1	2026-01-16 10:22:33.358948-04
+685	2026-01-16 10:22:31.026339-04	HT-301	TEMP_HYDRO	340.9	1	2026-01-16 10:22:33.358948-04
+686	2026-01-16 10:22:31.026357-04	HT-301	H2_PRESS	49.04	1	2026-01-16 10:22:33.358948-04
+687	2026-01-16 10:22:39.426801-04	CDU-101	TEMP_TOWER	440.3	1	2026-01-16 10:22:39.634186-04
+688	2026-01-16 10:22:39.42685-04	CDU-101	PRESS_TOWER	3.16	1	2026-01-16 10:22:39.634186-04
+689	2026-01-16 10:22:39.426867-04	CDU-101	FLOW_FEED	10129	1	2026-01-16 10:22:39.634186-04
+690	2026-01-16 10:22:39.426883-04	FCC-201	TEMP_REACTOR	519.24	1	2026-01-16 10:22:39.634186-04
+691	2026-01-16 10:22:39.426899-04	FCC-201	CATALYST_ACT	90.96	1	2026-01-16 10:22:39.634186-04
+692	2026-01-16 10:22:39.426915-04	HT-301	TEMP_HYDRO	320.38	1	2026-01-16 10:22:39.634186-04
+693	2026-01-16 10:22:39.42693-04	HT-301	H2_PRESS	36.82	1	2026-01-16 10:22:39.634186-04
+694	2026-01-16 10:22:44.762972-04	CDU-101	TEMP_TOWER	416.18	1	2026-01-16 10:22:45.213068-04
+695	2026-01-16 10:22:44.763025-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:22:45.213068-04
+696	2026-01-16 10:22:44.763042-04	CDU-101	FLOW_FEED	11696.57	1	2026-01-16 10:22:45.213068-04
+697	2026-01-16 10:22:44.76306-04	FCC-201	TEMP_REACTOR	486.74	1	2026-01-16 10:22:45.213068-04
+698	2026-01-16 10:22:44.763076-04	FCC-201	CATALYST_ACT	93.27	1	2026-01-16 10:22:45.213068-04
+699	2026-01-16 10:22:44.763093-04	HT-301	TEMP_HYDRO	308.53	1	2026-01-16 10:22:45.213068-04
+700	2026-01-16 10:22:44.763109-04	HT-301	H2_PRESS	42.9	1	2026-01-16 10:22:45.213068-04
+701	2026-01-16 10:22:50.273965-04	CDU-101	TEMP_TOWER	420.77	1	2026-01-16 10:22:52.507711-04
+702	2026-01-16 10:22:50.274021-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:22:52.507711-04
+703	2026-01-16 10:22:50.274039-04	CDU-101	FLOW_FEED	8544.89	1	2026-01-16 10:22:52.507711-04
+704	2026-01-16 10:22:50.274056-04	FCC-201	TEMP_REACTOR	518.24	1	2026-01-16 10:22:52.507711-04
+705	2026-01-16 10:22:50.274073-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:22:52.507711-04
+706	2026-01-16 10:22:50.274092-04	HT-301	TEMP_HYDRO	352.22	1	2026-01-16 10:22:52.507711-04
+707	2026-01-16 10:22:50.27411-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:22:52.507711-04
+708	2026-01-16 10:22:57.55014-04	CDU-101	TEMP_TOWER	444.5	1	2026-01-16 10:23:00.071391-04
+709	2026-01-16 10:22:57.550193-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:23:00.071391-04
+710	2026-01-16 10:22:57.550211-04	CDU-101	FLOW_FEED	8955.9	1	2026-01-16 10:23:00.071391-04
+711	2026-01-16 10:22:57.550228-04	FCC-201	TEMP_REACTOR	482.05	1	2026-01-16 10:23:00.071391-04
+712	2026-01-16 10:22:57.550244-04	FCC-201	CATALYST_ACT	94.06	1	2026-01-16 10:23:00.071391-04
+713	2026-01-16 10:22:57.550261-04	HT-301	TEMP_HYDRO	352.7	1	2026-01-16 10:23:00.071391-04
+714	2026-01-16 10:22:57.550277-04	HT-301	H2_PRESS	38.07	1	2026-01-16 10:23:00.071391-04
+715	2026-01-16 10:23:09.820166-04	CDU-101	TEMP_TOWER	381.8	1	2026-01-16 10:23:12.875869-04
+716	2026-01-16 10:23:09.82023-04	CDU-101	PRESS_TOWER	4.69	1	2026-01-16 10:23:12.875869-04
+717	2026-01-16 10:23:09.820249-04	CDU-101	FLOW_FEED	11129.83	1	2026-01-16 10:23:12.875869-04
+718	2026-01-16 10:23:09.820268-04	FCC-201	TEMP_REACTOR	544.36	1	2026-01-16 10:23:12.875869-04
+719	2026-01-16 10:23:09.820285-04	FCC-201	CATALYST_ACT	78.46	1	2026-01-16 10:23:12.875869-04
+720	2026-01-16 10:23:09.820303-04	HT-301	TEMP_HYDRO	305.24	1	2026-01-16 10:23:12.875869-04
+721	2026-01-16 10:23:09.820319-04	HT-301	H2_PRESS	43.74	1	2026-01-16 10:23:12.875869-04
+722	2026-01-16 10:23:17.917636-04	CDU-101	TEMP_TOWER	371.72	1	2026-01-16 10:23:20.163172-04
+723	2026-01-16 10:23:17.917705-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:23:20.163172-04
+724	2026-01-16 10:23:17.917722-04	CDU-101	FLOW_FEED	11924.52	1	2026-01-16 10:23:20.163172-04
+725	2026-01-16 10:23:17.917741-04	FCC-201	TEMP_REACTOR	505.61	1	2026-01-16 10:23:20.163172-04
+726	2026-01-16 10:23:17.917759-04	FCC-201	CATALYST_ACT	89.61	1	2026-01-16 10:23:20.163172-04
+727	2026-01-16 10:23:17.917778-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:23:20.163172-04
+728	2026-01-16 10:23:17.917795-04	HT-301	H2_PRESS	35.92	1	2026-01-16 10:23:20.163172-04
+729	2026-01-16 10:23:25.213596-04	CDU-101	TEMP_TOWER	371.21	1	2026-01-16 10:23:27.858328-04
+730	2026-01-16 10:23:25.213661-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:23:27.858328-04
+731	2026-01-16 10:23:25.213681-04	CDU-101	FLOW_FEED	11264.42	1	2026-01-16 10:23:27.858328-04
+732	2026-01-16 10:23:25.213702-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:23:27.858328-04
+733	2026-01-16 10:23:25.213719-04	FCC-201	CATALYST_ACT	73.28	1	2026-01-16 10:23:27.858328-04
+734	2026-01-16 10:23:25.213736-04	HT-301	TEMP_HYDRO	304.66	1	2026-01-16 10:23:27.858328-04
+735	2026-01-16 10:23:25.213752-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:23:27.858328-04
+736	2026-01-16 10:23:32.904164-04	CDU-101	TEMP_TOWER	445.75	1	2026-01-16 10:23:33.246675-04
+737	2026-01-16 10:23:32.904218-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:23:33.246675-04
+738	2026-01-16 10:23:32.904235-04	CDU-101	FLOW_FEED	10727.24	1	2026-01-16 10:23:33.246675-04
+739	2026-01-16 10:23:32.904252-04	FCC-201	TEMP_REACTOR	547.9	1	2026-01-16 10:23:33.246675-04
+740	2026-01-16 10:23:32.904268-04	FCC-201	CATALYST_ACT	80.09	1	2026-01-16 10:23:33.246675-04
+741	2026-01-16 10:23:32.904284-04	HT-301	TEMP_HYDRO	327.38	1	2026-01-16 10:23:33.246675-04
+742	2026-01-16 10:23:32.904299-04	HT-301	H2_PRESS	48.61	1	2026-01-16 10:23:33.246675-04
+743	2026-01-16 10:23:38.275745-04	CDU-101	TEMP_TOWER	409.25	1	2026-01-16 10:23:40.867905-04
+744	2026-01-16 10:23:38.275807-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:23:40.867905-04
+745	2026-01-16 10:23:38.275826-04	CDU-101	FLOW_FEED	8468.85	1	2026-01-16 10:23:40.867905-04
+746	2026-01-16 10:23:38.275845-04	FCC-201	TEMP_REACTOR	539.57	1	2026-01-16 10:23:40.867905-04
+747	2026-01-16 10:23:38.27586-04	FCC-201	CATALYST_ACT	87.58	1	2026-01-16 10:23:40.867905-04
+748	2026-01-16 10:23:38.275877-04	HT-301	TEMP_HYDRO	338.61	1	2026-01-16 10:23:40.867905-04
+749	2026-01-16 10:23:38.275892-04	HT-301	H2_PRESS	41.75	1	2026-01-16 10:23:40.867905-04
+750	2026-01-16 10:23:45.946101-04	CDU-101	TEMP_TOWER	383.69	1	2026-01-16 10:23:46.231207-04
+751	2026-01-16 10:23:45.946159-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:23:46.231207-04
+752	2026-01-16 10:23:45.946177-04	CDU-101	FLOW_FEED	9468	1	2026-01-16 10:23:46.231207-04
+753	2026-01-16 10:23:45.946195-04	FCC-201	TEMP_REACTOR	491.29	1	2026-01-16 10:23:46.231207-04
+754	2026-01-16 10:23:45.946211-04	FCC-201	CATALYST_ACT	74.68	1	2026-01-16 10:23:46.231207-04
+755	2026-01-16 10:23:45.946227-04	HT-301	TEMP_HYDRO	338.66	1	2026-01-16 10:23:46.231207-04
+756	2026-01-16 10:23:45.946244-04	HT-301	H2_PRESS	39.52	1	2026-01-16 10:23:46.231207-04
+757	2026-01-16 10:23:51.263802-04	CDU-101	TEMP_TOWER	423.45	1	2026-01-16 10:23:51.80562-04
+758	2026-01-16 10:23:51.265008-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:23:51.80562-04
+759	2026-01-16 10:23:51.265086-04	CDU-101	FLOW_FEED	9566.36	1	2026-01-16 10:23:51.80562-04
+760	2026-01-16 10:23:51.265108-04	FCC-201	TEMP_REACTOR	492.29	1	2026-01-16 10:23:51.80562-04
+761	2026-01-16 10:23:51.265127-04	FCC-201	CATALYST_ACT	77.5	1	2026-01-16 10:23:51.80562-04
+762	2026-01-16 10:23:51.265145-04	HT-301	TEMP_HYDRO	300.93	1	2026-01-16 10:23:51.80562-04
+763	2026-01-16 10:23:51.265163-04	HT-301	H2_PRESS	48.18	1	2026-01-16 10:23:51.80562-04
+764	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:07.10153-04
+765	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:07.10153-04
+766	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:07.10153-04
+767	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:07.10153-04
+768	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:07.10153-04
+769	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:07.10153-04
+770	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:07.10153-04
+771	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:09.662083-04
+772	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:09.662083-04
+773	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:09.662083-04
+774	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:09.662083-04
+775	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:09.662083-04
+776	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:09.662083-04
+777	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:09.662083-04
+778	2026-01-16 10:24:14.922041-04	CDU-101	TEMP_TOWER	410.66	1	2026-01-16 10:24:15.125166-04
+779	2026-01-16 10:24:14.922107-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:24:15.125166-04
+780	2026-01-16 10:24:14.922168-04	CDU-101	FLOW_FEED	10547.47	1	2026-01-16 10:24:15.125166-04
+781	2026-01-16 10:24:14.922189-04	FCC-201	TEMP_REACTOR	526.99	1	2026-01-16 10:24:15.125166-04
+782	2026-01-16 10:24:14.922205-04	FCC-201	CATALYST_ACT	78.75	1	2026-01-16 10:24:15.125166-04
+783	2026-01-16 10:24:14.922225-04	HT-301	TEMP_HYDRO	325.18	1	2026-01-16 10:24:15.125166-04
+784	2026-01-16 10:24:14.922241-04	HT-301	H2_PRESS	47.97	1	2026-01-16 10:24:15.125166-04
+785	2026-01-16 10:24:20.192866-04	CDU-101	TEMP_TOWER	353.73	1	2026-01-16 10:24:20.683471-04
+786	2026-01-16 10:24:20.192923-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:24:20.683471-04
+787	2026-01-16 10:24:20.19294-04	CDU-101	FLOW_FEED	8834.56	1	2026-01-16 10:24:20.683471-04
+788	2026-01-16 10:24:20.192957-04	FCC-201	TEMP_REACTOR	495.19	1	2026-01-16 10:24:20.683471-04
+789	2026-01-16 10:24:20.192972-04	FCC-201	CATALYST_ACT	86.04	1	2026-01-16 10:24:20.683471-04
+790	2026-01-16 10:24:20.192987-04	HT-301	TEMP_HYDRO	368.94	1	2026-01-16 10:24:20.683471-04
+791	2026-01-16 10:24:20.193001-04	HT-301	H2_PRESS	39.98	1	2026-01-16 10:24:20.683471-04
+792	2026-01-16 10:24:25.723755-04	CDU-101	TEMP_TOWER	408.59	1	2026-01-16 10:24:25.921512-04
+793	2026-01-16 10:24:25.723802-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:24:25.921512-04
+794	2026-01-16 10:24:25.723819-04	CDU-101	FLOW_FEED	10353.57	1	2026-01-16 10:24:25.921512-04
+795	2026-01-16 10:24:25.723836-04	FCC-201	TEMP_REACTOR	536.57	1	2026-01-16 10:24:25.921512-04
+796	2026-01-16 10:24:25.72385-04	FCC-201	CATALYST_ACT	70.85	1	2026-01-16 10:24:25.921512-04
+797	2026-01-16 10:24:25.723866-04	HT-301	TEMP_HYDRO	335.36	1	2026-01-16 10:24:25.921512-04
+798	2026-01-16 10:24:25.72388-04	HT-301	H2_PRESS	46.27	1	2026-01-16 10:24:25.921512-04
+799	2026-01-16 10:24:30.972691-04	CDU-101	TEMP_TOWER	418.73	1	2026-01-16 10:24:33.439834-04
+800	2026-01-16 10:24:30.972748-04	CDU-101	PRESS_TOWER	4.26	1	2026-01-16 10:24:33.439834-04
+801	2026-01-16 10:24:30.972767-04	CDU-101	FLOW_FEED	8943.52	1	2026-01-16 10:24:33.439834-04
+802	2026-01-16 10:24:30.972785-04	FCC-201	TEMP_REACTOR	490.15	1	2026-01-16 10:24:33.439834-04
+803	2026-01-16 10:24:30.972802-04	FCC-201	CATALYST_ACT	88.79	1	2026-01-16 10:24:33.439834-04
+804	2026-01-16 10:24:30.972818-04	HT-301	TEMP_HYDRO	372.1	1	2026-01-16 10:24:33.439834-04
+805	2026-01-16 10:24:30.972834-04	HT-301	H2_PRESS	34.99	1	2026-01-16 10:24:33.439834-04
+806	2026-01-16 10:24:38.48167-04	CDU-101	TEMP_TOWER	436.15	1	2026-01-16 10:24:38.679329-04
+807	2026-01-16 10:24:38.481719-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:24:38.679329-04
+808	2026-01-16 10:24:38.481735-04	CDU-101	FLOW_FEED	10006.84	1	2026-01-16 10:24:38.679329-04
+809	2026-01-16 10:24:38.481752-04	FCC-201	TEMP_REACTOR	482.7	1	2026-01-16 10:24:38.679329-04
+810	2026-01-16 10:24:38.481767-04	FCC-201	CATALYST_ACT	85.82	1	2026-01-16 10:24:38.679329-04
+811	2026-01-16 10:24:38.481782-04	HT-301	TEMP_HYDRO	360.97	1	2026-01-16 10:24:38.679329-04
+812	2026-01-16 10:24:38.481797-04	HT-301	H2_PRESS	43.11	1	2026-01-16 10:24:38.679329-04
+813	2026-01-16 10:24:43.705794-04	CDU-101	TEMP_TOWER	401.51	1	2026-01-16 10:24:44.171045-04
+814	2026-01-16 10:24:43.705842-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:24:44.171045-04
+815	2026-01-16 10:24:43.705858-04	CDU-101	FLOW_FEED	9772.79	1	2026-01-16 10:24:44.171045-04
+816	2026-01-16 10:24:43.705874-04	FCC-201	TEMP_REACTOR	493.79	1	2026-01-16 10:24:44.171045-04
+817	2026-01-16 10:24:43.705889-04	FCC-201	CATALYST_ACT	70.86	1	2026-01-16 10:24:44.171045-04
+818	2026-01-16 10:24:43.705904-04	HT-301	TEMP_HYDRO	300.42	1	2026-01-16 10:24:44.171045-04
+819	2026-01-16 10:24:43.705919-04	HT-301	H2_PRESS	33.5	1	2026-01-16 10:24:44.171045-04
+820	2026-01-16 10:24:49.207696-04	CDU-101	TEMP_TOWER	438.37	1	2026-01-16 10:24:49.404001-04
+821	2026-01-16 10:24:49.207741-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:24:49.404001-04
+822	2026-01-16 10:24:49.207758-04	CDU-101	FLOW_FEED	9095.93	1	2026-01-16 10:24:49.404001-04
+823	2026-01-16 10:24:49.207774-04	FCC-201	TEMP_REACTOR	508.84	1	2026-01-16 10:24:49.404001-04
+824	2026-01-16 10:24:49.207789-04	FCC-201	CATALYST_ACT	71.28	1	2026-01-16 10:24:49.404001-04
+825	2026-01-16 10:24:49.207804-04	HT-301	TEMP_HYDRO	312.47	1	2026-01-16 10:24:49.404001-04
+826	2026-01-16 10:24:49.207819-04	HT-301	H2_PRESS	40.83	1	2026-01-16 10:24:49.404001-04
+827	2026-01-16 10:24:54.441585-04	CDU-101	TEMP_TOWER	365.77	1	2026-01-16 10:24:56.924932-04
+828	2026-01-16 10:24:54.441641-04	CDU-101	PRESS_TOWER	3.74	1	2026-01-16 10:24:56.924932-04
+829	2026-01-16 10:24:54.441727-04	CDU-101	FLOW_FEED	11448.45	1	2026-01-16 10:24:56.924932-04
+830	2026-01-16 10:24:54.441759-04	FCC-201	TEMP_REACTOR	519.71	1	2026-01-16 10:24:56.924932-04
+831	2026-01-16 10:24:54.441778-04	FCC-201	CATALYST_ACT	73.81	1	2026-01-16 10:24:56.924932-04
+832	2026-01-16 10:24:54.441822-04	HT-301	TEMP_HYDRO	312.68	1	2026-01-16 10:24:56.924932-04
+833	2026-01-16 10:24:54.441848-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:24:56.924932-04
+834	2026-01-16 10:25:01.958688-04	CDU-101	TEMP_TOWER	436.54	1	2026-01-16 10:25:02.153953-04
+835	2026-01-16 10:25:01.958734-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:25:02.153953-04
+836	2026-01-16 10:25:01.958751-04	CDU-101	FLOW_FEED	8121.98	1	2026-01-16 10:25:02.153953-04
+837	2026-01-16 10:25:01.958767-04	FCC-201	TEMP_REACTOR	519.88	1	2026-01-16 10:25:02.153953-04
+838	2026-01-16 10:25:01.958782-04	FCC-201	CATALYST_ACT	87.38	1	2026-01-16 10:25:02.153953-04
+839	2026-01-16 10:25:01.958797-04	HT-301	TEMP_HYDRO	331.13	1	2026-01-16 10:25:02.153953-04
+840	2026-01-16 10:25:01.958812-04	HT-301	H2_PRESS	35.16	1	2026-01-16 10:25:02.153953-04
+841	2026-01-16 10:25:07.1926-04	CDU-101	TEMP_TOWER	386.03	1	2026-01-16 10:25:07.651512-04
+842	2026-01-16 10:25:07.192666-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:25:07.651512-04
+843	2026-01-16 10:25:07.192684-04	CDU-101	FLOW_FEED	10693.3	1	2026-01-16 10:25:07.651512-04
+844	2026-01-16 10:25:07.192703-04	FCC-201	TEMP_REACTOR	548.94	1	2026-01-16 10:25:07.651512-04
+845	2026-01-16 10:25:07.192721-04	FCC-201	CATALYST_ACT	89.09	1	2026-01-16 10:25:07.651512-04
+846	2026-01-16 10:25:07.192738-04	HT-301	TEMP_HYDRO	368.74	1	2026-01-16 10:25:07.651512-04
+847	2026-01-16 10:25:07.192754-04	HT-301	H2_PRESS	30.92	1	2026-01-16 10:25:07.651512-04
+848	2026-01-16 10:25:12.685617-04	CDU-101	TEMP_TOWER	413.64	1	2026-01-16 10:25:14.89209-04
+849	2026-01-16 10:25:12.685675-04	CDU-101	PRESS_TOWER	2.66	1	2026-01-16 10:25:14.89209-04
+850	2026-01-16 10:25:12.685694-04	CDU-101	FLOW_FEED	9565.77	1	2026-01-16 10:25:14.89209-04
+851	2026-01-16 10:25:12.685713-04	FCC-201	TEMP_REACTOR	520.31	1	2026-01-16 10:25:14.89209-04
+852	2026-01-16 10:25:12.685729-04	FCC-201	CATALYST_ACT	78.36	1	2026-01-16 10:25:14.89209-04
+853	2026-01-16 10:25:12.685746-04	HT-301	TEMP_HYDRO	370.73	1	2026-01-16 10:25:14.89209-04
+854	2026-01-16 10:25:12.685763-04	HT-301	H2_PRESS	43.42	1	2026-01-16 10:25:14.89209-04
+855	2026-01-16 10:25:19.918858-04	CDU-101	TEMP_TOWER	405.66	1	2026-01-16 10:25:20.394652-04
+856	2026-01-16 10:25:19.918906-04	CDU-101	PRESS_TOWER	3.02	1	2026-01-16 10:25:20.394652-04
+857	2026-01-16 10:25:19.918923-04	CDU-101	FLOW_FEED	10081.2	1	2026-01-16 10:25:20.394652-04
+858	2026-01-16 10:25:19.918939-04	FCC-201	TEMP_REACTOR	507.95	1	2026-01-16 10:25:20.394652-04
+859	2026-01-16 10:25:19.918954-04	FCC-201	CATALYST_ACT	85.14	1	2026-01-16 10:25:20.394652-04
+860	2026-01-16 10:25:19.91897-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:25:20.394652-04
+861	2026-01-16 10:25:19.918984-04	HT-301	H2_PRESS	49.57	1	2026-01-16 10:25:20.394652-04
+862	2026-01-16 10:25:25.428324-04	CDU-101	TEMP_TOWER	389.09	1	2026-01-16 10:25:25.62286-04
+863	2026-01-16 10:25:25.428375-04	CDU-101	PRESS_TOWER	3.17	1	2026-01-16 10:25:25.62286-04
+864	2026-01-16 10:25:25.428392-04	CDU-101	FLOW_FEED	8504.42	1	2026-01-16 10:25:25.62286-04
+865	2026-01-16 10:25:25.428407-04	FCC-201	TEMP_REACTOR	503.79	1	2026-01-16 10:25:25.62286-04
+866	2026-01-16 10:25:25.428422-04	FCC-201	CATALYST_ACT	76.98	1	2026-01-16 10:25:25.62286-04
+867	2026-01-16 10:25:25.428437-04	HT-301	TEMP_HYDRO	372.74	1	2026-01-16 10:25:25.62286-04
+868	2026-01-16 10:25:25.428452-04	HT-301	H2_PRESS	44.53	1	2026-01-16 10:25:25.62286-04
+869	2026-01-16 10:25:30.66533-04	CDU-101	TEMP_TOWER	371.07	1	2026-01-16 10:25:33.134725-04
+870	2026-01-16 10:25:30.66539-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:25:33.134725-04
+871	2026-01-16 10:25:30.665408-04	CDU-101	FLOW_FEED	8786.6	1	2026-01-16 10:25:33.134725-04
+872	2026-01-16 10:25:30.665425-04	FCC-201	TEMP_REACTOR	488.73	1	2026-01-16 10:25:33.134725-04
+873	2026-01-16 10:25:30.66544-04	FCC-201	CATALYST_ACT	88.69	1	2026-01-16 10:25:33.134725-04
+874	2026-01-16 10:25:30.665455-04	HT-301	TEMP_HYDRO	312.62	1	2026-01-16 10:25:33.134725-04
+875	2026-01-16 10:25:30.66547-04	HT-301	H2_PRESS	40.08	1	2026-01-16 10:25:33.134725-04
+876	2026-01-16 10:25:38.175427-04	CDU-101	TEMP_TOWER	361.94	1	2026-01-16 10:25:38.391081-04
+877	2026-01-16 10:25:38.175484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:25:38.391081-04
+878	2026-01-16 10:25:38.175503-04	CDU-101	FLOW_FEED	10299.44	1	2026-01-16 10:25:38.391081-04
+879	2026-01-16 10:25:38.17552-04	FCC-201	TEMP_REACTOR	490.94	1	2026-01-16 10:25:38.391081-04
+880	2026-01-16 10:25:38.175536-04	FCC-201	CATALYST_ACT	78.35	1	2026-01-16 10:25:38.391081-04
+881	2026-01-16 10:25:38.175552-04	HT-301	TEMP_HYDRO	339.51	1	2026-01-16 10:25:38.391081-04
+882	2026-01-16 10:25:38.175653-04	HT-301	H2_PRESS	38.35	1	2026-01-16 10:25:38.391081-04
+883	2026-01-16 10:25:43.44182-04	CDU-101	TEMP_TOWER	374.02	1	2026-01-16 10:25:43.929966-04
+884	2026-01-16 10:25:43.441884-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:43.929966-04
+885	2026-01-16 10:25:43.441903-04	CDU-101	FLOW_FEED	8917.93	1	2026-01-16 10:25:43.929966-04
+886	2026-01-16 10:25:43.441921-04	FCC-201	TEMP_REACTOR	547.99	1	2026-01-16 10:25:43.929966-04
+887	2026-01-16 10:25:43.441937-04	FCC-201	CATALYST_ACT	70.51	1	2026-01-16 10:25:43.929966-04
+888	2026-01-16 10:25:43.441955-04	HT-301	TEMP_HYDRO	304.49	1	2026-01-16 10:25:43.929966-04
+889	2026-01-16 10:25:43.441971-04	HT-301	H2_PRESS	34.82	1	2026-01-16 10:25:43.929966-04
+890	2026-01-16 10:25:48.962178-04	CDU-101	TEMP_TOWER	390.39	1	2026-01-16 10:25:51.181699-04
+891	2026-01-16 10:25:48.962237-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:51.181699-04
+892	2026-01-16 10:25:48.962257-04	CDU-101	FLOW_FEED	10329.41	1	2026-01-16 10:25:51.181699-04
+893	2026-01-16 10:25:48.962275-04	FCC-201	TEMP_REACTOR	548.1	1	2026-01-16 10:25:51.181699-04
+894	2026-01-16 10:25:48.962292-04	FCC-201	CATALYST_ACT	70.31	1	2026-01-16 10:25:51.181699-04
+895	2026-01-16 10:25:48.962308-04	HT-301	TEMP_HYDRO	372.19	1	2026-01-16 10:25:51.181699-04
+896	2026-01-16 10:25:48.962325-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:25:51.181699-04
+897	2026-01-16 10:25:56.385547-04	CDU-101	TEMP_TOWER	383.17	1	2026-01-16 10:25:56.877935-04
+898	2026-01-16 10:25:56.385608-04	CDU-101	PRESS_TOWER	3.2	1	2026-01-16 10:25:56.877935-04
+899	2026-01-16 10:25:56.385627-04	CDU-101	FLOW_FEED	11151.18	1	2026-01-16 10:25:56.877935-04
+900	2026-01-16 10:25:56.385648-04	FCC-201	TEMP_REACTOR	542.42	1	2026-01-16 10:25:56.877935-04
+901	2026-01-16 10:25:56.385664-04	FCC-201	CATALYST_ACT	87.15	1	2026-01-16 10:25:56.877935-04
+902	2026-01-16 10:25:56.385682-04	HT-301	TEMP_HYDRO	366.51	1	2026-01-16 10:25:56.877935-04
+903	2026-01-16 10:25:56.385698-04	HT-301	H2_PRESS	30.91	1	2026-01-16 10:25:56.877935-04
+904	2026-01-16 10:26:01.984273-04	CDU-101	TEMP_TOWER	411.67	1	2026-01-16 10:26:02.188-04
+905	2026-01-16 10:26:01.984322-04	CDU-101	PRESS_TOWER	3.27	1	2026-01-16 10:26:02.188-04
+906	2026-01-16 10:26:01.98434-04	CDU-101	FLOW_FEED	11397.47	1	2026-01-16 10:26:02.188-04
+907	2026-01-16 10:26:01.984357-04	FCC-201	TEMP_REACTOR	486.69	1	2026-01-16 10:26:02.188-04
+908	2026-01-16 10:26:01.984373-04	FCC-201	CATALYST_ACT	85.41	1	2026-01-16 10:26:02.188-04
+909	2026-01-16 10:26:01.984389-04	HT-301	TEMP_HYDRO	325.36	1	2026-01-16 10:26:02.188-04
+910	2026-01-16 10:26:01.984404-04	HT-301	H2_PRESS	37.81	1	2026-01-16 10:26:02.188-04
+911	2026-01-16 10:26:07.220643-04	CDU-101	TEMP_TOWER	363.33	1	2026-01-16 10:26:07.692443-04
+912	2026-01-16 10:26:07.220699-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:26:07.692443-04
+913	2026-01-16 10:26:07.220717-04	CDU-101	FLOW_FEED	10561.95	1	2026-01-16 10:26:07.692443-04
+914	2026-01-16 10:26:07.220735-04	FCC-201	TEMP_REACTOR	497.22	1	2026-01-16 10:26:07.692443-04
+915	2026-01-16 10:26:07.22075-04	FCC-201	CATALYST_ACT	94.2	1	2026-01-16 10:26:07.692443-04
+916	2026-01-16 10:26:07.220766-04	HT-301	TEMP_HYDRO	301.43	1	2026-01-16 10:26:07.692443-04
+917	2026-01-16 10:26:07.220781-04	HT-301	H2_PRESS	49.74	1	2026-01-16 10:26:07.692443-04
+918	2026-01-16 10:26:12.722608-04	CDU-101	TEMP_TOWER	357.97	1	2026-01-16 10:26:12.924255-04
+919	2026-01-16 10:26:12.722664-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:26:12.924255-04
+920	2026-01-16 10:26:12.722683-04	CDU-101	FLOW_FEED	11633.39	1	2026-01-16 10:26:12.924255-04
+921	2026-01-16 10:26:12.722701-04	FCC-201	TEMP_REACTOR	508.41	1	2026-01-16 10:26:12.924255-04
+922	2026-01-16 10:26:12.722718-04	FCC-201	CATALYST_ACT	82.49	1	2026-01-16 10:26:12.924255-04
+923	2026-01-16 10:26:12.722735-04	HT-301	TEMP_HYDRO	365.45	1	2026-01-16 10:26:12.924255-04
+924	2026-01-16 10:26:12.722751-04	HT-301	H2_PRESS	44.39	1	2026-01-16 10:26:12.924255-04
+925	2026-01-16 10:26:17.951141-04	CDU-101	TEMP_TOWER	352.65	1	2026-01-16 10:26:18.41653-04
+926	2026-01-16 10:26:17.951189-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:26:18.41653-04
+927	2026-01-16 10:26:17.951206-04	CDU-101	FLOW_FEED	9716.79	1	2026-01-16 10:26:18.41653-04
+928	2026-01-16 10:26:17.951222-04	FCC-201	TEMP_REACTOR	495.37	1	2026-01-16 10:26:18.41653-04
+929	2026-01-16 10:26:17.951237-04	FCC-201	CATALYST_ACT	89.93	1	2026-01-16 10:26:18.41653-04
+930	2026-01-16 10:26:17.951253-04	HT-301	TEMP_HYDRO	376.63	1	2026-01-16 10:26:18.41653-04
+931	2026-01-16 10:26:17.951268-04	HT-301	H2_PRESS	44.37	1	2026-01-16 10:26:18.41653-04
+932	2026-01-16 10:26:23.449916-04	CDU-101	TEMP_TOWER	408.89	1	2026-01-16 10:26:23.654996-04
+933	2026-01-16 10:26:23.449966-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:26:23.654996-04
+934	2026-01-16 10:26:23.449984-04	CDU-101	FLOW_FEED	8275.24	1	2026-01-16 10:26:23.654996-04
+935	2026-01-16 10:26:23.450001-04	FCC-201	TEMP_REACTOR	547.87	1	2026-01-16 10:26:23.654996-04
+936	2026-01-16 10:26:23.450017-04	FCC-201	CATALYST_ACT	89.24	1	2026-01-16 10:26:23.654996-04
+937	2026-01-16 10:26:23.450032-04	HT-301	TEMP_HYDRO	366.4	1	2026-01-16 10:26:23.654996-04
+938	2026-01-16 10:26:23.450047-04	HT-301	H2_PRESS	45.25	1	2026-01-16 10:26:23.654996-04
+939	2026-01-16 10:26:28.907667-04	CDU-101	TEMP_TOWER	354.69	1	2026-01-16 10:26:29.411128-04
+940	2026-01-16 10:26:28.907732-04	CDU-101	PRESS_TOWER	4.35	1	2026-01-16 10:26:29.411128-04
+941	2026-01-16 10:26:28.90775-04	CDU-101	FLOW_FEED	8499.95	1	2026-01-16 10:26:29.411128-04
+942	2026-01-16 10:26:28.907767-04	FCC-201	TEMP_REACTOR	528.69	1	2026-01-16 10:26:29.411128-04
+943	2026-01-16 10:26:28.907783-04	FCC-201	CATALYST_ACT	80.39	1	2026-01-16 10:26:29.411128-04
+944	2026-01-16 10:26:28.907798-04	HT-301	TEMP_HYDRO	339.05	1	2026-01-16 10:26:29.411128-04
+945	2026-01-16 10:26:28.907813-04	HT-301	H2_PRESS	36.94	1	2026-01-16 10:26:29.411128-04
+946	2026-01-16 10:26:34.441743-04	CDU-101	TEMP_TOWER	429.69	1	2026-01-16 10:26:36.676509-04
+947	2026-01-16 10:26:34.441803-04	CDU-101	PRESS_TOWER	4.89	1	2026-01-16 10:26:36.676509-04
+948	2026-01-16 10:26:34.441824-04	CDU-101	FLOW_FEED	10249.63	1	2026-01-16 10:26:36.676509-04
+949	2026-01-16 10:26:34.441842-04	FCC-201	TEMP_REACTOR	520.53	1	2026-01-16 10:26:36.676509-04
+950	2026-01-16 10:26:34.441859-04	FCC-201	CATALYST_ACT	88.99	1	2026-01-16 10:26:36.676509-04
+951	2026-01-16 10:26:34.441875-04	HT-301	TEMP_HYDRO	326.87	1	2026-01-16 10:26:36.676509-04
+952	2026-01-16 10:26:34.441891-04	HT-301	H2_PRESS	32.16	1	2026-01-16 10:26:36.676509-04
+953	2026-01-16 10:26:41.704094-04	CDU-101	TEMP_TOWER	410.01	1	2026-01-16 10:26:44.193435-04
+954	2026-01-16 10:26:41.704161-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 10:26:44.193435-04
+955	2026-01-16 10:26:41.704179-04	CDU-101	FLOW_FEED	10806.24	1	2026-01-16 10:26:44.193435-04
+956	2026-01-16 10:26:41.704196-04	FCC-201	TEMP_REACTOR	509.04	1	2026-01-16 10:26:44.193435-04
+957	2026-01-16 10:26:41.704212-04	FCC-201	CATALYST_ACT	86.77	1	2026-01-16 10:26:44.193435-04
+958	2026-01-16 10:26:41.704228-04	HT-301	TEMP_HYDRO	309.14	1	2026-01-16 10:26:44.193435-04
+959	2026-01-16 10:26:41.704243-04	HT-301	H2_PRESS	41.23	1	2026-01-16 10:26:44.193435-04
+960	2026-01-16 10:26:49.236814-04	CDU-101	TEMP_TOWER	368.52	1	2026-01-16 10:26:49.435897-04
+961	2026-01-16 10:26:49.236863-04	CDU-101	PRESS_TOWER	4.83	1	2026-01-16 10:26:49.435897-04
+962	2026-01-16 10:26:49.23688-04	CDU-101	FLOW_FEED	11256.66	1	2026-01-16 10:26:49.435897-04
+963	2026-01-16 10:26:49.236896-04	FCC-201	TEMP_REACTOR	536.85	1	2026-01-16 10:26:49.435897-04
+964	2026-01-16 10:26:49.236911-04	FCC-201	CATALYST_ACT	79.42	1	2026-01-16 10:26:49.435897-04
+965	2026-01-16 10:26:49.236926-04	HT-301	TEMP_HYDRO	325.8	1	2026-01-16 10:26:49.435897-04
+966	2026-01-16 10:26:49.236941-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:26:49.435897-04
+967	2026-01-16 10:26:54.487623-04	CDU-101	TEMP_TOWER	392.86	1	2026-01-16 10:26:56.986218-04
+968	2026-01-16 10:26:54.487681-04	CDU-101	PRESS_TOWER	4.09	1	2026-01-16 10:26:56.986218-04
+969	2026-01-16 10:26:54.487699-04	CDU-101	FLOW_FEED	9070.59	1	2026-01-16 10:26:56.986218-04
+970	2026-01-16 10:26:54.487718-04	FCC-201	TEMP_REACTOR	485.72	1	2026-01-16 10:26:56.986218-04
+971	2026-01-16 10:26:54.487733-04	FCC-201	CATALYST_ACT	86.35	1	2026-01-16 10:26:56.986218-04
+972	2026-01-16 10:26:54.48775-04	HT-301	TEMP_HYDRO	314.18	1	2026-01-16 10:26:56.986218-04
+973	2026-01-16 10:26:54.487766-04	HT-301	H2_PRESS	30.72	1	2026-01-16 10:26:56.986218-04
+974	2026-01-16 10:27:02.037656-04	CDU-101	TEMP_TOWER	410.73	1	2026-01-16 10:27:02.240397-04
+975	2026-01-16 10:27:02.037722-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:27:02.240397-04
+976	2026-01-16 10:27:02.037761-04	CDU-101	FLOW_FEED	11284.66	1	2026-01-16 10:27:02.240397-04
+977	2026-01-16 10:27:02.037783-04	FCC-201	TEMP_REACTOR	486.05	1	2026-01-16 10:27:02.240397-04
+978	2026-01-16 10:27:02.037799-04	FCC-201	CATALYST_ACT	93.69	1	2026-01-16 10:27:02.240397-04
+979	2026-01-16 10:27:02.037815-04	HT-301	TEMP_HYDRO	345.25	1	2026-01-16 10:27:02.240397-04
+980	2026-01-16 10:27:02.03783-04	HT-301	H2_PRESS	40.89	1	2026-01-16 10:27:02.240397-04
+981	2026-01-16 10:27:07.328399-04	CDU-101	TEMP_TOWER	405.11	1	2026-01-16 10:27:07.78589-04
+982	2026-01-16 10:27:07.328448-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:27:07.78589-04
+983	2026-01-16 10:27:07.328465-04	CDU-101	FLOW_FEED	10000.77	1	2026-01-16 10:27:07.78589-04
+984	2026-01-16 10:27:07.328481-04	FCC-201	TEMP_REACTOR	544.72	1	2026-01-16 10:27:07.78589-04
+985	2026-01-16 10:27:07.328496-04	FCC-201	CATALYST_ACT	81.75	1	2026-01-16 10:27:07.78589-04
+986	2026-01-16 10:27:07.328511-04	HT-301	TEMP_HYDRO	323.08	1	2026-01-16 10:27:07.78589-04
+987	2026-01-16 10:27:07.328525-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:27:07.78589-04
+988	2026-01-16 10:27:12.832719-04	CDU-101	TEMP_TOWER	355.54	1	2026-01-16 10:27:13.03091-04
+989	2026-01-16 10:27:12.832778-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 10:27:13.03091-04
+990	2026-01-16 10:27:12.832798-04	CDU-101	FLOW_FEED	9969.96	1	2026-01-16 10:27:13.03091-04
+991	2026-01-16 10:27:12.832817-04	FCC-201	TEMP_REACTOR	521.73	1	2026-01-16 10:27:13.03091-04
+992	2026-01-16 10:27:12.832833-04	FCC-201	CATALYST_ACT	71.43	1	2026-01-16 10:27:13.03091-04
+993	2026-01-16 10:27:12.83285-04	HT-301	TEMP_HYDRO	329.63	1	2026-01-16 10:27:13.03091-04
+994	2026-01-16 10:27:12.832869-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:27:13.03091-04
+995	2026-01-16 10:27:18.084868-04	CDU-101	TEMP_TOWER	407.33	1	2026-01-16 10:27:18.563452-04
+996	2026-01-16 10:27:18.084935-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:27:18.563452-04
+997	2026-01-16 10:27:18.084954-04	CDU-101	FLOW_FEED	10807.02	1	2026-01-16 10:27:18.563452-04
+998	2026-01-16 10:27:18.084972-04	FCC-201	TEMP_REACTOR	481.66	1	2026-01-16 10:27:18.563452-04
+999	2026-01-16 10:27:18.084991-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 10:27:18.563452-04
+1000	2026-01-16 10:27:18.085008-04	HT-301	TEMP_HYDRO	335.97	1	2026-01-16 10:27:18.563452-04
+1001	2026-01-16 10:27:18.085024-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:27:18.563452-04
+1002	2026-01-16 10:27:23.602675-04	CDU-101	TEMP_TOWER	428.04	1	2026-01-16 10:27:23.801929-04
+1003	2026-01-16 10:27:23.602735-04	CDU-101	PRESS_TOWER	4.5	1	2026-01-16 10:27:23.801929-04
+1004	2026-01-16 10:27:23.602753-04	CDU-101	FLOW_FEED	11577.31	1	2026-01-16 10:27:23.801929-04
+1005	2026-01-16 10:27:23.602771-04	FCC-201	TEMP_REACTOR	514.85	1	2026-01-16 10:27:23.801929-04
+1006	2026-01-16 10:27:23.602786-04	FCC-201	CATALYST_ACT	85.3	1	2026-01-16 10:27:23.801929-04
+1007	2026-01-16 10:27:23.602802-04	HT-301	TEMP_HYDRO	371.88	1	2026-01-16 10:27:23.801929-04
+1008	2026-01-16 10:27:23.602818-04	HT-301	H2_PRESS	44.57	1	2026-01-16 10:27:23.801929-04
+1009	2026-01-16 10:27:28.833674-04	CDU-101	TEMP_TOWER	408.01	1	2026-01-16 10:27:29.297608-04
+1010	2026-01-16 10:27:28.833724-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:27:29.297608-04
+1011	2026-01-16 10:27:28.833741-04	CDU-101	FLOW_FEED	9583.36	1	2026-01-16 10:27:29.297608-04
+1012	2026-01-16 10:27:28.833757-04	FCC-201	TEMP_REACTOR	488.69	1	2026-01-16 10:27:29.297608-04
+1013	2026-01-16 10:27:28.833772-04	FCC-201	CATALYST_ACT	74.74	1	2026-01-16 10:27:29.297608-04
+1014	2026-01-16 10:27:28.833787-04	HT-301	TEMP_HYDRO	358.5	1	2026-01-16 10:27:29.297608-04
+1015	2026-01-16 10:27:28.833801-04	HT-301	H2_PRESS	38.9	1	2026-01-16 10:27:29.297608-04
+1016	2026-01-16 10:27:34.325241-04	CDU-101	TEMP_TOWER	441.23	1	2026-01-16 10:27:34.525996-04
+1017	2026-01-16 10:27:34.325296-04	CDU-101	PRESS_TOWER	4.76	1	2026-01-16 10:27:34.525996-04
+1018	2026-01-16 10:27:34.325313-04	CDU-101	FLOW_FEED	10076.64	1	2026-01-16 10:27:34.525996-04
+1019	2026-01-16 10:27:34.32533-04	FCC-201	TEMP_REACTOR	526.87	1	2026-01-16 10:27:34.525996-04
+1020	2026-01-16 10:27:34.325346-04	FCC-201	CATALYST_ACT	72.68	1	2026-01-16 10:27:34.525996-04
+1021	2026-01-16 10:27:34.325363-04	HT-301	TEMP_HYDRO	341.3	1	2026-01-16 10:27:34.525996-04
+1022	2026-01-16 10:27:34.325379-04	HT-301	H2_PRESS	41.57	1	2026-01-16 10:27:34.525996-04
+1023	2026-01-16 10:27:39.567608-04	CDU-101	TEMP_TOWER	371.79	1	2026-01-16 10:27:40.029484-04
+1024	2026-01-16 10:27:39.567673-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 10:27:40.029484-04
+1025	2026-01-16 10:27:39.567693-04	CDU-101	FLOW_FEED	9698.52	1	2026-01-16 10:27:40.029484-04
+1026	2026-01-16 10:27:39.567713-04	FCC-201	TEMP_REACTOR	544.38	1	2026-01-16 10:27:40.029484-04
+1027	2026-01-16 10:27:39.56773-04	FCC-201	CATALYST_ACT	77.14	1	2026-01-16 10:27:40.029484-04
+1028	2026-01-16 10:27:39.567746-04	HT-301	TEMP_HYDRO	323.05	1	2026-01-16 10:27:40.029484-04
+1029	2026-01-16 10:27:39.567764-04	HT-301	H2_PRESS	41.54	1	2026-01-16 10:27:40.029484-04
+1030	2026-01-16 10:27:45.080497-04	CDU-101	TEMP_TOWER	385.72	1	2026-01-16 10:27:45.339448-04
+1031	2026-01-16 10:27:45.080565-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:27:45.339448-04
+1032	2026-01-16 10:27:45.080583-04	CDU-101	FLOW_FEED	11079.8	1	2026-01-16 10:27:45.339448-04
+1033	2026-01-16 10:27:45.080602-04	FCC-201	TEMP_REACTOR	500.62	1	2026-01-16 10:27:45.339448-04
+1034	2026-01-16 10:27:45.080618-04	FCC-201	CATALYST_ACT	82.34	1	2026-01-16 10:27:45.339448-04
+1035	2026-01-16 10:27:45.080636-04	HT-301	TEMP_HYDRO	341.42	1	2026-01-16 10:27:45.339448-04
+1036	2026-01-16 10:27:45.080653-04	HT-301	H2_PRESS	39	1	2026-01-16 10:27:45.339448-04
+1037	2026-01-16 10:27:50.403439-04	CDU-101	TEMP_TOWER	413.22	1	2026-01-16 10:27:50.982057-04
+1038	2026-01-16 10:27:50.4035-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:27:50.982057-04
+1039	2026-01-16 10:27:50.403519-04	CDU-101	FLOW_FEED	10932.95	1	2026-01-16 10:27:50.982057-04
+1040	2026-01-16 10:27:50.403538-04	FCC-201	TEMP_REACTOR	540.44	1	2026-01-16 10:27:50.982057-04
+1041	2026-01-16 10:27:50.403555-04	FCC-201	CATALYST_ACT	73.09	1	2026-01-16 10:27:50.982057-04
+1042	2026-01-16 10:27:50.403572-04	HT-301	TEMP_HYDRO	324.46	1	2026-01-16 10:27:50.982057-04
+1043	2026-01-16 10:27:50.40359-04	HT-301	H2_PRESS	35.75	1	2026-01-16 10:27:50.982057-04
+1044	2026-01-16 10:27:56.024708-04	CDU-101	TEMP_TOWER	426.96	1	2026-01-16 10:27:56.229611-04
+1045	2026-01-16 10:27:56.024757-04	CDU-101	PRESS_TOWER	3.52	1	2026-01-16 10:27:56.229611-04
+1046	2026-01-16 10:27:56.024773-04	CDU-101	FLOW_FEED	8090.48	1	2026-01-16 10:27:56.229611-04
+1047	2026-01-16 10:27:56.024789-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:27:56.229611-04
+1048	2026-01-16 10:27:56.024804-04	FCC-201	CATALYST_ACT	77.24	1	2026-01-16 10:27:56.229611-04
+1049	2026-01-16 10:27:56.024819-04	HT-301	TEMP_HYDRO	359.65	1	2026-01-16 10:27:56.229611-04
+1050	2026-01-16 10:27:56.024834-04	HT-301	H2_PRESS	38.22	1	2026-01-16 10:27:56.229611-04
+1051	2026-01-16 10:28:01.279124-04	CDU-101	TEMP_TOWER	428.12	1	2026-01-16 10:28:03.773878-04
+1052	2026-01-16 10:28:01.279184-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:28:03.773878-04
+1053	2026-01-16 10:28:01.279204-04	CDU-101	FLOW_FEED	9945.52	1	2026-01-16 10:28:03.773878-04
+1054	2026-01-16 10:28:01.279221-04	FCC-201	TEMP_REACTOR	485.04	1	2026-01-16 10:28:03.773878-04
+1055	2026-01-16 10:28:01.279239-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 10:28:03.773878-04
+1056	2026-01-16 10:28:01.279256-04	HT-301	TEMP_HYDRO	360.02	1	2026-01-16 10:28:03.773878-04
+1057	2026-01-16 10:28:01.279274-04	HT-301	H2_PRESS	41.79	1	2026-01-16 10:28:03.773878-04
+1058	2026-01-16 10:28:08.83085-04	CDU-101	TEMP_TOWER	399.42	1	2026-01-16 10:28:09.041362-04
+1059	2026-01-16 10:28:08.830898-04	CDU-101	PRESS_TOWER	3.54	1	2026-01-16 10:28:09.041362-04
+1060	2026-01-16 10:28:08.830914-04	CDU-101	FLOW_FEED	8906.48	1	2026-01-16 10:28:09.041362-04
+1061	2026-01-16 10:28:08.830931-04	FCC-201	TEMP_REACTOR	525.86	1	2026-01-16 10:28:09.041362-04
+1062	2026-01-16 10:28:08.830946-04	FCC-201	CATALYST_ACT	90.39	1	2026-01-16 10:28:09.041362-04
+1063	2026-01-16 10:28:08.830961-04	HT-301	TEMP_HYDRO	379.73	1	2026-01-16 10:28:09.041362-04
+1064	2026-01-16 10:28:08.830976-04	HT-301	H2_PRESS	38.89	1	2026-01-16 10:28:09.041362-04
+1065	2026-01-16 10:28:14.119088-04	CDU-101	TEMP_TOWER	431.49	1	2026-01-16 10:28:14.585242-04
+1066	2026-01-16 10:28:14.119134-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:28:14.585242-04
+1067	2026-01-16 10:28:14.119151-04	CDU-101	FLOW_FEED	9598.56	1	2026-01-16 10:28:14.585242-04
+1068	2026-01-16 10:28:14.119167-04	FCC-201	TEMP_REACTOR	483.55	1	2026-01-16 10:28:14.585242-04
+1069	2026-01-16 10:28:14.119182-04	FCC-201	CATALYST_ACT	90.23	1	2026-01-16 10:28:14.585242-04
+1070	2026-01-16 10:28:14.119197-04	HT-301	TEMP_HYDRO	361.71	1	2026-01-16 10:28:14.585242-04
+1071	2026-01-16 10:28:14.119231-04	HT-301	H2_PRESS	45.95	1	2026-01-16 10:28:14.585242-04
+1072	2026-01-16 10:28:19.633631-04	CDU-101	TEMP_TOWER	390.77	1	2026-01-16 10:28:19.834349-04
+1073	2026-01-16 10:28:19.633689-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:28:19.834349-04
+1074	2026-01-16 10:28:19.633706-04	CDU-101	FLOW_FEED	11130.18	1	2026-01-16 10:28:19.834349-04
+1075	2026-01-16 10:28:19.633723-04	FCC-201	TEMP_REACTOR	546.82	1	2026-01-16 10:28:19.834349-04
+1076	2026-01-16 10:28:19.633738-04	FCC-201	CATALYST_ACT	79.09	1	2026-01-16 10:28:19.834349-04
+1077	2026-01-16 10:28:19.633753-04	HT-301	TEMP_HYDRO	318.43	1	2026-01-16 10:28:19.834349-04
+1078	2026-01-16 10:28:19.633767-04	HT-301	H2_PRESS	45.07	1	2026-01-16 10:28:19.834349-04
+1079	2026-01-16 10:28:24.871588-04	CDU-101	TEMP_TOWER	379.06	1	2026-01-16 10:28:25.381005-04
+1080	2026-01-16 10:28:24.871647-04	CDU-101	PRESS_TOWER	2.61	1	2026-01-16 10:28:25.381005-04
+1081	2026-01-16 10:28:24.871665-04	CDU-101	FLOW_FEED	10650.56	1	2026-01-16 10:28:25.381005-04
+1082	2026-01-16 10:28:24.871682-04	FCC-201	TEMP_REACTOR	526.08	1	2026-01-16 10:28:25.381005-04
+1083	2026-01-16 10:28:24.871698-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:28:25.381005-04
+1084	2026-01-16 10:28:24.871714-04	HT-301	TEMP_HYDRO	322.58	1	2026-01-16 10:28:25.381005-04
+1085	2026-01-16 10:28:24.87173-04	HT-301	H2_PRESS	43.55	1	2026-01-16 10:28:25.381005-04
+1086	2026-01-16 10:28:30.432187-04	CDU-101	TEMP_TOWER	390.08	1	2026-01-16 10:28:31.375496-04
+1087	2026-01-16 10:28:30.432254-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:28:31.375496-04
+1088	2026-01-16 10:28:30.432274-04	CDU-101	FLOW_FEED	10013.36	1	2026-01-16 10:28:31.375496-04
+1089	2026-01-16 10:28:30.432292-04	FCC-201	TEMP_REACTOR	511.73	1	2026-01-16 10:28:31.375496-04
+1090	2026-01-16 10:28:30.432307-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:28:31.375496-04
+1091	2026-01-16 10:28:30.432322-04	HT-301	TEMP_HYDRO	306.26	1	2026-01-16 10:28:31.375496-04
+1092	2026-01-16 10:28:30.432341-04	HT-301	H2_PRESS	31.34	1	2026-01-16 10:28:31.375496-04
+1093	2026-01-16 10:28:36.434876-04	CDU-101	TEMP_TOWER	420.32	1	2026-01-16 10:28:39.282138-04
+1094	2026-01-16 10:28:36.434936-04	CDU-101	PRESS_TOWER	4.74	1	2026-01-16 10:28:39.282138-04
+1095	2026-01-16 10:28:36.434956-04	CDU-101	FLOW_FEED	11317.28	1	2026-01-16 10:28:39.282138-04
+1096	2026-01-16 10:28:36.434974-04	FCC-201	TEMP_REACTOR	531.71	1	2026-01-16 10:28:39.282138-04
+1097	2026-01-16 10:28:36.43499-04	FCC-201	CATALYST_ACT	77.18	1	2026-01-16 10:28:39.282138-04
+1098	2026-01-16 10:28:36.435006-04	HT-301	TEMP_HYDRO	373.04	1	2026-01-16 10:28:39.282138-04
+1099	2026-01-16 10:28:36.435023-04	HT-301	H2_PRESS	44.55	1	2026-01-16 10:28:39.282138-04
+1100	2026-01-16 10:28:46.585833-04	CDU-101	TEMP_TOWER	397.18	1	2026-01-16 10:28:52.286659-04
+1101	2026-01-16 10:28:46.58591-04	CDU-101	PRESS_TOWER	4.71	1	2026-01-16 10:28:52.286659-04
+1102	2026-01-16 10:28:46.585927-04	CDU-101	FLOW_FEED	10179.37	1	2026-01-16 10:28:52.286659-04
+1103	2026-01-16 10:28:46.585945-04	FCC-201	TEMP_REACTOR	542.86	1	2026-01-16 10:28:52.286659-04
+1104	2026-01-16 10:28:46.585963-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:28:52.286659-04
+1105	2026-01-16 10:28:46.58598-04	HT-301	TEMP_HYDRO	326.83	1	2026-01-16 10:28:52.286659-04
+1106	2026-01-16 10:28:46.585995-04	HT-301	H2_PRESS	32.6	1	2026-01-16 10:28:52.286659-04
+1107	2026-01-16 10:28:57.387675-04	CDU-101	TEMP_TOWER	405.19	1	2026-01-16 10:28:57.766465-04
+1108	2026-01-16 10:28:57.387734-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:28:57.766465-04
+1109	2026-01-16 10:28:57.387751-04	CDU-101	FLOW_FEED	9510.35	1	2026-01-16 10:28:57.766465-04
+1110	2026-01-16 10:28:57.387768-04	FCC-201	TEMP_REACTOR	480.95	1	2026-01-16 10:28:57.766465-04
+1111	2026-01-16 10:28:57.387785-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:28:57.766465-04
+1112	2026-01-16 10:28:57.387802-04	HT-301	TEMP_HYDRO	325.25	1	2026-01-16 10:28:57.766465-04
+1113	2026-01-16 10:28:57.387818-04	HT-301	H2_PRESS	39.83	1	2026-01-16 10:28:57.766465-04
+1114	2026-01-16 10:29:02.833763-04	CDU-101	TEMP_TOWER	394.06	1	2026-01-16 10:29:03.346602-04
+1115	2026-01-16 10:29:02.833818-04	CDU-101	PRESS_TOWER	4.78	1	2026-01-16 10:29:03.346602-04
+1116	2026-01-16 10:29:02.833838-04	CDU-101	FLOW_FEED	10883.96	1	2026-01-16 10:29:03.346602-04
+1117	2026-01-16 10:29:02.833854-04	FCC-201	TEMP_REACTOR	537.98	1	2026-01-16 10:29:03.346602-04
+1118	2026-01-16 10:29:02.83387-04	FCC-201	CATALYST_ACT	74.42	1	2026-01-16 10:29:03.346602-04
+1119	2026-01-16 10:29:02.833885-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:29:03.346602-04
+1120	2026-01-16 10:29:02.8339-04	HT-301	H2_PRESS	49.53	1	2026-01-16 10:29:03.346602-04
+1121	2026-01-16 10:29:08.377875-04	CDU-101	TEMP_TOWER	410.05	1	2026-01-16 10:29:10.577338-04
+1122	2026-01-16 10:29:08.377935-04	CDU-101	PRESS_TOWER	4.97	1	2026-01-16 10:29:10.577338-04
+1123	2026-01-16 10:29:08.377955-04	CDU-101	FLOW_FEED	11330.81	1	2026-01-16 10:29:10.577338-04
+1124	2026-01-16 10:29:08.377972-04	FCC-201	TEMP_REACTOR	503.53	1	2026-01-16 10:29:10.577338-04
+1125	2026-01-16 10:29:08.377989-04	FCC-201	CATALYST_ACT	84.9	1	2026-01-16 10:29:10.577338-04
+1126	2026-01-16 10:29:08.378006-04	HT-301	TEMP_HYDRO	358.81	1	2026-01-16 10:29:10.577338-04
+1127	2026-01-16 10:29:08.378022-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:29:10.577338-04
+1128	2026-01-16 10:29:15.624626-04	CDU-101	TEMP_TOWER	422.5	1	2026-01-16 10:29:18.212705-04
+1129	2026-01-16 10:29:15.624686-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:18.212705-04
+1130	2026-01-16 10:29:15.624705-04	CDU-101	FLOW_FEED	9802.32	1	2026-01-16 10:29:18.212705-04
+1131	2026-01-16 10:29:15.624724-04	FCC-201	TEMP_REACTOR	487.49	1	2026-01-16 10:29:18.212705-04
+1132	2026-01-16 10:29:15.624741-04	FCC-201	CATALYST_ACT	94.62	1	2026-01-16 10:29:18.212705-04
+1133	2026-01-16 10:29:15.624758-04	HT-301	TEMP_HYDRO	334.33	1	2026-01-16 10:29:18.212705-04
+1134	2026-01-16 10:29:15.624775-04	HT-301	H2_PRESS	31.95	1	2026-01-16 10:29:18.212705-04
+1135	2026-01-16 10:29:23.296516-04	CDU-101	TEMP_TOWER	356.92	1	2026-01-16 10:29:23.562659-04
+1136	2026-01-16 10:29:23.296578-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:29:23.562659-04
+1137	2026-01-16 10:29:23.296595-04	CDU-101	FLOW_FEED	11852.17	1	2026-01-16 10:29:23.562659-04
+1138	2026-01-16 10:29:23.296611-04	FCC-201	TEMP_REACTOR	517.64	1	2026-01-16 10:29:23.562659-04
+1139	2026-01-16 10:29:23.296626-04	FCC-201	CATALYST_ACT	90.05	1	2026-01-16 10:29:23.562659-04
+1140	2026-01-16 10:29:23.296642-04	HT-301	TEMP_HYDRO	351.82	1	2026-01-16 10:29:23.562659-04
+1141	2026-01-16 10:29:23.296657-04	HT-301	H2_PRESS	45.04	1	2026-01-16 10:29:23.562659-04
+1142	2026-01-16 10:29:28.703804-04	CDU-101	TEMP_TOWER	386.52	1	2026-01-16 10:29:29.195216-04
+1143	2026-01-16 10:29:28.703862-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:29.195216-04
+1144	2026-01-16 10:29:28.70388-04	CDU-101	FLOW_FEED	8608.47	1	2026-01-16 10:29:29.195216-04
+1145	2026-01-16 10:29:28.703897-04	FCC-201	TEMP_REACTOR	501.03	1	2026-01-16 10:29:29.195216-04
+1146	2026-01-16 10:29:28.703913-04	FCC-201	CATALYST_ACT	85.46	1	2026-01-16 10:29:29.195216-04
+1147	2026-01-16 10:29:28.70393-04	HT-301	TEMP_HYDRO	371.69	1	2026-01-16 10:29:29.195216-04
+1148	2026-01-16 10:29:28.703947-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:29:29.195216-04
+1149	2026-01-16 10:29:34.22273-04	CDU-101	TEMP_TOWER	355.56	1	2026-01-16 10:29:34.438862-04
+1150	2026-01-16 10:29:34.222777-04	CDU-101	PRESS_TOWER	3.3	1	2026-01-16 10:29:34.438862-04
+1151	2026-01-16 10:29:34.222793-04	CDU-101	FLOW_FEED	11455.22	1	2026-01-16 10:29:34.438862-04
+1152	2026-01-16 10:29:34.222809-04	FCC-201	TEMP_REACTOR	542.09	1	2026-01-16 10:29:34.438862-04
+1153	2026-01-16 10:29:34.222824-04	FCC-201	CATALYST_ACT	79.77	1	2026-01-16 10:29:34.438862-04
+1154	2026-01-16 10:29:34.222839-04	HT-301	TEMP_HYDRO	338.86	1	2026-01-16 10:29:34.438862-04
+1155	2026-01-16 10:29:34.222854-04	HT-301	H2_PRESS	49.16	1	2026-01-16 10:29:34.438862-04
+1156	2026-01-16 10:29:39.473288-04	CDU-101	TEMP_TOWER	378.7	1	2026-01-16 10:29:39.944023-04
+1157	2026-01-16 10:29:39.473354-04	CDU-101	PRESS_TOWER	2.81	1	2026-01-16 10:29:39.944023-04
+1158	2026-01-16 10:29:39.473372-04	CDU-101	FLOW_FEED	10990.54	1	2026-01-16 10:29:39.944023-04
+1159	2026-01-16 10:29:39.473392-04	FCC-201	TEMP_REACTOR	541.95	1	2026-01-16 10:29:39.944023-04
+1160	2026-01-16 10:29:39.473408-04	FCC-201	CATALYST_ACT	84.65	1	2026-01-16 10:29:39.944023-04
+1161	2026-01-16 10:29:39.473425-04	HT-301	TEMP_HYDRO	348.03	1	2026-01-16 10:29:39.944023-04
+1162	2026-01-16 10:29:39.473441-04	HT-301	H2_PRESS	46.22	1	2026-01-16 10:29:39.944023-04
+1163	2026-01-16 10:29:44.970842-04	CDU-101	TEMP_TOWER	434.33	1	2026-01-16 10:29:45.171287-04
+1164	2026-01-16 10:29:44.970904-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:29:45.171287-04
+1165	2026-01-16 10:29:44.970924-04	CDU-101	FLOW_FEED	9846.45	1	2026-01-16 10:29:45.171287-04
+1166	2026-01-16 10:29:44.97094-04	FCC-201	TEMP_REACTOR	499.19	1	2026-01-16 10:29:45.171287-04
+1167	2026-01-16 10:29:44.970955-04	FCC-201	CATALYST_ACT	74.13	1	2026-01-16 10:29:45.171287-04
+1168	2026-01-16 10:29:44.970971-04	HT-301	TEMP_HYDRO	377.38	1	2026-01-16 10:29:45.171287-04
+1169	2026-01-16 10:29:44.970986-04	HT-301	H2_PRESS	37.27	1	2026-01-16 10:29:45.171287-04
+1170	2026-01-16 10:29:50.21744-04	CDU-101	TEMP_TOWER	423.31	1	2026-01-16 10:29:50.710103-04
+1171	2026-01-16 10:29:50.217495-04	CDU-101	PRESS_TOWER	2.65	1	2026-01-16 10:29:50.710103-04
+1172	2026-01-16 10:29:50.217512-04	CDU-101	FLOW_FEED	11312.31	1	2026-01-16 10:29:50.710103-04
+1173	2026-01-16 10:29:50.217529-04	FCC-201	TEMP_REACTOR	539.19	1	2026-01-16 10:29:50.710103-04
+1174	2026-01-16 10:29:50.217545-04	FCC-201	CATALYST_ACT	72.65	1	2026-01-16 10:29:50.710103-04
+1175	2026-01-16 10:29:50.217561-04	HT-301	TEMP_HYDRO	346.56	1	2026-01-16 10:29:50.710103-04
+1176	2026-01-16 10:29:50.217577-04	HT-301	H2_PRESS	38.16	1	2026-01-16 10:29:50.710103-04
+1177	2026-01-16 10:29:55.762175-04	CDU-101	TEMP_TOWER	397.87	1	2026-01-16 10:29:55.998134-04
+1178	2026-01-16 10:29:55.762233-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:29:55.998134-04
+1179	2026-01-16 10:29:55.762253-04	CDU-101	FLOW_FEED	11751.32	1	2026-01-16 10:29:55.998134-04
+1180	2026-01-16 10:29:55.762271-04	FCC-201	TEMP_REACTOR	548.44	1	2026-01-16 10:29:55.998134-04
+1181	2026-01-16 10:29:55.762288-04	FCC-201	CATALYST_ACT	71.03	1	2026-01-16 10:29:55.998134-04
+1182	2026-01-16 10:29:55.762305-04	HT-301	TEMP_HYDRO	347.62	1	2026-01-16 10:29:55.998134-04
+1183	2026-01-16 10:29:55.762324-04	HT-301	H2_PRESS	35.93	1	2026-01-16 10:29:55.998134-04
+1184	2026-01-16 10:30:01.041043-04	CDU-101	TEMP_TOWER	402.09	1	2026-01-16 10:30:01.532518-04
+1185	2026-01-16 10:30:01.041091-04	CDU-101	PRESS_TOWER	4.75	1	2026-01-16 10:30:01.532518-04
+1186	2026-01-16 10:30:01.041108-04	CDU-101	FLOW_FEED	11624.26	1	2026-01-16 10:30:01.532518-04
+1187	2026-01-16 10:30:01.041124-04	FCC-201	TEMP_REACTOR	506.18	1	2026-01-16 10:30:01.532518-04
+1188	2026-01-16 10:30:01.041139-04	FCC-201	CATALYST_ACT	75.98	1	2026-01-16 10:30:01.532518-04
+1189	2026-01-16 10:30:01.041157-04	HT-301	TEMP_HYDRO	366.47	1	2026-01-16 10:30:01.532518-04
+1190	2026-01-16 10:30:01.041173-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:30:01.532518-04
+1191	2026-01-16 10:30:06.571181-04	CDU-101	TEMP_TOWER	440.17	1	2026-01-16 10:30:12.745873-04
+1192	2026-01-16 10:30:06.571239-04	CDU-101	PRESS_TOWER	3.55	1	2026-01-16 10:30:12.745873-04
+1193	2026-01-16 10:30:06.571259-04	CDU-101	FLOW_FEED	11972.92	1	2026-01-16 10:30:12.745873-04
+1194	2026-01-16 10:30:06.571278-04	FCC-201	TEMP_REACTOR	517.11	1	2026-01-16 10:30:12.745873-04
+1195	2026-01-16 10:30:06.571293-04	FCC-201	CATALYST_ACT	72.51	1	2026-01-16 10:30:12.745873-04
+1196	2026-01-16 10:30:06.57131-04	HT-301	TEMP_HYDRO	371.91	1	2026-01-16 10:30:12.745873-04
+1197	2026-01-16 10:30:06.571326-04	HT-301	H2_PRESS	48.21	1	2026-01-16 10:30:12.745873-04
+1198	2026-01-16 10:30:17.778307-04	CDU-101	TEMP_TOWER	353.74	1	2026-01-16 10:30:18.439965-04
+1199	2026-01-16 10:30:17.77837-04	CDU-101	PRESS_TOWER	4.47	1	2026-01-16 10:30:18.439965-04
+1200	2026-01-16 10:30:17.778389-04	CDU-101	FLOW_FEED	9174.31	1	2026-01-16 10:30:18.439965-04
+1201	2026-01-16 10:30:17.778407-04	FCC-201	TEMP_REACTOR	481.95	1	2026-01-16 10:30:18.439965-04
+1202	2026-01-16 10:30:17.778423-04	FCC-201	CATALYST_ACT	84.19	1	2026-01-16 10:30:18.439965-04
+1203	2026-01-16 10:30:17.778442-04	HT-301	TEMP_HYDRO	352.91	1	2026-01-16 10:30:18.439965-04
+1204	2026-01-16 10:30:17.778458-04	HT-301	H2_PRESS	34.78	1	2026-01-16 10:30:18.439965-04
+1205	2026-01-16 10:30:23.497972-04	CDU-101	TEMP_TOWER	414.89	1	2026-01-16 10:30:23.823558-04
+1206	2026-01-16 10:30:23.498019-04	CDU-101	PRESS_TOWER	4.43	1	2026-01-16 10:30:23.823558-04
+1207	2026-01-16 10:30:23.498036-04	CDU-101	FLOW_FEED	11808.42	1	2026-01-16 10:30:23.823558-04
+1208	2026-01-16 10:30:23.498052-04	FCC-201	TEMP_REACTOR	536.89	1	2026-01-16 10:30:23.823558-04
+1209	2026-01-16 10:30:23.498067-04	FCC-201	CATALYST_ACT	91.54	1	2026-01-16 10:30:23.823558-04
+1210	2026-01-16 10:30:23.498081-04	HT-301	TEMP_HYDRO	376.32	1	2026-01-16 10:30:23.823558-04
+1211	2026-01-16 10:30:23.498096-04	HT-301	H2_PRESS	33.8	1	2026-01-16 10:30:23.823558-04
+1212	2026-01-16 10:30:28.895949-04	CDU-101	TEMP_TOWER	408.34	1	2026-01-16 10:30:29.357518-04
+1213	2026-01-16 10:30:28.895997-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:30:29.357518-04
+1214	2026-01-16 10:30:28.896014-04	CDU-101	FLOW_FEED	9884.94	1	2026-01-16 10:30:29.357518-04
+1215	2026-01-16 10:30:28.89603-04	FCC-201	TEMP_REACTOR	506.77	1	2026-01-16 10:30:29.357518-04
+1216	2026-01-16 10:30:28.896045-04	FCC-201	CATALYST_ACT	93.46	1	2026-01-16 10:30:29.357518-04
+1217	2026-01-16 10:30:28.89606-04	HT-301	TEMP_HYDRO	310.88	1	2026-01-16 10:30:29.357518-04
+1218	2026-01-16 10:30:28.896075-04	HT-301	H2_PRESS	34.23	1	2026-01-16 10:30:29.357518-04
+1219	2026-01-16 10:30:34.516517-04	CDU-101	TEMP_TOWER	411.95	1	2026-01-16 10:30:38.218901-04
+1220	2026-01-16 10:30:34.517033-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:38.218901-04
+1221	2026-01-16 10:30:34.517096-04	CDU-101	FLOW_FEED	10174.93	1	2026-01-16 10:30:38.218901-04
+1222	2026-01-16 10:30:34.51712-04	FCC-201	TEMP_REACTOR	493.46	1	2026-01-16 10:30:38.218901-04
+1223	2026-01-16 10:30:34.517138-04	FCC-201	CATALYST_ACT	87.59	1	2026-01-16 10:30:38.218901-04
+1224	2026-01-16 10:30:34.517154-04	HT-301	TEMP_HYDRO	361.29	1	2026-01-16 10:30:38.218901-04
+1225	2026-01-16 10:30:34.517171-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:30:38.218901-04
+1226	2026-01-16 10:30:43.265957-04	CDU-101	TEMP_TOWER	379.2	1	2026-01-16 10:30:43.782537-04
+1227	2026-01-16 10:30:43.266007-04	CDU-101	PRESS_TOWER	3.59	1	2026-01-16 10:30:43.782537-04
+1228	2026-01-16 10:30:43.266025-04	CDU-101	FLOW_FEED	11635.26	1	2026-01-16 10:30:43.782537-04
+1229	2026-01-16 10:30:43.266042-04	FCC-201	TEMP_REACTOR	495.85	1	2026-01-16 10:30:43.782537-04
+1230	2026-01-16 10:30:43.266057-04	FCC-201	CATALYST_ACT	73.83	1	2026-01-16 10:30:43.782537-04
+1231	2026-01-16 10:30:43.266072-04	HT-301	TEMP_HYDRO	335.67	1	2026-01-16 10:30:43.782537-04
+1232	2026-01-16 10:30:43.266088-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:30:43.782537-04
+1233	2026-01-16 10:30:48.83423-04	CDU-101	TEMP_TOWER	377.54	1	2026-01-16 10:30:51.190296-04
+1234	2026-01-16 10:30:48.834458-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:51.190296-04
+1235	2026-01-16 10:30:48.834485-04	CDU-101	FLOW_FEED	8851.93	1	2026-01-16 10:30:51.190296-04
+1236	2026-01-16 10:30:48.834503-04	FCC-201	TEMP_REACTOR	518.66	1	2026-01-16 10:30:51.190296-04
+1237	2026-01-16 10:30:48.834522-04	FCC-201	CATALYST_ACT	71.54	1	2026-01-16 10:30:51.190296-04
+1238	2026-01-16 10:30:48.834542-04	HT-301	TEMP_HYDRO	373.84	1	2026-01-16 10:30:51.190296-04
+1239	2026-01-16 10:30:48.83456-04	HT-301	H2_PRESS	48.79	1	2026-01-16 10:30:51.190296-04
+1240	2026-01-16 10:30:56.255287-04	CDU-101	TEMP_TOWER	404.37	1	2026-01-16 10:30:56.729258-04
+1241	2026-01-16 10:30:56.255348-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:30:56.729258-04
+1242	2026-01-16 10:30:56.255366-04	CDU-101	FLOW_FEED	9682.12	1	2026-01-16 10:30:56.729258-04
+1243	2026-01-16 10:30:56.255383-04	FCC-201	TEMP_REACTOR	547.67	1	2026-01-16 10:30:56.729258-04
+1244	2026-01-16 10:30:56.255398-04	FCC-201	CATALYST_ACT	94.66	1	2026-01-16 10:30:56.729258-04
+1245	2026-01-16 10:30:56.255413-04	HT-301	TEMP_HYDRO	349.46	1	2026-01-16 10:30:56.729258-04
+1246	2026-01-16 10:30:56.255428-04	HT-301	H2_PRESS	36.31	1	2026-01-16 10:30:56.729258-04
+1247	2026-01-16 10:31:01.770982-04	CDU-101	TEMP_TOWER	394.97	1	2026-01-16 10:31:02.607016-04
+1248	2026-01-16 10:31:01.771081-04	CDU-101	PRESS_TOWER	2.64	1	2026-01-16 10:31:02.607016-04
+1249	2026-01-16 10:31:01.771107-04	CDU-101	FLOW_FEED	10800.69	1	2026-01-16 10:31:02.607016-04
+1250	2026-01-16 10:31:01.771126-04	FCC-201	TEMP_REACTOR	548.12	1	2026-01-16 10:31:02.607016-04
+1251	2026-01-16 10:31:01.771143-04	FCC-201	CATALYST_ACT	82.85	1	2026-01-16 10:31:02.607016-04
+1252	2026-01-16 10:31:01.771201-04	HT-301	TEMP_HYDRO	377.28	1	2026-01-16 10:31:02.607016-04
+1253	2026-01-16 10:31:01.771219-04	HT-301	H2_PRESS	44.48	1	2026-01-16 10:31:02.607016-04
+1254	2026-01-16 10:31:07.64956-04	CDU-101	TEMP_TOWER	400.73	1	2026-01-16 10:31:14.284358-04
+1255	2026-01-16 10:31:07.649685-04	CDU-101	PRESS_TOWER	4.27	1	2026-01-16 10:31:14.284358-04
+1256	2026-01-16 10:31:07.649705-04	CDU-101	FLOW_FEED	9229.64	1	2026-01-16 10:31:14.284358-04
+1257	2026-01-16 10:31:07.649723-04	FCC-201	TEMP_REACTOR	519.64	1	2026-01-16 10:31:14.284358-04
+1258	2026-01-16 10:31:07.64974-04	FCC-201	CATALYST_ACT	77.66	1	2026-01-16 10:31:14.284358-04
+1259	2026-01-16 10:31:07.649756-04	HT-301	TEMP_HYDRO	308.24	1	2026-01-16 10:31:14.284358-04
+1260	2026-01-16 10:31:07.649774-04	HT-301	H2_PRESS	30.08	1	2026-01-16 10:31:14.284358-04
+1261	2026-01-16 10:31:19.317384-04	CDU-101	TEMP_TOWER	357.18	1	2026-01-16 10:31:20.117792-04
+1262	2026-01-16 10:31:19.317434-04	CDU-101	PRESS_TOWER	4.84	1	2026-01-16 10:31:20.117792-04
+1263	2026-01-16 10:31:19.31745-04	CDU-101	FLOW_FEED	10250.33	1	2026-01-16 10:31:20.117792-04
+1264	2026-01-16 10:31:19.317466-04	FCC-201	TEMP_REACTOR	491.17	1	2026-01-16 10:31:20.117792-04
+1265	2026-01-16 10:31:19.317481-04	FCC-201	CATALYST_ACT	74.91	1	2026-01-16 10:31:20.117792-04
+1266	2026-01-16 10:31:19.317497-04	HT-301	TEMP_HYDRO	346.28	1	2026-01-16 10:31:20.117792-04
+1267	2026-01-16 10:31:19.317511-04	HT-301	H2_PRESS	45.98	1	2026-01-16 10:31:20.117792-04
+1268	2026-01-16 10:31:25.23139-04	CDU-101	TEMP_TOWER	424.02	1	2026-01-16 10:31:25.851161-04
+1269	2026-01-16 10:31:25.231471-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:31:25.851161-04
+1270	2026-01-16 10:31:25.231489-04	CDU-101	FLOW_FEED	8703.81	1	2026-01-16 10:31:25.851161-04
+1271	2026-01-16 10:31:25.231508-04	FCC-201	TEMP_REACTOR	515.76	1	2026-01-16 10:31:25.851161-04
+1272	2026-01-16 10:31:25.231525-04	FCC-201	CATALYST_ACT	71.45	1	2026-01-16 10:31:25.851161-04
+1273	2026-01-16 10:31:25.231541-04	HT-301	TEMP_HYDRO	356.49	1	2026-01-16 10:31:25.851161-04
+1274	2026-01-16 10:31:25.231559-04	HT-301	H2_PRESS	47.33	1	2026-01-16 10:31:25.851161-04
+1275	2026-01-16 10:31:30.939591-04	CDU-101	TEMP_TOWER	360.94	1	2026-01-16 10:31:34.171122-04
+1276	2026-01-16 10:31:30.939652-04	CDU-101	PRESS_TOWER	2.54	1	2026-01-16 10:31:34.171122-04
+1277	2026-01-16 10:31:30.939673-04	CDU-101	FLOW_FEED	8136.45	1	2026-01-16 10:31:34.171122-04
+1278	2026-01-16 10:31:30.93969-04	FCC-201	TEMP_REACTOR	518.25	1	2026-01-16 10:31:34.171122-04
+1279	2026-01-16 10:31:30.939707-04	FCC-201	CATALYST_ACT	78.95	1	2026-01-16 10:31:34.171122-04
+1280	2026-01-16 10:31:30.939723-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:31:34.171122-04
+1281	2026-01-16 10:31:30.939741-04	HT-301	H2_PRESS	35.76	1	2026-01-16 10:31:34.171122-04
+1282	2026-01-16 10:31:39.407564-04	CDU-101	TEMP_TOWER	363.29	1	2026-01-16 10:31:40.538398-04
+1283	2026-01-16 10:31:39.40765-04	CDU-101	PRESS_TOWER	3.97	1	2026-01-16 10:31:40.538398-04
+1284	2026-01-16 10:31:39.407668-04	CDU-101	FLOW_FEED	10670.08	1	2026-01-16 10:31:40.538398-04
+1285	2026-01-16 10:31:39.407685-04	FCC-201	TEMP_REACTOR	524.02	1	2026-01-16 10:31:40.538398-04
+1286	2026-01-16 10:31:39.4077-04	FCC-201	CATALYST_ACT	71.26	1	2026-01-16 10:31:40.538398-04
+1287	2026-01-16 10:31:39.407716-04	HT-301	TEMP_HYDRO	301.55	1	2026-01-16 10:31:40.538398-04
+1288	2026-01-16 10:31:39.407731-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:31:40.538398-04
+1289	2026-01-16 10:31:45.867603-04	CDU-101	TEMP_TOWER	419.42	1	2026-01-16 10:31:46.555631-04
+1290	2026-01-16 10:31:45.86772-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:31:46.555631-04
+1291	2026-01-16 10:31:45.867741-04	CDU-101	FLOW_FEED	11225.31	1	2026-01-16 10:31:46.555631-04
+1292	2026-01-16 10:31:45.867761-04	FCC-201	TEMP_REACTOR	544.47	1	2026-01-16 10:31:46.555631-04
+1293	2026-01-16 10:31:45.867778-04	FCC-201	CATALYST_ACT	85.69	1	2026-01-16 10:31:46.555631-04
+1294	2026-01-16 10:31:45.867795-04	HT-301	TEMP_HYDRO	304.73	1	2026-01-16 10:31:46.555631-04
+1295	2026-01-16 10:31:45.867815-04	HT-301	H2_PRESS	38.71	1	2026-01-16 10:31:46.555631-04
+1296	2026-01-16 10:31:51.664903-04	CDU-101	TEMP_TOWER	406.4	1	2026-01-16 10:31:54.476581-04
+1297	2026-01-16 10:31:51.664971-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:31:54.476581-04
+1298	2026-01-16 10:31:51.66499-04	CDU-101	FLOW_FEED	8392.11	1	2026-01-16 10:31:54.476581-04
+1299	2026-01-16 10:31:51.66501-04	FCC-201	TEMP_REACTOR	526.16	1	2026-01-16 10:31:54.476581-04
+1300	2026-01-16 10:31:51.665027-04	FCC-201	CATALYST_ACT	71.94	1	2026-01-16 10:31:54.476581-04
+1301	2026-01-16 10:31:51.665044-04	HT-301	TEMP_HYDRO	343.15	1	2026-01-16 10:31:54.476581-04
+1302	2026-01-16 10:31:51.66506-04	HT-301	H2_PRESS	31.83	1	2026-01-16 10:31:54.476581-04
+1303	2026-01-16 10:32:00.615406-04	CDU-101	TEMP_TOWER	443.45	1	2026-01-16 10:32:01.599685-04
+1304	2026-01-16 10:32:00.615503-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:32:01.599685-04
+1305	2026-01-16 10:32:00.615523-04	CDU-101	FLOW_FEED	9016.95	1	2026-01-16 10:32:01.599685-04
+1306	2026-01-16 10:32:00.615589-04	FCC-201	TEMP_REACTOR	530.01	1	2026-01-16 10:32:01.599685-04
+1307	2026-01-16 10:32:00.615609-04	FCC-201	CATALYST_ACT	91.76	1	2026-01-16 10:32:01.599685-04
+1308	2026-01-16 10:32:00.615625-04	HT-301	TEMP_HYDRO	353.24	1	2026-01-16 10:32:01.599685-04
+1309	2026-01-16 10:32:00.615645-04	HT-301	H2_PRESS	49.49	1	2026-01-16 10:32:01.599685-04
+1310	2026-01-16 10:32:09.326671-04	CDU-101	TEMP_TOWER	388.31	1	2026-01-16 10:32:12.204717-04
+1311	2026-01-16 10:32:09.326737-04	CDU-101	PRESS_TOWER	4.23	1	2026-01-16 10:32:12.204717-04
+1312	2026-01-16 10:32:09.326759-04	CDU-101	FLOW_FEED	8401.27	1	2026-01-16 10:32:12.204717-04
+1313	2026-01-16 10:32:09.326778-04	FCC-201	TEMP_REACTOR	494.36	1	2026-01-16 10:32:12.204717-04
+1314	2026-01-16 10:32:09.326796-04	FCC-201	CATALYST_ACT	91	1	2026-01-16 10:32:12.204717-04
+1315	2026-01-16 10:32:09.326814-04	HT-301	TEMP_HYDRO	359.89	1	2026-01-16 10:32:12.204717-04
+1316	2026-01-16 10:32:09.326829-04	HT-301	H2_PRESS	40.67	1	2026-01-16 10:32:12.204717-04
+1317	2026-01-16 10:32:17.396486-04	CDU-101	TEMP_TOWER	358.4	1	2026-01-16 10:32:17.738737-04
+1318	2026-01-16 10:32:17.396559-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:32:17.738737-04
+1319	2026-01-16 10:32:17.396579-04	CDU-101	FLOW_FEED	9768.87	1	2026-01-16 10:32:17.738737-04
+1320	2026-01-16 10:32:17.3966-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:32:17.738737-04
+1321	2026-01-16 10:32:17.396617-04	FCC-201	CATALYST_ACT	85.1	1	2026-01-16 10:32:17.738737-04
+1322	2026-01-16 10:32:17.396634-04	HT-301	TEMP_HYDRO	369.4	1	2026-01-16 10:32:17.738737-04
+1323	2026-01-16 10:32:17.396651-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:32:17.738737-04
+1324	2026-01-16 10:32:22.872986-04	CDU-101	TEMP_TOWER	419.35	1	2026-01-16 10:32:24.235468-04
+1325	2026-01-16 10:32:22.873065-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:32:24.235468-04
+1326	2026-01-16 10:32:22.873085-04	CDU-101	FLOW_FEED	8581.79	1	2026-01-16 10:32:24.235468-04
+1327	2026-01-16 10:32:22.873104-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:32:24.235468-04
+1328	2026-01-16 10:32:22.873122-04	FCC-201	CATALYST_ACT	75.79	1	2026-01-16 10:32:24.235468-04
+1329	2026-01-16 10:32:22.873138-04	HT-301	TEMP_HYDRO	368.58	1	2026-01-16 10:32:24.235468-04
+1330	2026-01-16 10:32:22.873155-04	HT-301	H2_PRESS	35.54	1	2026-01-16 10:32:24.235468-04
+1331	2026-01-16 10:32:29.896867-04	CDU-101	TEMP_TOWER	362.48	1	2026-01-16 10:32:30.281874-04
+1332	2026-01-16 10:32:29.896927-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:32:30.281874-04
+1333	2026-01-16 10:32:29.896949-04	CDU-101	FLOW_FEED	9186.29	1	2026-01-16 10:32:30.281874-04
+1334	2026-01-16 10:32:29.896967-04	FCC-201	TEMP_REACTOR	495.6	1	2026-01-16 10:32:30.281874-04
+1335	2026-01-16 10:32:29.896983-04	FCC-201	CATALYST_ACT	84.52	1	2026-01-16 10:32:30.281874-04
+1336	2026-01-16 10:32:29.897001-04	HT-301	TEMP_HYDRO	349.92	1	2026-01-16 10:32:30.281874-04
+1337	2026-01-16 10:32:29.89702-04	HT-301	H2_PRESS	47.73	1	2026-01-16 10:32:30.281874-04
+1338	2026-01-16 10:32:35.393358-04	CDU-101	TEMP_TOWER	381.03	1	2026-01-16 10:32:36.064363-04
+1339	2026-01-16 10:32:35.39342-04	CDU-101	PRESS_TOWER	2.95	1	2026-01-16 10:32:36.064363-04
+1340	2026-01-16 10:32:35.393438-04	CDU-101	FLOW_FEED	8166.6	1	2026-01-16 10:32:36.064363-04
+1341	2026-01-16 10:32:35.393456-04	FCC-201	TEMP_REACTOR	531.02	1	2026-01-16 10:32:36.064363-04
+1342	2026-01-16 10:32:35.393472-04	FCC-201	CATALYST_ACT	80.94	1	2026-01-16 10:32:36.064363-04
+1343	2026-01-16 10:32:35.393489-04	HT-301	TEMP_HYDRO	301.58	1	2026-01-16 10:32:36.064363-04
+1344	2026-01-16 10:32:35.393507-04	HT-301	H2_PRESS	44.78	1	2026-01-16 10:32:36.064363-04
+1345	2026-01-16 10:32:41.211862-04	CDU-101	TEMP_TOWER	423.36	1	2026-01-16 10:32:41.521975-04
+1346	2026-01-16 10:32:41.21192-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:32:41.521975-04
+1347	2026-01-16 10:32:41.211938-04	CDU-101	FLOW_FEED	9548.44	1	2026-01-16 10:32:41.521975-04
+1348	2026-01-16 10:32:41.211957-04	FCC-201	TEMP_REACTOR	532.23	1	2026-01-16 10:32:41.521975-04
+1349	2026-01-16 10:32:41.211973-04	FCC-201	CATALYST_ACT	77.48	1	2026-01-16 10:32:41.521975-04
+1350	2026-01-16 10:32:41.211989-04	HT-301	TEMP_HYDRO	372.69	1	2026-01-16 10:32:41.521975-04
+1351	2026-01-16 10:32:41.212005-04	HT-301	H2_PRESS	30.38	1	2026-01-16 10:32:41.521975-04
+1352	2026-01-16 10:32:46.552203-04	CDU-101	TEMP_TOWER	397.47	1	2026-01-16 10:32:49.218202-04
+1353	2026-01-16 10:32:46.552262-04	CDU-101	PRESS_TOWER	4.01	1	2026-01-16 10:32:49.218202-04
+1354	2026-01-16 10:32:46.552283-04	CDU-101	FLOW_FEED	11476.17	1	2026-01-16 10:32:49.218202-04
+1355	2026-01-16 10:32:46.552302-04	FCC-201	TEMP_REACTOR	515.12	1	2026-01-16 10:32:49.218202-04
+1356	2026-01-16 10:32:46.552321-04	FCC-201	CATALYST_ACT	92.45	1	2026-01-16 10:32:49.218202-04
+1357	2026-01-16 10:32:46.552339-04	HT-301	TEMP_HYDRO	342.45	1	2026-01-16 10:32:49.218202-04
+1358	2026-01-16 10:32:46.552356-04	HT-301	H2_PRESS	31.27	1	2026-01-16 10:32:49.218202-04
+1359	2026-01-16 10:32:54.296948-04	CDU-101	TEMP_TOWER	385.75	1	2026-01-16 10:32:54.493525-04
+1360	2026-01-16 10:32:54.296998-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:32:54.493525-04
+1361	2026-01-16 10:32:54.297015-04	CDU-101	FLOW_FEED	8096.41	1	2026-01-16 10:32:54.493525-04
+1362	2026-01-16 10:32:54.297032-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:32:54.493525-04
+1363	2026-01-16 10:32:54.297046-04	FCC-201	CATALYST_ACT	80.43	1	2026-01-16 10:32:54.493525-04
+1364	2026-01-16 10:32:54.297063-04	HT-301	TEMP_HYDRO	359.25	1	2026-01-16 10:32:54.493525-04
+1365	2026-01-16 10:32:54.297078-04	HT-301	H2_PRESS	41.7	1	2026-01-16 10:32:54.493525-04
+1366	2026-01-16 10:32:59.555964-04	CDU-101	TEMP_TOWER	377.09	1	2026-01-16 10:33:02.164792-04
+1367	2026-01-16 10:32:59.556023-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:33:02.164792-04
+1368	2026-01-16 10:32:59.556042-04	CDU-101	FLOW_FEED	8561.83	1	2026-01-16 10:33:02.164792-04
+1369	2026-01-16 10:32:59.55606-04	FCC-201	TEMP_REACTOR	523.35	1	2026-01-16 10:33:02.164792-04
+1370	2026-01-16 10:32:59.556076-04	FCC-201	CATALYST_ACT	85.72	1	2026-01-16 10:33:02.164792-04
+1371	2026-01-16 10:32:59.556093-04	HT-301	TEMP_HYDRO	358.33	1	2026-01-16 10:33:02.164792-04
+1372	2026-01-16 10:32:59.55611-04	HT-301	H2_PRESS	35.36	1	2026-01-16 10:33:02.164792-04
+1373	2026-01-16 10:33:07.273094-04	CDU-101	TEMP_TOWER	406.61	1	2026-01-16 10:33:07.497101-04
+1374	2026-01-16 10:33:07.273143-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 10:33:07.497101-04
+1375	2026-01-16 10:33:07.273161-04	CDU-101	FLOW_FEED	8137.3	1	2026-01-16 10:33:07.497101-04
+1376	2026-01-16 10:33:07.273178-04	FCC-201	TEMP_REACTOR	517.25	1	2026-01-16 10:33:07.497101-04
+1377	2026-01-16 10:33:07.273193-04	FCC-201	CATALYST_ACT	92.65	1	2026-01-16 10:33:07.497101-04
+1378	2026-01-16 10:33:07.273208-04	HT-301	TEMP_HYDRO	318.42	1	2026-01-16 10:33:07.497101-04
+1379	2026-01-16 10:33:07.273223-04	HT-301	H2_PRESS	40.73	1	2026-01-16 10:33:07.497101-04
+1380	2026-01-16 10:33:12.529268-04	CDU-101	TEMP_TOWER	385.52	1	2026-01-16 10:33:13.00047-04
+1381	2026-01-16 10:33:12.529329-04	CDU-101	PRESS_TOWER	3.63	1	2026-01-16 10:33:13.00047-04
+1382	2026-01-16 10:33:12.529347-04	CDU-101	FLOW_FEED	10373.21	1	2026-01-16 10:33:13.00047-04
+1383	2026-01-16 10:33:12.529364-04	FCC-201	TEMP_REACTOR	524.69	1	2026-01-16 10:33:13.00047-04
+1384	2026-01-16 10:33:12.52938-04	FCC-201	CATALYST_ACT	92.35	1	2026-01-16 10:33:13.00047-04
+1385	2026-01-16 10:33:12.529395-04	HT-301	TEMP_HYDRO	320.21	1	2026-01-16 10:33:13.00047-04
+1386	2026-01-16 10:33:12.52941-04	HT-301	H2_PRESS	46.63	1	2026-01-16 10:33:13.00047-04
+1387	2026-01-16 10:33:21.248244-04	CDU-101	TEMP_TOWER	399.47	1	2026-01-16 10:33:21.640509-04
+1388	2026-01-16 10:33:21.24832-04	CDU-101	PRESS_TOWER	4.9	1	2026-01-16 10:33:21.640509-04
+1389	2026-01-16 10:33:21.248339-04	CDU-101	FLOW_FEED	10195.7	1	2026-01-16 10:33:21.640509-04
+1390	2026-01-16 10:33:21.248356-04	FCC-201	TEMP_REACTOR	549.71	1	2026-01-16 10:33:21.640509-04
+1391	2026-01-16 10:33:21.248373-04	FCC-201	CATALYST_ACT	74.43	1	2026-01-16 10:33:21.640509-04
+1392	2026-01-16 10:33:21.248389-04	HT-301	TEMP_HYDRO	377.12	1	2026-01-16 10:33:21.640509-04
+1393	2026-01-16 10:33:21.248406-04	HT-301	H2_PRESS	36.56	1	2026-01-16 10:33:21.640509-04
+1394	2026-01-16 10:33:26.694202-04	CDU-101	TEMP_TOWER	433.79	1	2026-01-16 10:33:27.157112-04
+1395	2026-01-16 10:33:26.694261-04	CDU-101	PRESS_TOWER	3.39	1	2026-01-16 10:33:27.157112-04
+1396	2026-01-16 10:33:26.69428-04	CDU-101	FLOW_FEED	9751.95	1	2026-01-16 10:33:27.157112-04
+1397	2026-01-16 10:33:26.694297-04	FCC-201	TEMP_REACTOR	505.57	1	2026-01-16 10:33:27.157112-04
+1398	2026-01-16 10:33:26.694314-04	FCC-201	CATALYST_ACT	80.74	1	2026-01-16 10:33:27.157112-04
+1399	2026-01-16 10:33:26.69433-04	HT-301	TEMP_HYDRO	333.75	1	2026-01-16 10:33:27.157112-04
+1400	2026-01-16 10:33:26.694346-04	HT-301	H2_PRESS	39.23	1	2026-01-16 10:33:27.157112-04
+1401	2026-01-16 10:33:32.202708-04	CDU-101	TEMP_TOWER	429.51	1	2026-01-16 10:33:32.4361-04
+1402	2026-01-16 10:33:32.202768-04	CDU-101	PRESS_TOWER	2.87	1	2026-01-16 10:33:32.4361-04
+1403	2026-01-16 10:33:32.202789-04	CDU-101	FLOW_FEED	8275.45	1	2026-01-16 10:33:32.4361-04
+1404	2026-01-16 10:33:32.202806-04	FCC-201	TEMP_REACTOR	548.04	1	2026-01-16 10:33:32.4361-04
+1405	2026-01-16 10:33:32.202823-04	FCC-201	CATALYST_ACT	76.81	1	2026-01-16 10:33:32.4361-04
+1406	2026-01-16 10:33:32.202839-04	HT-301	TEMP_HYDRO	368.22	1	2026-01-16 10:33:32.4361-04
+1407	2026-01-16 10:33:32.202855-04	HT-301	H2_PRESS	42.27	1	2026-01-16 10:33:32.4361-04
+1408	2026-01-16 10:33:37.477779-04	CDU-101	TEMP_TOWER	386.89	1	2026-01-16 10:33:39.983945-04
+1409	2026-01-16 10:33:37.477837-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 10:33:39.983945-04
+1410	2026-01-16 10:33:37.477854-04	CDU-101	FLOW_FEED	9034.87	1	2026-01-16 10:33:39.983945-04
+1411	2026-01-16 10:33:37.477872-04	FCC-201	TEMP_REACTOR	488.96	1	2026-01-16 10:33:39.983945-04
+1412	2026-01-16 10:33:37.477886-04	FCC-201	CATALYST_ACT	80.46	1	2026-01-16 10:33:39.983945-04
+1413	2026-01-16 10:33:37.477902-04	HT-301	TEMP_HYDRO	332.33	1	2026-01-16 10:33:39.983945-04
+1414	2026-01-16 10:33:37.477917-04	HT-301	H2_PRESS	34.54	1	2026-01-16 10:33:39.983945-04
+1415	2026-01-16 10:33:45.036201-04	CDU-101	TEMP_TOWER	424.83	1	2026-01-16 10:33:45.262717-04
+1416	2026-01-16 10:33:45.036255-04	CDU-101	PRESS_TOWER	4.48	1	2026-01-16 10:33:45.262717-04
+1417	2026-01-16 10:33:45.036273-04	CDU-101	FLOW_FEED	10095.67	1	2026-01-16 10:33:45.262717-04
+1418	2026-01-16 10:33:45.036289-04	FCC-201	TEMP_REACTOR	523.18	1	2026-01-16 10:33:45.262717-04
+1419	2026-01-16 10:33:45.036304-04	FCC-201	CATALYST_ACT	71.74	1	2026-01-16 10:33:45.262717-04
+1420	2026-01-16 10:33:45.036319-04	HT-301	TEMP_HYDRO	330.83	1	2026-01-16 10:33:45.262717-04
+1421	2026-01-16 10:33:45.036334-04	HT-301	H2_PRESS	32.19	1	2026-01-16 10:33:45.262717-04
+1422	2026-01-16 10:33:50.326776-04	CDU-101	TEMP_TOWER	403.86	1	2026-01-16 10:33:58.55448-04
+1423	2026-01-16 10:33:50.32684-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:33:58.55448-04
+1424	2026-01-16 10:33:50.326858-04	CDU-101	FLOW_FEED	8652.82	1	2026-01-16 10:33:58.55448-04
+1425	2026-01-16 10:33:50.326877-04	FCC-201	TEMP_REACTOR	532.66	1	2026-01-16 10:33:58.55448-04
+1426	2026-01-16 10:33:50.326894-04	FCC-201	CATALYST_ACT	78.32	1	2026-01-16 10:33:58.55448-04
+1427	2026-01-16 10:33:50.32691-04	HT-301	TEMP_HYDRO	362.01	1	2026-01-16 10:33:58.55448-04
+1428	2026-01-16 10:33:50.326926-04	HT-301	H2_PRESS	42.52	1	2026-01-16 10:33:58.55448-04
+1429	2026-01-16 10:34:03.622918-04	CDU-101	TEMP_TOWER	386.46	1	2026-01-16 10:34:04.164338-04
+1430	2026-01-16 10:34:03.622984-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:34:04.164338-04
+1431	2026-01-16 10:34:03.623005-04	CDU-101	FLOW_FEED	11742.54	1	2026-01-16 10:34:04.164338-04
+1432	2026-01-16 10:34:03.623024-04	FCC-201	TEMP_REACTOR	501.34	1	2026-01-16 10:34:04.164338-04
+1433	2026-01-16 10:34:03.623041-04	FCC-201	CATALYST_ACT	72.8	1	2026-01-16 10:34:04.164338-04
+1434	2026-01-16 10:34:03.623058-04	HT-301	TEMP_HYDRO	335.7	1	2026-01-16 10:34:04.164338-04
+1435	2026-01-16 10:34:03.623075-04	HT-301	H2_PRESS	43.57	1	2026-01-16 10:34:04.164338-04
+1436	2026-01-16 10:34:09.206976-04	CDU-101	TEMP_TOWER	350.46	1	2026-01-16 10:34:09.450243-04
+1437	2026-01-16 10:34:09.207045-04	CDU-101	PRESS_TOWER	2.82	1	2026-01-16 10:34:09.450243-04
+1438	2026-01-16 10:34:09.207064-04	CDU-101	FLOW_FEED	10611.57	1	2026-01-16 10:34:09.450243-04
+1439	2026-01-16 10:34:09.207081-04	FCC-201	TEMP_REACTOR	510.62	1	2026-01-16 10:34:09.450243-04
+1440	2026-01-16 10:34:09.207099-04	FCC-201	CATALYST_ACT	81.4	1	2026-01-16 10:34:09.450243-04
+1441	2026-01-16 10:34:09.207117-04	HT-301	TEMP_HYDRO	328.49	1	2026-01-16 10:34:09.450243-04
+1442	2026-01-16 10:34:09.207134-04	HT-301	H2_PRESS	34.87	1	2026-01-16 10:34:09.450243-04
+1443	2026-01-16 10:34:14.48283-04	CDU-101	TEMP_TOWER	414.51	1	2026-01-16 10:34:17.00368-04
+1444	2026-01-16 10:34:14.482891-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:34:17.00368-04
+1445	2026-01-16 10:34:14.482909-04	CDU-101	FLOW_FEED	9838.7	1	2026-01-16 10:34:17.00368-04
+1446	2026-01-16 10:34:14.482927-04	FCC-201	TEMP_REACTOR	542.14	1	2026-01-16 10:34:17.00368-04
+1447	2026-01-16 10:34:14.482943-04	FCC-201	CATALYST_ACT	77.34	1	2026-01-16 10:34:17.00368-04
+1448	2026-01-16 10:34:14.482958-04	HT-301	TEMP_HYDRO	378.14	1	2026-01-16 10:34:17.00368-04
+1449	2026-01-16 10:34:14.482974-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:34:17.00368-04
+1450	2026-01-16 10:34:22.038612-04	CDU-101	TEMP_TOWER	365.68	1	2026-01-16 10:34:22.30655-04
+1451	2026-01-16 10:34:22.038673-04	CDU-101	PRESS_TOWER	4.95	1	2026-01-16 10:34:22.30655-04
+1452	2026-01-16 10:34:22.038693-04	CDU-101	FLOW_FEED	8800.62	1	2026-01-16 10:34:22.30655-04
+1453	2026-01-16 10:34:22.038712-04	FCC-201	TEMP_REACTOR	480.01	1	2026-01-16 10:34:22.30655-04
+1454	2026-01-16 10:34:22.038727-04	FCC-201	CATALYST_ACT	77.11	1	2026-01-16 10:34:22.30655-04
+1455	2026-01-16 10:34:22.038743-04	HT-301	TEMP_HYDRO	337.39	1	2026-01-16 10:34:22.30655-04
+1456	2026-01-16 10:34:22.03876-04	HT-301	H2_PRESS	36.09	1	2026-01-16 10:34:22.30655-04
+1457	2026-01-16 10:34:27.339392-04	CDU-101	TEMP_TOWER	395.05	1	2026-01-16 10:34:27.883442-04
+1458	2026-01-16 10:34:27.339473-04	CDU-101	PRESS_TOWER	3.81	1	2026-01-16 10:34:27.883442-04
+1459	2026-01-16 10:34:27.339492-04	CDU-101	FLOW_FEED	8415.83	1	2026-01-16 10:34:27.883442-04
+1460	2026-01-16 10:34:27.339513-04	FCC-201	TEMP_REACTOR	546.22	1	2026-01-16 10:34:27.883442-04
+1461	2026-01-16 10:34:27.339531-04	FCC-201	CATALYST_ACT	79.24	1	2026-01-16 10:34:27.883442-04
+1462	2026-01-16 10:34:27.339547-04	HT-301	TEMP_HYDRO	365.73	1	2026-01-16 10:34:27.883442-04
+1463	2026-01-16 10:34:27.339563-04	HT-301	H2_PRESS	49.99	1	2026-01-16 10:34:27.883442-04
+1464	2026-01-16 10:34:32.918522-04	CDU-101	TEMP_TOWER	422.03	1	2026-01-16 10:34:33.110994-04
+1465	2026-01-16 10:34:32.918573-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:34:33.110994-04
+1466	2026-01-16 10:34:32.918589-04	CDU-101	FLOW_FEED	8067.06	1	2026-01-16 10:34:33.110994-04
+1467	2026-01-16 10:34:32.918605-04	FCC-201	TEMP_REACTOR	508.55	1	2026-01-16 10:34:33.110994-04
+1468	2026-01-16 10:34:32.91862-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:34:33.110994-04
+1469	2026-01-16 10:34:32.918635-04	HT-301	TEMP_HYDRO	371.39	1	2026-01-16 10:34:33.110994-04
+1470	2026-01-16 10:34:32.91865-04	HT-301	H2_PRESS	47.63	1	2026-01-16 10:34:33.110994-04
+1471	2026-01-16 10:34:38.186718-04	CDU-101	TEMP_TOWER	375.55	1	2026-01-16 10:34:38.654647-04
+1472	2026-01-16 10:34:38.186775-04	CDU-101	PRESS_TOWER	3.78	1	2026-01-16 10:34:38.654647-04
+1473	2026-01-16 10:34:38.186793-04	CDU-101	FLOW_FEED	11036.33	1	2026-01-16 10:34:38.654647-04
+1474	2026-01-16 10:34:38.186813-04	FCC-201	TEMP_REACTOR	491.23	1	2026-01-16 10:34:38.654647-04
+1475	2026-01-16 10:34:38.18683-04	FCC-201	CATALYST_ACT	93.71	1	2026-01-16 10:34:38.654647-04
+1476	2026-01-16 10:34:38.186846-04	HT-301	TEMP_HYDRO	323.31	1	2026-01-16 10:34:38.654647-04
+1477	2026-01-16 10:34:38.186862-04	HT-301	H2_PRESS	44.74	1	2026-01-16 10:34:38.654647-04
+1478	2026-01-16 10:34:43.718707-04	CDU-101	TEMP_TOWER	430.54	1	2026-01-16 10:34:45.919293-04
+1479	2026-01-16 10:34:43.718766-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:34:45.919293-04
+1480	2026-01-16 10:34:43.718785-04	CDU-101	FLOW_FEED	9808.91	1	2026-01-16 10:34:45.919293-04
+1481	2026-01-16 10:34:43.718802-04	FCC-201	TEMP_REACTOR	547.88	1	2026-01-16 10:34:45.919293-04
+1482	2026-01-16 10:34:43.718819-04	FCC-201	CATALYST_ACT	75.57	1	2026-01-16 10:34:45.919293-04
+1483	2026-01-16 10:34:43.718836-04	HT-301	TEMP_HYDRO	303.23	1	2026-01-16 10:34:45.919293-04
+1484	2026-01-16 10:34:43.718852-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:34:45.919293-04
+1485	2026-01-16 10:34:50.978722-04	CDU-101	TEMP_TOWER	431.68	1	2026-01-16 10:34:51.429352-04
+1486	2026-01-16 10:34:50.978785-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:34:51.429352-04
+1487	2026-01-16 10:34:50.978803-04	CDU-101	FLOW_FEED	10576.43	1	2026-01-16 10:34:51.429352-04
+1488	2026-01-16 10:34:50.978824-04	FCC-201	TEMP_REACTOR	545.01	1	2026-01-16 10:34:51.429352-04
+1489	2026-01-16 10:34:50.978841-04	FCC-201	CATALYST_ACT	87.55	1	2026-01-16 10:34:51.429352-04
+1490	2026-01-16 10:34:50.978858-04	HT-301	TEMP_HYDRO	328.18	1	2026-01-16 10:34:51.429352-04
+1491	2026-01-16 10:34:50.978876-04	HT-301	H2_PRESS	40.99	1	2026-01-16 10:34:51.429352-04
+1492	2026-01-16 10:34:56.457603-04	CDU-101	TEMP_TOWER	415.03	1	2026-01-16 10:34:56.648045-04
+1493	2026-01-16 10:34:56.457657-04	CDU-101	PRESS_TOWER	2.77	1	2026-01-16 10:34:56.648045-04
+1494	2026-01-16 10:34:56.457674-04	CDU-101	FLOW_FEED	10877.67	1	2026-01-16 10:34:56.648045-04
+1495	2026-01-16 10:34:56.45769-04	FCC-201	TEMP_REACTOR	528.05	1	2026-01-16 10:34:56.648045-04
+1496	2026-01-16 10:34:56.457705-04	FCC-201	CATALYST_ACT	92.2	1	2026-01-16 10:34:56.648045-04
+1497	2026-01-16 10:34:56.45772-04	HT-301	TEMP_HYDRO	337.08	1	2026-01-16 10:34:56.648045-04
+1498	2026-01-16 10:34:56.457735-04	HT-301	H2_PRESS	49.6	1	2026-01-16 10:34:56.648045-04
+1499	2026-01-16 10:35:01.681978-04	CDU-101	TEMP_TOWER	433.68	1	2026-01-16 10:35:04.144458-04
+1500	2026-01-16 10:35:01.682036-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:35:04.144458-04
+1501	2026-01-16 10:35:01.682055-04	CDU-101	FLOW_FEED	10855.79	1	2026-01-16 10:35:04.144458-04
+1502	2026-01-16 10:35:01.682073-04	FCC-201	TEMP_REACTOR	533.64	1	2026-01-16 10:35:04.144458-04
+1503	2026-01-16 10:35:01.682091-04	FCC-201	CATALYST_ACT	87.92	1	2026-01-16 10:35:04.144458-04
+1504	2026-01-16 10:35:01.682108-04	HT-301	TEMP_HYDRO	345.07	1	2026-01-16 10:35:04.144458-04
+1505	2026-01-16 10:35:01.682127-04	HT-301	H2_PRESS	35.05	1	2026-01-16 10:35:04.144458-04
+1506	2026-01-16 10:35:09.173089-04	CDU-101	TEMP_TOWER	425.75	1	2026-01-16 10:35:09.371006-04
+1507	2026-01-16 10:35:09.173137-04	CDU-101	PRESS_TOWER	3.4	1	2026-01-16 10:35:09.371006-04
+1508	2026-01-16 10:35:09.173154-04	CDU-101	FLOW_FEED	11542.61	1	2026-01-16 10:35:09.371006-04
+1509	2026-01-16 10:35:09.173171-04	FCC-201	TEMP_REACTOR	490.07	1	2026-01-16 10:35:09.371006-04
+1510	2026-01-16 10:35:09.173187-04	FCC-201	CATALYST_ACT	86.67	1	2026-01-16 10:35:09.371006-04
+1511	2026-01-16 10:35:09.173202-04	HT-301	TEMP_HYDRO	311.71	1	2026-01-16 10:35:09.371006-04
+1512	2026-01-16 10:35:09.173218-04	HT-301	H2_PRESS	34.38	1	2026-01-16 10:35:09.371006-04
+1513	2026-01-16 10:35:14.406287-04	CDU-101	TEMP_TOWER	404.17	1	2026-01-16 10:35:16.883747-04
+1514	2026-01-16 10:35:14.406345-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:35:16.883747-04
+1515	2026-01-16 10:35:14.406364-04	CDU-101	FLOW_FEED	8004.3	1	2026-01-16 10:35:16.883747-04
+1516	2026-01-16 10:35:14.406382-04	FCC-201	TEMP_REACTOR	495.28	1	2026-01-16 10:35:16.883747-04
+1517	2026-01-16 10:35:14.406398-04	FCC-201	CATALYST_ACT	83.84	1	2026-01-16 10:35:16.883747-04
+1518	2026-01-16 10:35:14.406417-04	HT-301	TEMP_HYDRO	306.17	1	2026-01-16 10:35:16.883747-04
+1519	2026-01-16 10:35:14.406434-04	HT-301	H2_PRESS	44.61	1	2026-01-16 10:35:16.883747-04
+1520	2026-01-16 10:35:21.917377-04	CDU-101	TEMP_TOWER	377.52	1	2026-01-16 10:35:22.110085-04
+1521	2026-01-16 10:35:21.917439-04	CDU-101	PRESS_TOWER	3.29	1	2026-01-16 10:35:22.110085-04
+1522	2026-01-16 10:35:21.917458-04	CDU-101	FLOW_FEED	9448.95	1	2026-01-16 10:35:22.110085-04
+1523	2026-01-16 10:35:21.917476-04	FCC-201	TEMP_REACTOR	510.59	1	2026-01-16 10:35:22.110085-04
+1524	2026-01-16 10:35:21.917492-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:35:22.110085-04
+1525	2026-01-16 10:35:21.917507-04	HT-301	TEMP_HYDRO	311.21	1	2026-01-16 10:35:22.110085-04
+1526	2026-01-16 10:35:21.917522-04	HT-301	H2_PRESS	35.49	1	2026-01-16 10:35:22.110085-04
+1527	2026-01-16 10:35:27.143586-04	CDU-101	TEMP_TOWER	372.86	1	2026-01-16 10:35:29.60218-04
+1528	2026-01-16 10:35:27.143649-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:35:29.60218-04
+1529	2026-01-16 10:35:27.143667-04	CDU-101	FLOW_FEED	9155.05	1	2026-01-16 10:35:29.60218-04
+1530	2026-01-16 10:35:27.143685-04	FCC-201	TEMP_REACTOR	528.54	1	2026-01-16 10:35:29.60218-04
+1531	2026-01-16 10:35:27.143702-04	FCC-201	CATALYST_ACT	78.71	1	2026-01-16 10:35:29.60218-04
+1532	2026-01-16 10:35:27.143719-04	HT-301	TEMP_HYDRO	328.6	1	2026-01-16 10:35:29.60218-04
+1533	2026-01-16 10:35:27.143738-04	HT-301	H2_PRESS	43.26	1	2026-01-16 10:35:29.60218-04
+1534	2026-01-16 10:35:34.626863-04	CDU-101	TEMP_TOWER	382.32	1	2026-01-16 10:35:36.852263-04
+1535	2026-01-16 10:35:34.626922-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:35:36.852263-04
+1536	2026-01-16 10:35:34.626941-04	CDU-101	FLOW_FEED	8097.34	1	2026-01-16 10:35:36.852263-04
+1537	2026-01-16 10:35:34.626959-04	FCC-201	TEMP_REACTOR	545.07	1	2026-01-16 10:35:36.852263-04
+1538	2026-01-16 10:35:34.626976-04	FCC-201	CATALYST_ACT	78.24	1	2026-01-16 10:35:36.852263-04
+1539	2026-01-16 10:35:34.626992-04	HT-301	TEMP_HYDRO	369.02	1	2026-01-16 10:35:36.852263-04
+1540	2026-01-16 10:35:34.627009-04	HT-301	H2_PRESS	32.85	1	2026-01-16 10:35:36.852263-04
+1541	2026-01-16 10:35:41.884529-04	CDU-101	TEMP_TOWER	442.24	1	2026-01-16 10:35:44.434377-04
+1542	2026-01-16 10:35:41.884585-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:35:44.434377-04
+1543	2026-01-16 10:35:41.884604-04	CDU-101	FLOW_FEED	9108.04	1	2026-01-16 10:35:44.434377-04
+1544	2026-01-16 10:35:41.884622-04	FCC-201	TEMP_REACTOR	486.84	1	2026-01-16 10:35:44.434377-04
+1545	2026-01-16 10:35:41.884638-04	FCC-201	CATALYST_ACT	71.27	1	2026-01-16 10:35:44.434377-04
+1546	2026-01-16 10:35:41.884655-04	HT-301	TEMP_HYDRO	318.02	1	2026-01-16 10:35:44.434377-04
+1547	2026-01-16 10:35:41.884672-04	HT-301	H2_PRESS	40.13	1	2026-01-16 10:35:44.434377-04
+1548	2026-01-16 10:35:49.464505-04	CDU-101	TEMP_TOWER	408.92	1	2026-01-16 10:35:49.786845-04
+1549	2026-01-16 10:35:49.464568-04	CDU-101	PRESS_TOWER	2.59	1	2026-01-16 10:35:49.786845-04
+1550	2026-01-16 10:35:49.464587-04	CDU-101	FLOW_FEED	8892.7	1	2026-01-16 10:35:49.786845-04
+1551	2026-01-16 10:35:49.464606-04	FCC-201	TEMP_REACTOR	537.83	1	2026-01-16 10:35:49.786845-04
+1552	2026-01-16 10:35:49.464622-04	FCC-201	CATALYST_ACT	90.59	1	2026-01-16 10:35:49.786845-04
+1553	2026-01-16 10:35:49.464639-04	HT-301	TEMP_HYDRO	335.13	1	2026-01-16 10:35:49.786845-04
+1554	2026-01-16 10:35:49.464656-04	HT-301	H2_PRESS	42.21	1	2026-01-16 10:35:49.786845-04
+1555	2026-01-16 10:35:54.968581-04	CDU-101	TEMP_TOWER	420.68	1	2026-01-16 10:35:55.432417-04
+1556	2026-01-16 10:35:54.968629-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:35:55.432417-04
+1557	2026-01-16 10:35:54.968646-04	CDU-101	FLOW_FEED	8307.64	1	2026-01-16 10:35:55.432417-04
+1558	2026-01-16 10:35:54.968662-04	FCC-201	TEMP_REACTOR	532.44	1	2026-01-16 10:35:55.432417-04
+1559	2026-01-16 10:35:54.968677-04	FCC-201	CATALYST_ACT	92.78	1	2026-01-16 10:35:55.432417-04
+1560	2026-01-16 10:35:54.968692-04	HT-301	TEMP_HYDRO	310.02	1	2026-01-16 10:35:55.432417-04
+1561	2026-01-16 10:35:54.968707-04	HT-301	H2_PRESS	33.61	1	2026-01-16 10:35:55.432417-04
+\.
+
+
+--
+-- Data for Name: backup_process_data_20260131_142318; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.backup_process_data_20260131_142318 (id, "time", unit_id, tag_id, value, quality, created_at) FROM stdin;
+1	2026-01-16 13:03:27.796152-04	CDU-101	TEMP_TOWER	435.48	1	2026-01-16 09:03:31.52595-04
+2	2026-01-16 13:03:27.796232-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 09:03:31.52595-04
+3	2026-01-16 13:03:27.796255-04	CDU-101	FLOW_FEED	9105.04	1	2026-01-16 09:03:31.52595-04
+4	2026-01-16 13:03:27.796279-04	FCC-201	TEMP_REACTOR	345.33	1	2026-01-16 09:03:31.52595-04
+5	2026-01-16 13:03:27.796298-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 09:03:31.52595-04
+6	2026-01-16 13:03:27.796314-04	HT-301	TEMP_HYDRO	368.4	1	2026-01-16 09:03:31.52595-04
+7	2026-01-16 13:03:27.796332-04	HT-301	H2_PRESS	5.21	1	2026-01-16 09:03:31.52595-04
+8	2026-01-16 13:03:37.936045-04	CDU-101	TEMP_TOWER	397.79	1	2026-01-16 09:03:38.321619-04
+9	2026-01-16 13:03:37.936083-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:03:38.321619-04
+10	2026-01-16 13:03:37.936101-04	CDU-101	FLOW_FEED	11275.67	1	2026-01-16 09:03:38.321619-04
+11	2026-01-16 13:03:37.936115-04	FCC-201	TEMP_REACTOR	314.58	1	2026-01-16 09:03:38.321619-04
+12	2026-01-16 13:03:37.936131-04	FCC-201	CATALYST_ACT	94.92	1	2026-01-16 09:03:38.321619-04
+13	2026-01-16 13:03:37.936146-04	HT-301	TEMP_HYDRO	359.23	1	2026-01-16 09:03:38.321619-04
+14	2026-01-16 13:03:37.936159-04	HT-301	H2_PRESS	2.06	1	2026-01-16 09:03:38.321619-04
+15	2026-01-16 13:03:43.388523-04	CDU-101	TEMP_TOWER	453.53	1	2026-01-16 09:03:43.858564-04
+16	2026-01-16 13:03:43.388561-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 09:03:43.858564-04
+17	2026-01-16 13:03:43.388576-04	CDU-101	FLOW_FEED	9838.36	1	2026-01-16 09:03:43.858564-04
+18	2026-01-16 13:03:43.388591-04	FCC-201	TEMP_REACTOR	429.06	1	2026-01-16 09:03:43.858564-04
+19	2026-01-16 13:03:43.388605-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 09:03:43.858564-04
+20	2026-01-16 13:03:43.388619-04	HT-301	TEMP_HYDRO	475.95	1	2026-01-16 09:03:43.858564-04
+21	2026-01-16 13:03:43.388632-04	HT-301	H2_PRESS	4.36	1	2026-01-16 09:03:43.858564-04
+22	2026-01-16 13:03:48.903758-04	CDU-101	TEMP_TOWER	356.4	1	2026-01-16 09:03:49.102551-04
+23	2026-01-16 13:03:48.903801-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 09:03:49.102551-04
+24	2026-01-16 13:03:48.903817-04	CDU-101	FLOW_FEED	10528.7	1	2026-01-16 09:03:49.102551-04
+25	2026-01-16 13:03:48.903832-04	FCC-201	TEMP_REACTOR	475.5	1	2026-01-16 09:03:49.102551-04
+26	2026-01-16 13:03:48.903847-04	FCC-201	CATALYST_ACT	75.08	1	2026-01-16 09:03:49.102551-04
+27	2026-01-16 13:03:48.903862-04	HT-301	TEMP_HYDRO	341.99	1	2026-01-16 09:03:49.102551-04
+28	2026-01-16 13:03:48.903876-04	HT-301	H2_PRESS	4.96	1	2026-01-16 09:03:49.102551-04
+29	2026-01-16 13:04:04.159565-04	CDU-101	TEMP_TOWER	456.83	1	2026-01-16 09:04:04.629963-04
+30	2026-01-16 13:04:04.159602-04	CDU-101	PRESS_TOWER	5.33	1	2026-01-16 09:04:04.629963-04
+31	2026-01-16 13:04:04.159617-04	CDU-101	FLOW_FEED	8429.92	1	2026-01-16 09:04:04.629963-04
+32	2026-01-16 13:04:04.159631-04	FCC-201	TEMP_REACTOR	385.4	1	2026-01-16 09:04:04.629963-04
+33	2026-01-16 13:04:04.159646-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 09:04:04.629963-04
+34	2026-01-16 13:04:04.15966-04	HT-301	TEMP_HYDRO	351.18	1	2026-01-16 09:04:04.629963-04
+35	2026-01-16 13:04:04.159673-04	HT-301	H2_PRESS	5.31	1	2026-01-16 09:04:04.629963-04
+36	2026-01-16 13:04:19.688307-04	CDU-101	TEMP_TOWER	366.68	1	2026-01-16 09:04:20.267735-04
+37	2026-01-16 13:04:19.688343-04	CDU-101	PRESS_TOWER	4.44	1	2026-01-16 09:04:20.267735-04
+38	2026-01-16 13:04:19.688358-04	CDU-101	FLOW_FEED	9195.83	1	2026-01-16 09:04:20.267735-04
+39	2026-01-16 13:04:19.688372-04	FCC-201	TEMP_REACTOR	459.55	1	2026-01-16 09:04:20.267735-04
+40	2026-01-16 13:04:19.688387-04	FCC-201	CATALYST_ACT	90.44	1	2026-01-16 09:04:20.267735-04
+41	2026-01-16 13:04:19.6884-04	HT-301	TEMP_HYDRO	467.3	1	2026-01-16 09:04:20.267735-04
+42	2026-01-16 13:04:19.688413-04	HT-301	H2_PRESS	4.65	1	2026-01-16 09:04:20.267735-04
+43	2026-01-16 13:04:35.320255-04	CDU-101	TEMP_TOWER	479.73	1	2026-01-16 09:04:35.819354-04
+44	2026-01-16 13:04:35.320295-04	CDU-101	PRESS_TOWER	2.99	1	2026-01-16 09:04:35.819354-04
+45	2026-01-16 13:04:35.32031-04	CDU-101	FLOW_FEED	10685.03	1	2026-01-16 09:04:35.819354-04
+46	2026-01-16 13:04:35.320325-04	FCC-201	TEMP_REACTOR	414.4	1	2026-01-16 09:04:35.819354-04
+47	2026-01-16 13:04:35.320339-04	FCC-201	CATALYST_ACT	77.37	1	2026-01-16 09:04:35.819354-04
+48	2026-01-16 13:04:35.320353-04	HT-301	TEMP_HYDRO	477.04	1	2026-01-16 09:04:35.819354-04
+49	2026-01-16 13:04:35.320366-04	HT-301	H2_PRESS	2	1	2026-01-16 09:04:35.819354-04
+50	2026-01-16 13:04:50.868351-04	CDU-101	TEMP_TOWER	303.02	1	2026-01-16 09:04:51.32927-04
+51	2026-01-16 13:04:50.868388-04	CDU-101	PRESS_TOWER	4.58	1	2026-01-16 09:04:51.32927-04
+52	2026-01-16 13:04:50.868404-04	CDU-101	FLOW_FEED	8059.54	1	2026-01-16 09:04:51.32927-04
+53	2026-01-16 13:04:50.868418-04	FCC-201	TEMP_REACTOR	483.08	1	2026-01-16 09:04:51.32927-04
+54	2026-01-16 13:04:50.868432-04	FCC-201	CATALYST_ACT	94.46	1	2026-01-16 09:04:51.32927-04
+55	2026-01-16 13:04:50.868445-04	HT-301	TEMP_HYDRO	311.64	1	2026-01-16 09:04:51.32927-04
+56	2026-01-16 13:04:50.868458-04	HT-301	H2_PRESS	2.33	1	2026-01-16 09:04:51.32927-04
+57	2026-01-16 13:05:06.363567-04	CDU-101	TEMP_TOWER	427.64	1	2026-01-16 09:05:06.8233-04
+58	2026-01-16 13:05:06.363607-04	CDU-101	PRESS_TOWER	4.29	1	2026-01-16 09:05:06.8233-04
+59	2026-01-16 13:05:06.363622-04	CDU-101	FLOW_FEED	10755.15	1	2026-01-16 09:05:06.8233-04
+60	2026-01-16 13:05:06.363637-04	FCC-201	TEMP_REACTOR	408.77	1	2026-01-16 09:05:06.8233-04
+61	2026-01-16 13:05:06.363652-04	FCC-201	CATALYST_ACT	82.69	1	2026-01-16 09:05:06.8233-04
+62	2026-01-16 13:05:06.363665-04	HT-301	TEMP_HYDRO	347.47	1	2026-01-16 09:05:06.8233-04
+63	2026-01-16 13:05:06.363679-04	HT-301	H2_PRESS	5.37	1	2026-01-16 09:05:06.8233-04
+64	2026-01-16 13:05:21.875534-04	CDU-101	TEMP_TOWER	490.62	1	2026-01-16 09:05:22.349777-04
+65	2026-01-16 13:05:21.875572-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:22.349777-04
+66	2026-01-16 13:05:21.875587-04	CDU-101	FLOW_FEED	8355.27	1	2026-01-16 09:05:22.349777-04
+67	2026-01-16 13:05:21.875601-04	FCC-201	TEMP_REACTOR	442.57	1	2026-01-16 09:05:22.349777-04
+68	2026-01-16 13:05:21.875615-04	FCC-201	CATALYST_ACT	85.81	1	2026-01-16 09:05:22.349777-04
+69	2026-01-16 13:05:21.875628-04	HT-301	TEMP_HYDRO	386.37	1	2026-01-16 09:05:22.349777-04
+70	2026-01-16 13:05:21.875641-04	HT-301	H2_PRESS	4.31	1	2026-01-16 09:05:22.349777-04
+71	2026-01-16 13:05:37.37748-04	CDU-101	TEMP_TOWER	333.44	1	2026-01-16 09:05:37.967847-04
+72	2026-01-16 13:05:37.377522-04	CDU-101	PRESS_TOWER	2.45	1	2026-01-16 09:05:37.967847-04
+73	2026-01-16 13:05:37.377536-04	CDU-101	FLOW_FEED	10805.98	1	2026-01-16 09:05:37.967847-04
+74	2026-01-16 13:05:37.37755-04	FCC-201	TEMP_REACTOR	458.05	1	2026-01-16 09:05:37.967847-04
+75	2026-01-16 13:05:37.377564-04	FCC-201	CATALYST_ACT	85.74	1	2026-01-16 09:05:37.967847-04
+76	2026-01-16 13:05:37.377578-04	HT-301	TEMP_HYDRO	391.3	1	2026-01-16 09:05:37.967847-04
+77	2026-01-16 13:05:37.377591-04	HT-301	H2_PRESS	2.36	1	2026-01-16 09:05:37.967847-04
+78	2026-01-16 13:05:43.000343-04	CDU-101	TEMP_TOWER	442.57	1	2026-01-16 09:05:43.248149-04
+79	2026-01-16 13:05:43.000392-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:43.248149-04
+80	2026-01-16 13:05:43.00041-04	CDU-101	FLOW_FEED	10437.42	1	2026-01-16 09:05:43.248149-04
+81	2026-01-16 13:05:43.000427-04	FCC-201	TEMP_REACTOR	480.26	1	2026-01-16 09:05:43.248149-04
+82	2026-01-16 13:05:43.000442-04	FCC-201	CATALYST_ACT	89.69	1	2026-01-16 09:05:43.248149-04
+83	2026-01-16 13:05:43.000456-04	HT-301	TEMP_HYDRO	408.16	1	2026-01-16 09:05:43.248149-04
+84	2026-01-16 13:05:43.000471-04	HT-301	H2_PRESS	3.27	1	2026-01-16 09:05:43.248149-04
+85	2026-01-16 13:05:48.280753-04	CDU-101	TEMP_TOWER	384	1	2026-01-16 09:05:48.779269-04
+86	2026-01-16 13:05:48.280803-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 09:05:48.779269-04
+87	2026-01-16 13:05:48.280823-04	CDU-101	FLOW_FEED	8976.87	1	2026-01-16 09:05:48.779269-04
+88	2026-01-16 13:05:48.280837-04	FCC-201	TEMP_REACTOR	323.18	1	2026-01-16 09:05:48.779269-04
+89	2026-01-16 13:05:48.280852-04	FCC-201	CATALYST_ACT	90.7	1	2026-01-16 09:05:48.779269-04
+90	2026-01-16 13:05:48.280865-04	HT-301	TEMP_HYDRO	390.97	1	2026-01-16 09:05:48.779269-04
+91	2026-01-16 13:05:48.280879-04	HT-301	H2_PRESS	4.68	1	2026-01-16 09:05:48.779269-04
+92	2026-01-16 13:05:53.87347-04	CDU-101	TEMP_TOWER	309.65	1	2026-01-16 09:05:54.117406-04
+93	2026-01-16 13:05:53.873506-04	CDU-101	PRESS_TOWER	5.29	1	2026-01-16 09:05:54.117406-04
+94	2026-01-16 13:05:53.873521-04	CDU-101	FLOW_FEED	9258.11	1	2026-01-16 09:05:54.117406-04
+95	2026-01-16 13:05:53.873535-04	FCC-201	TEMP_REACTOR	421.63	1	2026-01-16 09:05:54.117406-04
+96	2026-01-16 13:05:53.873549-04	FCC-201	CATALYST_ACT	82.13	1	2026-01-16 09:05:54.117406-04
+97	2026-01-16 13:05:53.873563-04	HT-301	TEMP_HYDRO	354.51	1	2026-01-16 09:05:54.117406-04
+98	2026-01-16 13:05:53.873576-04	HT-301	H2_PRESS	4.04	1	2026-01-16 09:05:54.117406-04
+99	2026-01-16 13:05:59.145385-04	CDU-101	TEMP_TOWER	388.25	1	2026-01-16 09:05:59.607303-04
+100	2026-01-16 13:05:59.14543-04	CDU-101	PRESS_TOWER	4.2	1	2026-01-16 09:05:59.607303-04
+101	2026-01-16 13:05:59.145445-04	CDU-101	FLOW_FEED	8840.85	1	2026-01-16 09:05:59.607303-04
+102	2026-01-16 13:05:59.14546-04	FCC-201	TEMP_REACTOR	492.24	1	2026-01-16 09:05:59.607303-04
+103	2026-01-16 13:05:59.145475-04	FCC-201	CATALYST_ACT	85.85	1	2026-01-16 09:05:59.607303-04
+104	2026-01-16 13:05:59.145489-04	HT-301	TEMP_HYDRO	364.03	1	2026-01-16 09:05:59.607303-04
+105	2026-01-16 13:05:59.145504-04	HT-301	H2_PRESS	2.98	1	2026-01-16 09:05:59.607303-04
+106	2026-01-16 13:06:14.635842-04	CDU-101	TEMP_TOWER	472.18	1	2026-01-16 09:06:15.215849-04
+107	2026-01-16 13:06:14.635883-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 09:06:15.215849-04
+108	2026-01-16 13:06:14.635897-04	CDU-101	FLOW_FEED	8743.92	1	2026-01-16 09:06:15.215849-04
+109	2026-01-16 13:06:14.635912-04	FCC-201	TEMP_REACTOR	348.66	1	2026-01-16 09:06:15.215849-04
+110	2026-01-16 13:06:14.635928-04	FCC-201	CATALYST_ACT	92.68	1	2026-01-16 09:06:15.215849-04
+111	2026-01-16 13:06:14.635942-04	HT-301	TEMP_HYDRO	483.55	1	2026-01-16 09:06:15.215849-04
+112	2026-01-16 13:06:14.635957-04	HT-301	H2_PRESS	5.96	1	2026-01-16 09:06:15.215849-04
+113	2026-01-16 13:06:30.29029-04	CDU-101	TEMP_TOWER	333.59	1	2026-01-16 09:06:30.769451-04
+114	2026-01-16 13:06:30.290339-04	CDU-101	PRESS_TOWER	2.68	1	2026-01-16 09:06:30.769451-04
+115	2026-01-16 13:06:30.290355-04	CDU-101	FLOW_FEED	9582.04	1	2026-01-16 09:06:30.769451-04
+116	2026-01-16 13:06:30.290372-04	FCC-201	TEMP_REACTOR	405.3	1	2026-01-16 09:06:30.769451-04
+117	2026-01-16 13:06:30.290529-04	FCC-201	CATALYST_ACT	80.92	1	2026-01-16 09:06:30.769451-04
+118	2026-01-16 13:06:30.290588-04	HT-301	TEMP_HYDRO	479.09	1	2026-01-16 09:06:30.769451-04
+119	2026-01-16 13:06:30.290606-04	HT-301	H2_PRESS	3.72	1	2026-01-16 09:06:30.769451-04
+120	2026-01-16 13:06:47.61827-04	CDU-101	TEMP_TOWER	378.53	1	2026-01-16 09:06:48.355057-04
+121	2026-01-16 13:06:47.618312-04	CDU-101	PRESS_TOWER	2.05	1	2026-01-16 09:06:48.355057-04
+122	2026-01-16 13:06:47.618327-04	CDU-101	FLOW_FEED	10238.43	1	2026-01-16 09:06:48.355057-04
+123	2026-01-16 13:06:47.618341-04	FCC-201	TEMP_REACTOR	321.98	1	2026-01-16 09:06:48.355057-04
+124	2026-01-16 13:06:47.618355-04	FCC-201	CATALYST_ACT	79.9	1	2026-01-16 09:06:48.355057-04
+125	2026-01-16 13:06:47.618369-04	HT-301	TEMP_HYDRO	417.85	1	2026-01-16 09:06:48.355057-04
+126	2026-01-16 13:06:47.618384-04	HT-301	H2_PRESS	3.82	1	2026-01-16 09:06:48.355057-04
+127	2026-01-16 13:07:03.794913-04	CDU-101	TEMP_TOWER	334.77	1	2026-01-16 09:07:04.49108-04
+128	2026-01-16 13:07:03.794971-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 09:07:04.49108-04
+129	2026-01-16 13:07:03.794987-04	CDU-101	FLOW_FEED	11549.86	1	2026-01-16 09:07:04.49108-04
+130	2026-01-16 13:07:03.795002-04	FCC-201	TEMP_REACTOR	422.26	1	2026-01-16 09:07:04.49108-04
+131	2026-01-16 13:07:03.795017-04	FCC-201	CATALYST_ACT	94.48	1	2026-01-16 09:07:04.49108-04
+132	2026-01-16 13:07:03.795032-04	HT-301	TEMP_HYDRO	478.98	1	2026-01-16 09:07:04.49108-04
+133	2026-01-16 13:07:03.795047-04	HT-301	H2_PRESS	5.57	1	2026-01-16 09:07:04.49108-04
+134	2026-01-16 13:07:09.568115-04	CDU-101	TEMP_TOWER	493.75	1	2026-01-16 09:07:10.346155-04
+135	2026-01-16 13:07:09.568161-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 09:07:10.346155-04
+136	2026-01-16 13:07:09.568178-04	CDU-101	FLOW_FEED	11461.91	1	2026-01-16 09:07:10.346155-04
+137	2026-01-16 13:07:09.568193-04	FCC-201	TEMP_REACTOR	443.98	1	2026-01-16 09:07:10.346155-04
+138	2026-01-16 13:07:09.568207-04	FCC-201	CATALYST_ACT	77.45	1	2026-01-16 09:07:10.346155-04
+139	2026-01-16 13:07:09.568221-04	HT-301	TEMP_HYDRO	371.12	1	2026-01-16 09:07:10.346155-04
+140	2026-01-16 13:07:09.568236-04	HT-301	H2_PRESS	5.92	1	2026-01-16 09:07:10.346155-04
+141	2026-01-16 13:07:15.433081-04	CDU-101	TEMP_TOWER	318.86	1	2026-01-16 09:07:16.950729-04
+142	2026-01-16 13:07:15.433122-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 09:07:16.950729-04
+143	2026-01-16 13:07:15.433138-04	CDU-101	FLOW_FEED	11754.8	1	2026-01-16 09:07:16.950729-04
+144	2026-01-16 13:07:15.433152-04	FCC-201	TEMP_REACTOR	343.47	1	2026-01-16 09:07:16.950729-04
+145	2026-01-16 13:07:15.433166-04	FCC-201	CATALYST_ACT	93.61	1	2026-01-16 09:07:16.950729-04
+146	2026-01-16 13:07:15.43318-04	HT-301	TEMP_HYDRO	363.35	1	2026-01-16 09:07:16.950729-04
+147	2026-01-16 13:07:15.433193-04	HT-301	H2_PRESS	3.32	1	2026-01-16 09:07:16.950729-04
+148	2026-01-16 13:07:22.094229-04	CDU-101	TEMP_TOWER	431.69	1	2026-01-16 09:07:22.480409-04
+149	2026-01-16 13:07:22.094272-04	CDU-101	PRESS_TOWER	5.87	1	2026-01-16 09:07:22.480409-04
+150	2026-01-16 13:07:22.094287-04	CDU-101	FLOW_FEED	8430.56	1	2026-01-16 09:07:22.480409-04
+151	2026-01-16 13:07:22.094301-04	FCC-201	TEMP_REACTOR	358.1	1	2026-01-16 09:07:22.480409-04
+152	2026-01-16 13:07:22.094316-04	FCC-201	CATALYST_ACT	89.99	1	2026-01-16 09:07:22.480409-04
+153	2026-01-16 13:07:22.094331-04	HT-301	TEMP_HYDRO	416.68	1	2026-01-16 09:07:22.480409-04
+154	2026-01-16 13:07:22.094346-04	HT-301	H2_PRESS	2.41	1	2026-01-16 09:07:22.480409-04
+155	2026-01-16 13:07:27.523222-04	CDU-101	TEMP_TOWER	413.8	1	2026-01-16 09:07:28.425936-04
+156	2026-01-16 13:07:27.523273-04	CDU-101	PRESS_TOWER	4.11	1	2026-01-16 09:07:28.425936-04
+157	2026-01-16 13:07:27.52329-04	CDU-101	FLOW_FEED	9971.59	1	2026-01-16 09:07:28.425936-04
+158	2026-01-16 13:07:27.523306-04	FCC-201	TEMP_REACTOR	416.38	1	2026-01-16 09:07:28.425936-04
+159	2026-01-16 13:07:27.523321-04	FCC-201	CATALYST_ACT	79.92	1	2026-01-16 09:07:28.425936-04
+160	2026-01-16 13:07:27.523335-04	HT-301	TEMP_HYDRO	346.31	1	2026-01-16 09:07:28.425936-04
+161	2026-01-16 13:07:27.52335-04	HT-301	H2_PRESS	3.74	1	2026-01-16 09:07:28.425936-04
+162	2026-01-16 13:07:33.475271-04	CDU-101	TEMP_TOWER	444.63	1	2026-01-16 09:07:34.115338-04
+163	2026-01-16 13:07:33.475357-04	CDU-101	PRESS_TOWER	5.83	1	2026-01-16 09:07:34.115338-04
+164	2026-01-16 13:07:33.475375-04	CDU-101	FLOW_FEED	8845.99	1	2026-01-16 09:07:34.115338-04
+165	2026-01-16 13:07:33.475396-04	FCC-201	TEMP_REACTOR	336.78	1	2026-01-16 09:07:34.115338-04
+166	2026-01-16 13:07:33.475413-04	FCC-201	CATALYST_ACT	86.57	1	2026-01-16 09:07:34.115338-04
+167	2026-01-16 13:07:33.475429-04	HT-301	TEMP_HYDRO	467.39	1	2026-01-16 09:07:34.115338-04
+168	2026-01-16 13:07:33.475444-04	HT-301	H2_PRESS	5.77	1	2026-01-16 09:07:34.115338-04
+169	2026-01-16 13:07:39.183374-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 09:07:39.911031-04
+170	2026-01-16 13:07:39.183418-04	CDU-101	PRESS_TOWER	5.81	1	2026-01-16 09:07:39.911031-04
+171	2026-01-16 13:07:39.183437-04	CDU-101	FLOW_FEED	8899.33	1	2026-01-16 09:07:39.911031-04
+172	2026-01-16 13:07:39.183455-04	FCC-201	TEMP_REACTOR	469.41	1	2026-01-16 09:07:39.911031-04
+173	2026-01-16 13:07:39.183472-04	FCC-201	CATALYST_ACT	86.83	1	2026-01-16 09:07:39.911031-04
+174	2026-01-16 13:07:39.183487-04	HT-301	TEMP_HYDRO	323.03	1	2026-01-16 09:07:39.911031-04
+175	2026-01-16 13:07:39.183504-04	HT-301	H2_PRESS	4.62	1	2026-01-16 09:07:39.911031-04
+176	2026-01-16 13:07:44.958668-04	CDU-101	TEMP_TOWER	398.26	1	2026-01-16 09:07:45.348886-04
+177	2026-01-16 13:07:44.958718-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:07:45.348886-04
+178	2026-01-16 13:07:44.958736-04	CDU-101	FLOW_FEED	11037.5	1	2026-01-16 09:07:45.348886-04
+179	2026-01-16 13:07:44.958751-04	FCC-201	TEMP_REACTOR	430.01	1	2026-01-16 09:07:45.348886-04
+180	2026-01-16 13:07:44.958767-04	FCC-201	CATALYST_ACT	87.51	1	2026-01-16 09:07:45.348886-04
+181	2026-01-16 13:07:44.958782-04	HT-301	TEMP_HYDRO	368.2	1	2026-01-16 09:07:45.348886-04
+182	2026-01-16 13:07:44.958797-04	HT-301	H2_PRESS	3.26	1	2026-01-16 09:07:45.348886-04
+183	2026-01-16 10:03:56.951451-04	CDU-101	TEMP_TOWER	352.4	1	2026-01-16 10:03:57.667213-04
+184	2026-01-16 10:03:56.951774-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:03:57.667213-04
+185	2026-01-16 10:03:56.951827-04	CDU-101	FLOW_FEED	8101.68	1	2026-01-16 10:03:57.667213-04
+186	2026-01-16 10:03:56.95189-04	FCC-201	TEMP_REACTOR	497.97	1	2026-01-16 10:03:57.667213-04
+187	2026-01-16 10:03:56.951911-04	FCC-201	CATALYST_ACT	94.76	1	2026-01-16 10:03:57.667213-04
+188	2026-01-16 10:03:56.951929-04	HT-301	TEMP_HYDRO	356.4	1	2026-01-16 10:03:57.667213-04
+189	2026-01-16 10:03:56.951946-04	HT-301	H2_PRESS	33.98	1	2026-01-16 10:03:57.667213-04
+190	2026-01-16 10:04:02.976793-04	CDU-101	TEMP_TOWER	389.18	1	2026-01-16 10:04:03.183112-04
+191	2026-01-16 10:04:02.976852-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 10:04:03.183112-04
+192	2026-01-16 10:04:02.976872-04	CDU-101	FLOW_FEED	8839.96	1	2026-01-16 10:04:03.183112-04
+193	2026-01-16 10:04:02.976891-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:04:03.183112-04
+194	2026-01-16 10:04:02.976908-04	FCC-201	CATALYST_ACT	70.53	1	2026-01-16 10:04:03.183112-04
+195	2026-01-16 10:04:02.976926-04	HT-301	TEMP_HYDRO	332.45	1	2026-01-16 10:04:03.183112-04
+196	2026-01-16 10:04:02.976943-04	HT-301	H2_PRESS	32.84	1	2026-01-16 10:04:03.183112-04
+197	2026-01-16 10:04:08.207836-04	CDU-101	TEMP_TOWER	449.22	1	2026-01-16 10:04:08.66787-04
+198	2026-01-16 10:04:08.207884-04	CDU-101	PRESS_TOWER	3.88	1	2026-01-16 10:04:08.66787-04
+199	2026-01-16 10:04:08.207901-04	CDU-101	FLOW_FEED	9971.64	1	2026-01-16 10:04:08.66787-04
+200	2026-01-16 10:04:08.207917-04	FCC-201	TEMP_REACTOR	537.07	1	2026-01-16 10:04:08.66787-04
+201	2026-01-16 10:04:08.207933-04	FCC-201	CATALYST_ACT	76.2	1	2026-01-16 10:04:08.66787-04
+202	2026-01-16 10:04:08.207949-04	HT-301	TEMP_HYDRO	316.88	1	2026-01-16 10:04:08.66787-04
+203	2026-01-16 10:04:08.207965-04	HT-301	H2_PRESS	31.9	1	2026-01-16 10:04:08.66787-04
+204	2026-01-16 10:04:13.689478-04	CDU-101	TEMP_TOWER	369.09	1	2026-01-16 10:04:13.880748-04
+205	2026-01-16 10:04:13.689536-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 10:04:13.880748-04
+206	2026-01-16 10:04:13.689554-04	CDU-101	FLOW_FEED	11499.85	1	2026-01-16 10:04:13.880748-04
+207	2026-01-16 10:04:13.689573-04	FCC-201	TEMP_REACTOR	524.42	1	2026-01-16 10:04:13.880748-04
+208	2026-01-16 10:04:13.689589-04	FCC-201	CATALYST_ACT	83.31	1	2026-01-16 10:04:13.880748-04
+209	2026-01-16 10:04:13.689607-04	HT-301	TEMP_HYDRO	334.86	1	2026-01-16 10:04:13.880748-04
+210	2026-01-16 10:04:13.689623-04	HT-301	H2_PRESS	40.68	1	2026-01-16 10:04:13.880748-04
+211	2026-01-16 10:04:18.930435-04	CDU-101	TEMP_TOWER	405.79	1	2026-01-16 10:04:19.382986-04
+212	2026-01-16 10:04:18.930487-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:04:19.382986-04
+213	2026-01-16 10:04:18.930504-04	CDU-101	FLOW_FEED	9173.64	1	2026-01-16 10:04:19.382986-04
+214	2026-01-16 10:04:18.930521-04	FCC-201	TEMP_REACTOR	492.44	1	2026-01-16 10:04:19.382986-04
+215	2026-01-16 10:04:18.930537-04	FCC-201	CATALYST_ACT	86.29	1	2026-01-16 10:04:19.382986-04
+216	2026-01-16 10:04:18.930553-04	HT-301	TEMP_HYDRO	377.21	1	2026-01-16 10:04:19.382986-04
+217	2026-01-16 10:04:18.930569-04	HT-301	H2_PRESS	33.84	1	2026-01-16 10:04:19.382986-04
+218	2026-01-16 10:04:24.413697-04	CDU-101	TEMP_TOWER	383.77	1	2026-01-16 10:04:24.630658-04
+219	2026-01-16 10:04:24.413758-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:04:24.630658-04
+220	2026-01-16 10:04:24.413779-04	CDU-101	FLOW_FEED	11237.41	1	2026-01-16 10:04:24.630658-04
+221	2026-01-16 10:04:24.413798-04	FCC-201	TEMP_REACTOR	502.57	1	2026-01-16 10:04:24.630658-04
+222	2026-01-16 10:04:24.413816-04	FCC-201	CATALYST_ACT	83.18	1	2026-01-16 10:04:24.630658-04
+223	2026-01-16 10:04:24.413833-04	HT-301	TEMP_HYDRO	334.96	1	2026-01-16 10:04:24.630658-04
+224	2026-01-16 10:04:24.413851-04	HT-301	H2_PRESS	38	1	2026-01-16 10:04:24.630658-04
+225	2026-01-16 10:04:29.659097-04	CDU-101	TEMP_TOWER	354.1	1	2026-01-16 10:04:32.305584-04
+226	2026-01-16 10:04:29.659148-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:04:32.305584-04
+227	2026-01-16 10:04:29.659166-04	CDU-101	FLOW_FEED	10091.16	1	2026-01-16 10:04:32.305584-04
+228	2026-01-16 10:04:29.659183-04	FCC-201	TEMP_REACTOR	516.98	1	2026-01-16 10:04:32.305584-04
+229	2026-01-16 10:04:29.659199-04	FCC-201	CATALYST_ACT	84.63	1	2026-01-16 10:04:32.305584-04
+230	2026-01-16 10:04:29.659215-04	HT-301	TEMP_HYDRO	334.78	1	2026-01-16 10:04:32.305584-04
+231	2026-01-16 10:04:29.659231-04	HT-301	H2_PRESS	44.93	1	2026-01-16 10:04:32.305584-04
+232	2026-01-16 10:04:37.580101-04	CDU-101	TEMP_TOWER	371.11	1	2026-01-16 10:04:39.787697-04
+233	2026-01-16 10:04:37.580162-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:04:39.787697-04
+234	2026-01-16 10:04:37.580184-04	CDU-101	FLOW_FEED	11918.59	1	2026-01-16 10:04:39.787697-04
+235	2026-01-16 10:04:37.580203-04	FCC-201	TEMP_REACTOR	504.79	1	2026-01-16 10:04:39.787697-04
+236	2026-01-16 10:04:37.580221-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:04:39.787697-04
+237	2026-01-16 10:04:37.580241-04	HT-301	TEMP_HYDRO	322.2	1	2026-01-16 10:04:39.787697-04
+238	2026-01-16 10:04:37.580258-04	HT-301	H2_PRESS	40.24	1	2026-01-16 10:04:39.787697-04
+239	2026-01-16 10:04:44.815766-04	CDU-101	TEMP_TOWER	356.47	1	2026-01-16 10:04:45.292572-04
+240	2026-01-16 10:04:44.815818-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:04:45.292572-04
+241	2026-01-16 10:04:44.815835-04	CDU-101	FLOW_FEED	9365.71	1	2026-01-16 10:04:45.292572-04
+242	2026-01-16 10:04:44.815853-04	FCC-201	TEMP_REACTOR	496.02	1	2026-01-16 10:04:45.292572-04
+243	2026-01-16 10:04:44.81587-04	FCC-201	CATALYST_ACT	81.78	1	2026-01-16 10:04:45.292572-04
+244	2026-01-16 10:04:44.815888-04	HT-301	TEMP_HYDRO	312.36	1	2026-01-16 10:04:45.292572-04
+245	2026-01-16 10:04:44.815905-04	HT-301	H2_PRESS	42.39	1	2026-01-16 10:04:45.292572-04
+246	2026-01-16 10:04:50.800003-04	CDU-101	TEMP_TOWER	374.89	1	2026-01-16 10:04:50.997676-04
+247	2026-01-16 10:04:50.800052-04	CDU-101	PRESS_TOWER	4.24	1	2026-01-16 10:04:50.997676-04
+248	2026-01-16 10:04:50.800069-04	CDU-101	FLOW_FEED	9224.41	1	2026-01-16 10:04:50.997676-04
+249	2026-01-16 10:04:50.800085-04	FCC-201	TEMP_REACTOR	522.83	1	2026-01-16 10:04:50.997676-04
+250	2026-01-16 10:04:50.8001-04	FCC-201	CATALYST_ACT	79.22	1	2026-01-16 10:04:50.997676-04
+251	2026-01-16 10:04:50.800116-04	HT-301	TEMP_HYDRO	357.95	1	2026-01-16 10:04:50.997676-04
+252	2026-01-16 10:04:50.800131-04	HT-301	H2_PRESS	43.84	1	2026-01-16 10:04:50.997676-04
+253	2026-01-16 10:04:56.332522-04	CDU-101	TEMP_TOWER	409.43	1	2026-01-16 10:04:56.807144-04
+254	2026-01-16 10:04:56.332571-04	CDU-101	PRESS_TOWER	4.67	1	2026-01-16 10:04:56.807144-04
+255	2026-01-16 10:04:56.332588-04	CDU-101	FLOW_FEED	11449.48	1	2026-01-16 10:04:56.807144-04
+256	2026-01-16 10:04:56.332605-04	FCC-201	TEMP_REACTOR	522.96	1	2026-01-16 10:04:56.807144-04
+257	2026-01-16 10:04:56.33262-04	FCC-201	CATALYST_ACT	92.11	1	2026-01-16 10:04:56.807144-04
+258	2026-01-16 10:04:56.332636-04	HT-301	TEMP_HYDRO	365.18	1	2026-01-16 10:04:56.807144-04
+259	2026-01-16 10:04:56.332651-04	HT-301	H2_PRESS	44.66	1	2026-01-16 10:04:56.807144-04
+260	2026-01-16 10:05:01.856374-04	CDU-101	TEMP_TOWER	380.36	1	2026-01-16 10:05:02.0562-04
+261	2026-01-16 10:05:01.856431-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:05:02.0562-04
+262	2026-01-16 10:05:01.856448-04	CDU-101	FLOW_FEED	10762.63	1	2026-01-16 10:05:02.0562-04
+263	2026-01-16 10:05:01.856465-04	FCC-201	TEMP_REACTOR	543.58	1	2026-01-16 10:05:02.0562-04
+264	2026-01-16 10:05:01.856481-04	FCC-201	CATALYST_ACT	80.5	1	2026-01-16 10:05:02.0562-04
+265	2026-01-16 10:05:01.856496-04	HT-301	TEMP_HYDRO	353.13	1	2026-01-16 10:05:02.0562-04
+266	2026-01-16 10:05:01.856512-04	HT-301	H2_PRESS	48.92	1	2026-01-16 10:05:02.0562-04
+267	2026-01-16 10:05:07.092786-04	CDU-101	TEMP_TOWER	421.19	1	2026-01-16 10:05:07.554772-04
+268	2026-01-16 10:05:07.092852-04	CDU-101	PRESS_TOWER	3.42	1	2026-01-16 10:05:07.554772-04
+269	2026-01-16 10:05:07.092872-04	CDU-101	FLOW_FEED	10480.45	1	2026-01-16 10:05:07.554772-04
+270	2026-01-16 10:05:07.092891-04	FCC-201	TEMP_REACTOR	484.44	1	2026-01-16 10:05:07.554772-04
+271	2026-01-16 10:05:07.09291-04	FCC-201	CATALYST_ACT	93.59	1	2026-01-16 10:05:07.554772-04
+272	2026-01-16 10:05:07.092928-04	HT-301	TEMP_HYDRO	361.22	1	2026-01-16 10:05:07.554772-04
+273	2026-01-16 10:05:07.092945-04	HT-301	H2_PRESS	31.74	1	2026-01-16 10:05:07.554772-04
+274	2026-01-16 10:05:12.597506-04	CDU-101	TEMP_TOWER	361.86	1	2026-01-16 10:05:12.798954-04
+275	2026-01-16 10:05:12.597555-04	CDU-101	PRESS_TOWER	3.24	1	2026-01-16 10:05:12.798954-04
+276	2026-01-16 10:05:12.597572-04	CDU-101	FLOW_FEED	10781.3	1	2026-01-16 10:05:12.798954-04
+277	2026-01-16 10:05:12.597588-04	FCC-201	TEMP_REACTOR	546.37	1	2026-01-16 10:05:12.798954-04
+278	2026-01-16 10:05:12.597604-04	FCC-201	CATALYST_ACT	82.09	1	2026-01-16 10:05:12.798954-04
+279	2026-01-16 10:05:12.597619-04	HT-301	TEMP_HYDRO	308.08	1	2026-01-16 10:05:12.798954-04
+280	2026-01-16 10:05:12.597635-04	HT-301	H2_PRESS	33.77	1	2026-01-16 10:05:12.798954-04
+281	2026-01-16 10:05:17.833446-04	CDU-101	TEMP_TOWER	383.75	1	2026-01-16 10:05:24.183624-04
+282	2026-01-16 10:05:17.833512-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:05:24.183624-04
+283	2026-01-16 10:05:17.833534-04	CDU-101	FLOW_FEED	11317.5	1	2026-01-16 10:05:24.183624-04
+284	2026-01-16 10:05:17.833554-04	FCC-201	TEMP_REACTOR	505.08	1	2026-01-16 10:05:24.183624-04
+285	2026-01-16 10:05:17.83357-04	FCC-201	CATALYST_ACT	85.24	1	2026-01-16 10:05:24.183624-04
+286	2026-01-16 10:05:17.833589-04	HT-301	TEMP_HYDRO	346.26	1	2026-01-16 10:05:24.183624-04
+287	2026-01-16 10:05:17.833604-04	HT-301	H2_PRESS	46.76	1	2026-01-16 10:05:24.183624-04
+289	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:44.636139-04
+288	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:45.344061-04
+290	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:45.344061-04
+291	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:44.636139-04
+292	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:45.344061-04
+293	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:44.636139-04
+294	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:45.344061-04
+295	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:44.636139-04
+296	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:45.344061-04
+297	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:44.636139-04
+298	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:45.344061-04
+299	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:44.636139-04
+300	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:45.344061-04
+301	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:44.636139-04
+302	2026-01-16 10:05:52.463743-04	CDU-101	TEMP_TOWER	375.66	1	2026-01-16 10:05:53.012388-04
+303	2026-01-16 10:05:52.463943-04	CDU-101	PRESS_TOWER	4.52	1	2026-01-16 10:05:53.012388-04
+304	2026-01-16 10:05:52.463976-04	CDU-101	FLOW_FEED	9252.66	1	2026-01-16 10:05:53.012388-04
+305	2026-01-16 10:05:52.463996-04	FCC-201	TEMP_REACTOR	542.38	1	2026-01-16 10:05:53.012388-04
+306	2026-01-16 10:05:52.464013-04	FCC-201	CATALYST_ACT	81.93	1	2026-01-16 10:05:53.012388-04
+307	2026-01-16 10:05:52.464032-04	HT-301	TEMP_HYDRO	337.31	1	2026-01-16 10:05:53.012388-04
+308	2026-01-16 10:05:52.464048-04	HT-301	H2_PRESS	43.02	1	2026-01-16 10:05:53.012388-04
+309	2026-01-16 10:05:58.111733-04	CDU-101	TEMP_TOWER	397.95	1	2026-01-16 10:05:58.344071-04
+310	2026-01-16 10:05:58.111783-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:05:58.344071-04
+311	2026-01-16 10:05:58.1118-04	CDU-101	FLOW_FEED	8888.16	1	2026-01-16 10:05:58.344071-04
+312	2026-01-16 10:05:58.111816-04	FCC-201	TEMP_REACTOR	547.7	1	2026-01-16 10:05:58.344071-04
+313	2026-01-16 10:05:58.111832-04	FCC-201	CATALYST_ACT	87.63	1	2026-01-16 10:05:58.344071-04
+314	2026-01-16 10:05:58.111848-04	HT-301	TEMP_HYDRO	300.26	1	2026-01-16 10:05:58.344071-04
+315	2026-01-16 10:05:58.111863-04	HT-301	H2_PRESS	32.03	1	2026-01-16 10:05:58.344071-04
+316	2026-01-16 10:06:03.430558-04	CDU-101	TEMP_TOWER	409.01	1	2026-01-16 10:06:04.000085-04
+317	2026-01-16 10:06:03.430607-04	CDU-101	PRESS_TOWER	4.87	1	2026-01-16 10:06:04.000085-04
+318	2026-01-16 10:06:03.430624-04	CDU-101	FLOW_FEED	9647.13	1	2026-01-16 10:06:04.000085-04
+319	2026-01-16 10:06:03.430641-04	FCC-201	TEMP_REACTOR	516.9	1	2026-01-16 10:06:04.000085-04
+320	2026-01-16 10:06:03.430656-04	FCC-201	CATALYST_ACT	72.41	1	2026-01-16 10:06:04.000085-04
+321	2026-01-16 10:06:03.430672-04	HT-301	TEMP_HYDRO	328.27	1	2026-01-16 10:06:04.000085-04
+322	2026-01-16 10:06:03.430687-04	HT-301	H2_PRESS	35.33	1	2026-01-16 10:06:04.000085-04
+323	2026-01-16 10:06:10.167356-04	CDU-101	TEMP_TOWER	356.97	1	2026-01-16 10:06:12.378024-04
+324	2026-01-16 10:06:10.167418-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:06:12.378024-04
+325	2026-01-16 10:06:10.167437-04	CDU-101	FLOW_FEED	10333.11	1	2026-01-16 10:06:12.378024-04
+326	2026-01-16 10:06:10.167455-04	FCC-201	TEMP_REACTOR	484.88	1	2026-01-16 10:06:12.378024-04
+327	2026-01-16 10:06:10.167471-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:06:12.378024-04
+328	2026-01-16 10:06:10.167488-04	HT-301	TEMP_HYDRO	356.65	1	2026-01-16 10:06:12.378024-04
+329	2026-01-16 10:06:10.167504-04	HT-301	H2_PRESS	46.64	1	2026-01-16 10:06:12.378024-04
+330	2026-01-16 10:06:17.544049-04	CDU-101	TEMP_TOWER	422.8	1	2026-01-16 10:06:18.007316-04
+331	2026-01-16 10:06:17.544113-04	CDU-101	PRESS_TOWER	4.72	1	2026-01-16 10:06:18.007316-04
+332	2026-01-16 10:06:17.544131-04	CDU-101	FLOW_FEED	8988.96	1	2026-01-16 10:06:18.007316-04
+333	2026-01-16 10:06:17.544151-04	FCC-201	TEMP_REACTOR	510.25	1	2026-01-16 10:06:18.007316-04
+334	2026-01-16 10:06:17.544167-04	FCC-201	CATALYST_ACT	79.17	1	2026-01-16 10:06:18.007316-04
+335	2026-01-16 10:06:17.544182-04	HT-301	TEMP_HYDRO	352.5	1	2026-01-16 10:06:18.007316-04
+336	2026-01-16 10:06:17.544197-04	HT-301	H2_PRESS	38.57	1	2026-01-16 10:06:18.007316-04
+337	2026-01-16 10:06:23.066147-04	CDU-101	TEMP_TOWER	397.65	1	2026-01-16 10:06:23.270319-04
+338	2026-01-16 10:06:23.0662-04	CDU-101	PRESS_TOWER	4.14	1	2026-01-16 10:06:23.270319-04
+339	2026-01-16 10:06:23.066218-04	CDU-101	FLOW_FEED	9919.81	1	2026-01-16 10:06:23.270319-04
+340	2026-01-16 10:06:23.066234-04	FCC-201	TEMP_REACTOR	521.78	1	2026-01-16 10:06:23.270319-04
+341	2026-01-16 10:06:23.06625-04	FCC-201	CATALYST_ACT	71.31	1	2026-01-16 10:06:23.270319-04
+342	2026-01-16 10:06:23.066266-04	HT-301	TEMP_HYDRO	352.76	1	2026-01-16 10:06:23.270319-04
+343	2026-01-16 10:06:23.066281-04	HT-301	H2_PRESS	31.37	1	2026-01-16 10:06:23.270319-04
+344	2026-01-16 10:06:28.343391-04	CDU-101	TEMP_TOWER	435.81	1	2026-01-16 10:06:30.208065-04
+345	2026-01-16 10:06:28.343451-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:06:30.208065-04
+346	2026-01-16 10:06:28.343469-04	CDU-101	FLOW_FEED	9693.91	1	2026-01-16 10:06:30.208065-04
+347	2026-01-16 10:06:28.343486-04	FCC-201	TEMP_REACTOR	484.64	1	2026-01-16 10:06:30.208065-04
+348	2026-01-16 10:06:28.343505-04	FCC-201	CATALYST_ACT	85.37	1	2026-01-16 10:06:30.208065-04
+349	2026-01-16 10:06:28.343522-04	HT-301	TEMP_HYDRO	354.08	1	2026-01-16 10:06:30.208065-04
+350	2026-01-16 10:06:28.343539-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:06:30.208065-04
+351	2026-01-16 10:06:35.541447-04	CDU-101	TEMP_TOWER	375.52	1	2026-01-16 10:06:35.731474-04
+352	2026-01-16 10:06:35.541497-04	CDU-101	PRESS_TOWER	4.96	1	2026-01-16 10:06:35.731474-04
+353	2026-01-16 10:06:35.541514-04	CDU-101	FLOW_FEED	8197.28	1	2026-01-16 10:06:35.731474-04
+354	2026-01-16 10:06:35.54153-04	FCC-201	TEMP_REACTOR	527.99	1	2026-01-16 10:06:35.731474-04
+355	2026-01-16 10:06:35.541546-04	FCC-201	CATALYST_ACT	71.91	1	2026-01-16 10:06:35.731474-04
+356	2026-01-16 10:06:35.541562-04	HT-301	TEMP_HYDRO	333.35	1	2026-01-16 10:06:35.731474-04
+357	2026-01-16 10:06:35.541577-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:06:35.731474-04
+358	2026-01-16 10:06:40.871166-04	CDU-101	TEMP_TOWER	402.13	1	2026-01-16 10:06:41.369528-04
+359	2026-01-16 10:06:40.871217-04	CDU-101	PRESS_TOWER	3.92	1	2026-01-16 10:06:41.369528-04
+360	2026-01-16 10:06:40.871234-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:06:41.369528-04
+361	2026-01-16 10:06:40.871251-04	FCC-201	TEMP_REACTOR	539.43	1	2026-01-16 10:06:41.369528-04
+362	2026-01-16 10:06:40.871266-04	FCC-201	CATALYST_ACT	92.01	1	2026-01-16 10:06:41.369528-04
+363	2026-01-16 10:06:40.871282-04	HT-301	TEMP_HYDRO	348.91	1	2026-01-16 10:06:41.369528-04
+364	2026-01-16 10:06:40.871297-04	HT-301	H2_PRESS	37.72	1	2026-01-16 10:06:41.369528-04
+365	2026-01-16 10:06:46.410855-04	CDU-101	TEMP_TOWER	389.91	1	2026-01-16 10:06:46.618844-04
+366	2026-01-16 10:06:46.410904-04	CDU-101	PRESS_TOWER	4.73	1	2026-01-16 10:06:46.618844-04
+367	2026-01-16 10:06:46.410921-04	CDU-101	FLOW_FEED	10060.59	1	2026-01-16 10:06:46.618844-04
+368	2026-01-16 10:06:46.410937-04	FCC-201	TEMP_REACTOR	511.43	1	2026-01-16 10:06:46.618844-04
+369	2026-01-16 10:06:46.410952-04	FCC-201	CATALYST_ACT	91.93	1	2026-01-16 10:06:46.618844-04
+370	2026-01-16 10:06:46.410968-04	HT-301	TEMP_HYDRO	306.19	1	2026-01-16 10:06:46.618844-04
+371	2026-01-16 10:06:46.410983-04	HT-301	H2_PRESS	32.45	1	2026-01-16 10:06:46.618844-04
+372	2026-01-16 10:06:51.656548-04	CDU-101	TEMP_TOWER	414.53	1	2026-01-16 10:06:52.462667-04
+373	2026-01-16 10:06:51.656651-04	CDU-101	PRESS_TOWER	3.48	1	2026-01-16 10:06:52.462667-04
+374	2026-01-16 10:06:51.656671-04	CDU-101	FLOW_FEED	8093.31	1	2026-01-16 10:06:52.462667-04
+375	2026-01-16 10:06:51.656688-04	FCC-201	TEMP_REACTOR	521.92	1	2026-01-16 10:06:52.462667-04
+376	2026-01-16 10:06:51.656706-04	FCC-201	CATALYST_ACT	71.81	1	2026-01-16 10:06:52.462667-04
+377	2026-01-16 10:06:51.656723-04	HT-301	TEMP_HYDRO	337.82	1	2026-01-16 10:06:52.462667-04
+378	2026-01-16 10:06:51.656741-04	HT-301	H2_PRESS	48.36	1	2026-01-16 10:06:52.462667-04
+379	2026-01-16 10:06:57.530123-04	CDU-101	TEMP_TOWER	405.08	1	2026-01-16 10:06:58.679192-04
+380	2026-01-16 10:06:57.530237-04	CDU-101	PRESS_TOWER	2.71	1	2026-01-16 10:06:58.679192-04
+381	2026-01-16 10:06:57.530258-04	CDU-101	FLOW_FEED	10827.77	1	2026-01-16 10:06:58.679192-04
+382	2026-01-16 10:06:57.530279-04	FCC-201	TEMP_REACTOR	484.33	1	2026-01-16 10:06:58.679192-04
+383	2026-01-16 10:06:57.5303-04	FCC-201	CATALYST_ACT	93.03	1	2026-01-16 10:06:58.679192-04
+384	2026-01-16 10:06:57.530318-04	HT-301	TEMP_HYDRO	315.81	1	2026-01-16 10:06:58.679192-04
+385	2026-01-16 10:06:57.530337-04	HT-301	H2_PRESS	39.38	1	2026-01-16 10:06:58.679192-04
+386	2026-01-16 10:07:03.71444-04	CDU-101	TEMP_TOWER	435.11	1	2026-01-16 10:07:04.195054-04
+387	2026-01-16 10:07:03.714488-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:07:04.195054-04
+388	2026-01-16 10:07:03.714505-04	CDU-101	FLOW_FEED	8180.01	1	2026-01-16 10:07:04.195054-04
+389	2026-01-16 10:07:03.714522-04	FCC-201	TEMP_REACTOR	486.04	1	2026-01-16 10:07:04.195054-04
+390	2026-01-16 10:07:03.714537-04	FCC-201	CATALYST_ACT	87.04	1	2026-01-16 10:07:04.195054-04
+391	2026-01-16 10:07:03.714553-04	HT-301	TEMP_HYDRO	367.67	1	2026-01-16 10:07:04.195054-04
+392	2026-01-16 10:07:03.714568-04	HT-301	H2_PRESS	42.49	1	2026-01-16 10:07:04.195054-04
+393	2026-01-16 10:07:09.311177-04	CDU-101	TEMP_TOWER	412.37	1	2026-01-16 10:07:11.161039-04
+394	2026-01-16 10:07:09.311253-04	CDU-101	PRESS_TOWER	2.51	1	2026-01-16 10:07:11.161039-04
+395	2026-01-16 10:07:09.311271-04	CDU-101	FLOW_FEED	10679.76	1	2026-01-16 10:07:11.161039-04
+396	2026-01-16 10:07:09.311289-04	FCC-201	TEMP_REACTOR	519.01	1	2026-01-16 10:07:11.161039-04
+397	2026-01-16 10:07:09.311305-04	FCC-201	CATALYST_ACT	82.98	1	2026-01-16 10:07:11.161039-04
+398	2026-01-16 10:07:09.311324-04	HT-301	TEMP_HYDRO	378.81	1	2026-01-16 10:07:11.161039-04
+399	2026-01-16 10:07:09.31134-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:07:11.161039-04
+400	2026-01-16 10:07:16.35775-04	CDU-101	TEMP_TOWER	395.38	1	2026-01-16 10:07:16.865005-04
+401	2026-01-16 10:07:16.357815-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:07:16.865005-04
+402	2026-01-16 10:07:16.357835-04	CDU-101	FLOW_FEED	8029.76	1	2026-01-16 10:07:16.865005-04
+403	2026-01-16 10:07:16.357855-04	FCC-201	TEMP_REACTOR	495.99	1	2026-01-16 10:07:16.865005-04
+404	2026-01-16 10:07:16.357873-04	FCC-201	CATALYST_ACT	91.47	1	2026-01-16 10:07:16.865005-04
+405	2026-01-16 10:07:16.357892-04	HT-301	TEMP_HYDRO	340.32	1	2026-01-16 10:07:16.865005-04
+406	2026-01-16 10:07:16.35791-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:07:16.865005-04
+407	2026-01-16 10:07:21.905408-04	CDU-101	TEMP_TOWER	386.93	1	2026-01-16 10:07:22.224812-04
+408	2026-01-16 10:07:21.905455-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:07:22.224812-04
+409	2026-01-16 10:07:21.905472-04	CDU-101	FLOW_FEED	10315.72	1	2026-01-16 10:07:22.224812-04
+410	2026-01-16 10:07:21.905488-04	FCC-201	TEMP_REACTOR	490.09	1	2026-01-16 10:07:22.224812-04
+411	2026-01-16 10:07:21.905503-04	FCC-201	CATALYST_ACT	84.97	1	2026-01-16 10:07:22.224812-04
+412	2026-01-16 10:07:21.905519-04	HT-301	TEMP_HYDRO	343.96	1	2026-01-16 10:07:22.224812-04
+413	2026-01-16 10:07:21.905535-04	HT-301	H2_PRESS	33.3	1	2026-01-16 10:07:22.224812-04
+414	2026-01-16 10:07:27.357213-04	CDU-101	TEMP_TOWER	361.05	1	2026-01-16 10:07:27.835577-04
+415	2026-01-16 10:07:27.357272-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:07:27.835577-04
+416	2026-01-16 10:07:27.357292-04	CDU-101	FLOW_FEED	9837.49	1	2026-01-16 10:07:27.835577-04
+417	2026-01-16 10:07:27.35731-04	FCC-201	TEMP_REACTOR	494.78	1	2026-01-16 10:07:27.835577-04
+418	2026-01-16 10:07:27.357329-04	FCC-201	CATALYST_ACT	78.74	1	2026-01-16 10:07:27.835577-04
+419	2026-01-16 10:07:27.357347-04	HT-301	TEMP_HYDRO	327.25	1	2026-01-16 10:07:27.835577-04
+420	2026-01-16 10:07:27.357362-04	HT-301	H2_PRESS	32.07	1	2026-01-16 10:07:27.835577-04
+421	2026-01-16 10:07:32.87251-04	CDU-101	TEMP_TOWER	354.64	1	2026-01-16 10:07:35.629481-04
+422	2026-01-16 10:07:32.872573-04	CDU-101	PRESS_TOWER	3.57	1	2026-01-16 10:07:35.629481-04
+423	2026-01-16 10:07:32.872592-04	CDU-101	FLOW_FEED	9684.81	1	2026-01-16 10:07:35.629481-04
+424	2026-01-16 10:07:32.872609-04	FCC-201	TEMP_REACTOR	495.75	1	2026-01-16 10:07:35.629481-04
+425	2026-01-16 10:07:32.872625-04	FCC-201	CATALYST_ACT	72.72	1	2026-01-16 10:07:35.629481-04
+426	2026-01-16 10:07:32.872642-04	HT-301	TEMP_HYDRO	347.5	1	2026-01-16 10:07:35.629481-04
+427	2026-01-16 10:07:32.872658-04	HT-301	H2_PRESS	30.47	1	2026-01-16 10:07:35.629481-04
+428	2026-01-16 10:07:41.648851-04	CDU-101	TEMP_TOWER	390	1	2026-01-16 10:07:43.316851-04
+429	2026-01-16 10:07:41.648904-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:07:43.316851-04
+430	2026-01-16 10:07:41.648922-04	CDU-101	FLOW_FEED	10851.8	1	2026-01-16 10:07:43.316851-04
+431	2026-01-16 10:07:41.648941-04	FCC-201	TEMP_REACTOR	513.28	1	2026-01-16 10:07:43.316851-04
+432	2026-01-16 10:07:41.648957-04	FCC-201	CATALYST_ACT	78.97	1	2026-01-16 10:07:43.316851-04
+433	2026-01-16 10:07:41.648973-04	HT-301	TEMP_HYDRO	376.79	1	2026-01-16 10:07:43.316851-04
+434	2026-01-16 10:07:41.64899-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:07:43.316851-04
+435	2026-01-16 10:07:48.479585-04	CDU-101	TEMP_TOWER	391.32	1	2026-01-16 10:07:48.676279-04
+436	2026-01-16 10:07:48.479634-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:07:48.676279-04
+437	2026-01-16 10:07:48.479653-04	CDU-101	FLOW_FEED	11281.66	1	2026-01-16 10:07:48.676279-04
+438	2026-01-16 10:07:48.47967-04	FCC-201	TEMP_REACTOR	499.79	1	2026-01-16 10:07:48.676279-04
+439	2026-01-16 10:07:48.479685-04	FCC-201	CATALYST_ACT	83.13	1	2026-01-16 10:07:48.676279-04
+440	2026-01-16 10:07:48.479701-04	HT-301	TEMP_HYDRO	333.8	1	2026-01-16 10:07:48.676279-04
+441	2026-01-16 10:07:48.479716-04	HT-301	H2_PRESS	48.58	1	2026-01-16 10:07:48.676279-04
+442	2026-01-16 10:07:53.700453-04	CDU-101	TEMP_TOWER	422.67	1	2026-01-16 10:07:54.26598-04
+443	2026-01-16 10:07:53.700501-04	CDU-101	PRESS_TOWER	2.74	1	2026-01-16 10:07:54.26598-04
+444	2026-01-16 10:07:53.700519-04	CDU-101	FLOW_FEED	8007.86	1	2026-01-16 10:07:54.26598-04
+445	2026-01-16 10:07:53.700535-04	FCC-201	TEMP_REACTOR	507.45	1	2026-01-16 10:07:54.26598-04
+446	2026-01-16 10:07:53.700551-04	FCC-201	CATALYST_ACT	76.97	1	2026-01-16 10:07:54.26598-04
+447	2026-01-16 10:07:53.700567-04	HT-301	TEMP_HYDRO	316.26	1	2026-01-16 10:07:54.26598-04
+448	2026-01-16 10:07:53.700583-04	HT-301	H2_PRESS	32.17	1	2026-01-16 10:07:54.26598-04
+449	2026-01-16 10:07:59.318598-04	CDU-101	TEMP_TOWER	354.04	1	2026-01-16 10:07:59.574921-04
+450	2026-01-16 10:07:59.318661-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:07:59.574921-04
+451	2026-01-16 10:07:59.318681-04	CDU-101	FLOW_FEED	8760.45	1	2026-01-16 10:07:59.574921-04
+452	2026-01-16 10:07:59.318698-04	FCC-201	TEMP_REACTOR	508.73	1	2026-01-16 10:07:59.574921-04
+453	2026-01-16 10:07:59.318714-04	FCC-201	CATALYST_ACT	82.38	1	2026-01-16 10:07:59.574921-04
+454	2026-01-16 10:07:59.318733-04	HT-301	TEMP_HYDRO	353.31	1	2026-01-16 10:07:59.574921-04
+455	2026-01-16 10:07:59.318751-04	HT-301	H2_PRESS	43.91	1	2026-01-16 10:07:59.574921-04
+456	2026-01-16 10:08:04.6145-04	CDU-101	TEMP_TOWER	399.19	1	2026-01-16 10:08:05.151103-04
+457	2026-01-16 10:08:04.61456-04	CDU-101	PRESS_TOWER	2.97	1	2026-01-16 10:08:05.151103-04
+458	2026-01-16 10:08:04.614581-04	CDU-101	FLOW_FEED	9812.59	1	2026-01-16 10:08:05.151103-04
+459	2026-01-16 10:08:04.6146-04	FCC-201	TEMP_REACTOR	548.21	1	2026-01-16 10:08:05.151103-04
+460	2026-01-16 10:08:04.614617-04	FCC-201	CATALYST_ACT	90.3	1	2026-01-16 10:08:05.151103-04
+461	2026-01-16 10:08:04.614633-04	HT-301	TEMP_HYDRO	334.66	1	2026-01-16 10:08:05.151103-04
+462	2026-01-16 10:08:04.614649-04	HT-301	H2_PRESS	48.03	1	2026-01-16 10:08:05.151103-04
+463	2026-01-16 10:08:10.264078-04	CDU-101	TEMP_TOWER	431.23	1	2026-01-16 10:08:10.458495-04
+464	2026-01-16 10:08:10.264139-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:08:10.458495-04
+465	2026-01-16 10:08:10.26416-04	CDU-101	FLOW_FEED	11517.95	1	2026-01-16 10:08:10.458495-04
+466	2026-01-16 10:08:10.26418-04	FCC-201	TEMP_REACTOR	547.43	1	2026-01-16 10:08:10.458495-04
+467	2026-01-16 10:08:10.264196-04	FCC-201	CATALYST_ACT	84.28	1	2026-01-16 10:08:10.458495-04
+468	2026-01-16 10:08:10.264212-04	HT-301	TEMP_HYDRO	311.19	1	2026-01-16 10:08:10.458495-04
+469	2026-01-16 10:08:10.264227-04	HT-301	H2_PRESS	42.88	1	2026-01-16 10:08:10.458495-04
+470	2026-01-16 10:08:15.494727-04	CDU-101	TEMP_TOWER	380.68	1	2026-01-16 10:08:15.975589-04
+471	2026-01-16 10:08:15.494785-04	CDU-101	PRESS_TOWER	4.81	1	2026-01-16 10:08:15.975589-04
+472	2026-01-16 10:08:15.494803-04	CDU-101	FLOW_FEED	11878.68	1	2026-01-16 10:08:15.975589-04
+473	2026-01-16 10:08:15.49482-04	FCC-201	TEMP_REACTOR	510.84	1	2026-01-16 10:08:15.975589-04
+474	2026-01-16 10:08:15.494836-04	FCC-201	CATALYST_ACT	79.51	1	2026-01-16 10:08:15.975589-04
+475	2026-01-16 10:08:15.494853-04	HT-301	TEMP_HYDRO	371.52	1	2026-01-16 10:08:15.975589-04
+476	2026-01-16 10:08:15.494869-04	HT-301	H2_PRESS	47.32	1	2026-01-16 10:08:15.975589-04
+477	2026-01-16 10:08:21.027572-04	CDU-101	TEMP_TOWER	352.61	1	2026-01-16 10:08:21.244106-04
+478	2026-01-16 10:08:21.027619-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:08:21.244106-04
+479	2026-01-16 10:08:21.027637-04	CDU-101	FLOW_FEED	9103.04	1	2026-01-16 10:08:21.244106-04
+480	2026-01-16 10:08:21.027653-04	FCC-201	TEMP_REACTOR	480.04	1	2026-01-16 10:08:21.244106-04
+481	2026-01-16 10:08:21.027668-04	FCC-201	CATALYST_ACT	78.85	1	2026-01-16 10:08:21.244106-04
+482	2026-01-16 10:08:21.027683-04	HT-301	TEMP_HYDRO	376.51	1	2026-01-16 10:08:21.244106-04
+483	2026-01-16 10:08:21.027698-04	HT-301	H2_PRESS	38.93	1	2026-01-16 10:08:21.244106-04
+484	2026-01-16 10:08:32.018724-04	CDU-101	TEMP_TOWER	350.05	1	2026-01-16 10:08:34.47269-04
+485	2026-01-16 10:08:32.018787-04	CDU-101	PRESS_TOWER	2.53	1	2026-01-16 10:08:34.47269-04
+486	2026-01-16 10:08:32.018806-04	CDU-101	FLOW_FEED	9107.47	1	2026-01-16 10:08:34.47269-04
+487	2026-01-16 10:08:32.018826-04	FCC-201	TEMP_REACTOR	549.46	1	2026-01-16 10:08:34.47269-04
+488	2026-01-16 10:08:32.018842-04	FCC-201	CATALYST_ACT	82.26	1	2026-01-16 10:08:34.47269-04
+489	2026-01-16 10:08:32.018858-04	HT-301	TEMP_HYDRO	367.86	1	2026-01-16 10:08:34.47269-04
+490	2026-01-16 10:08:32.018874-04	HT-301	H2_PRESS	30.82	1	2026-01-16 10:08:34.47269-04
+491	2026-01-16 10:08:39.516184-04	CDU-101	TEMP_TOWER	419.2	1	2026-01-16 10:08:41.73235-04
+492	2026-01-16 10:08:39.516234-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:08:41.73235-04
+493	2026-01-16 10:08:39.516252-04	CDU-101	FLOW_FEED	9954	1	2026-01-16 10:08:41.73235-04
+494	2026-01-16 10:08:39.516268-04	FCC-201	TEMP_REACTOR	538.09	1	2026-01-16 10:08:41.73235-04
+495	2026-01-16 10:08:39.516284-04	FCC-201	CATALYST_ACT	72.78	1	2026-01-16 10:08:41.73235-04
+496	2026-01-16 10:08:39.516299-04	HT-301	TEMP_HYDRO	344.33	1	2026-01-16 10:08:41.73235-04
+497	2026-01-16 10:08:39.516314-04	HT-301	H2_PRESS	44.75	1	2026-01-16 10:08:41.73235-04
+498	2026-01-16 10:08:46.777615-04	CDU-101	TEMP_TOWER	379.07	1	2026-01-16 10:08:47.310346-04
+499	2026-01-16 10:08:46.777682-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 10:08:47.310346-04
+500	2026-01-16 10:08:46.777702-04	CDU-101	FLOW_FEED	10959.22	1	2026-01-16 10:08:47.310346-04
+501	2026-01-16 10:08:46.77772-04	FCC-201	TEMP_REACTOR	529.49	1	2026-01-16 10:08:47.310346-04
+502	2026-01-16 10:08:46.777741-04	FCC-201	CATALYST_ACT	85.67	1	2026-01-16 10:08:47.310346-04
+503	2026-01-16 10:08:46.777759-04	HT-301	TEMP_HYDRO	323.17	1	2026-01-16 10:08:47.310346-04
+504	2026-01-16 10:08:46.777776-04	HT-301	H2_PRESS	39.39	1	2026-01-16 10:08:47.310346-04
+505	2026-01-16 10:08:52.347689-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 10:08:52.542953-04
+506	2026-01-16 10:08:52.347737-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:52.542953-04
+507	2026-01-16 10:08:52.347754-04	CDU-101	FLOW_FEED	10036.84	1	2026-01-16 10:08:52.542953-04
+508	2026-01-16 10:08:52.347771-04	FCC-201	TEMP_REACTOR	529.18	1	2026-01-16 10:08:52.542953-04
+509	2026-01-16 10:08:52.347786-04	FCC-201	CATALYST_ACT	72.93	1	2026-01-16 10:08:52.542953-04
+510	2026-01-16 10:08:52.347801-04	HT-301	TEMP_HYDRO	362.29	1	2026-01-16 10:08:52.542953-04
+511	2026-01-16 10:08:52.347816-04	HT-301	H2_PRESS	36.72	1	2026-01-16 10:08:52.542953-04
+512	2026-01-16 10:08:57.58111-04	CDU-101	TEMP_TOWER	384.32	1	2026-01-16 10:08:58.030458-04
+513	2026-01-16 10:08:57.58117-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:58.030458-04
+514	2026-01-16 10:08:57.581189-04	CDU-101	FLOW_FEED	11213.62	1	2026-01-16 10:08:58.030458-04
+515	2026-01-16 10:08:57.581208-04	FCC-201	TEMP_REACTOR	505	1	2026-01-16 10:08:58.030458-04
+516	2026-01-16 10:08:57.581225-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:08:58.030458-04
+517	2026-01-16 10:08:57.581241-04	HT-301	TEMP_HYDRO	361.41	1	2026-01-16 10:08:58.030458-04
+518	2026-01-16 10:08:57.581257-04	HT-301	H2_PRESS	46.75	1	2026-01-16 10:08:58.030458-04
+519	2026-01-16 10:09:03.065275-04	CDU-101	TEMP_TOWER	427.32	1	2026-01-16 10:09:03.294004-04
+520	2026-01-16 10:09:03.065334-04	CDU-101	PRESS_TOWER	3.68	1	2026-01-16 10:09:03.294004-04
+521	2026-01-16 10:09:03.065354-04	CDU-101	FLOW_FEED	9069.18	1	2026-01-16 10:09:03.294004-04
+522	2026-01-16 10:09:03.065371-04	FCC-201	TEMP_REACTOR	514.13	1	2026-01-16 10:09:03.294004-04
+523	2026-01-16 10:09:03.065388-04	FCC-201	CATALYST_ACT	87.65	1	2026-01-16 10:09:03.294004-04
+524	2026-01-16 10:09:03.065404-04	HT-301	TEMP_HYDRO	330.91	1	2026-01-16 10:09:03.294004-04
+525	2026-01-16 10:09:03.065421-04	HT-301	H2_PRESS	49.02	1	2026-01-16 10:09:03.294004-04
+526	2026-01-16 10:09:08.32823-04	CDU-101	TEMP_TOWER	440.56	1	2026-01-16 10:09:08.794526-04
+527	2026-01-16 10:09:08.328293-04	CDU-101	PRESS_TOWER	4.08	1	2026-01-16 10:09:08.794526-04
+528	2026-01-16 10:09:08.328311-04	CDU-101	FLOW_FEED	11141.67	1	2026-01-16 10:09:08.794526-04
+529	2026-01-16 10:09:08.328328-04	FCC-201	TEMP_REACTOR	509.71	1	2026-01-16 10:09:08.794526-04
+530	2026-01-16 10:09:08.328343-04	FCC-201	CATALYST_ACT	83.15	1	2026-01-16 10:09:08.794526-04
+531	2026-01-16 10:09:08.328359-04	HT-301	TEMP_HYDRO	347.87	1	2026-01-16 10:09:08.794526-04
+532	2026-01-16 10:09:08.328374-04	HT-301	H2_PRESS	38.51	1	2026-01-16 10:09:08.794526-04
+533	2026-01-16 10:09:13.822302-04	CDU-101	TEMP_TOWER	359.04	1	2026-01-16 10:09:14.017219-04
+534	2026-01-16 10:09:13.82236-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:09:14.017219-04
+535	2026-01-16 10:09:13.82238-04	CDU-101	FLOW_FEED	10843.84	1	2026-01-16 10:09:14.017219-04
+536	2026-01-16 10:09:13.822397-04	FCC-201	TEMP_REACTOR	502.31	1	2026-01-16 10:09:14.017219-04
+537	2026-01-16 10:09:13.822414-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:09:14.017219-04
+538	2026-01-16 10:09:13.822429-04	HT-301	TEMP_HYDRO	326.07	1	2026-01-16 10:09:14.017219-04
+539	2026-01-16 10:09:13.822446-04	HT-301	H2_PRESS	47.76	1	2026-01-16 10:09:14.017219-04
+540	2026-01-16 10:09:19.041548-04	CDU-101	TEMP_TOWER	367.47	1	2026-01-16 10:09:19.57813-04
+541	2026-01-16 10:09:19.041619-04	CDU-101	PRESS_TOWER	4.17	1	2026-01-16 10:09:19.57813-04
+542	2026-01-16 10:09:19.041638-04	CDU-101	FLOW_FEED	11647.95	1	2026-01-16 10:09:19.57813-04
+543	2026-01-16 10:09:19.041656-04	FCC-201	TEMP_REACTOR	497.24	1	2026-01-16 10:09:19.57813-04
+544	2026-01-16 10:09:19.041675-04	FCC-201	CATALYST_ACT	74.56	1	2026-01-16 10:09:19.57813-04
+545	2026-01-16 10:09:19.041692-04	HT-301	TEMP_HYDRO	308.17	1	2026-01-16 10:09:19.57813-04
+546	2026-01-16 10:09:19.041708-04	HT-301	H2_PRESS	32.8	1	2026-01-16 10:09:19.57813-04
+547	2026-01-16 10:09:26.728146-04	CDU-101	TEMP_TOWER	394.08	1	2026-01-16 10:09:27.257851-04
+548	2026-01-16 10:09:26.728208-04	CDU-101	PRESS_TOWER	3	1	2026-01-16 10:09:27.257851-04
+549	2026-01-16 10:09:26.728228-04	CDU-101	FLOW_FEED	9999.6	1	2026-01-16 10:09:27.257851-04
+550	2026-01-16 10:09:26.728246-04	FCC-201	TEMP_REACTOR	511.66	1	2026-01-16 10:09:27.257851-04
+551	2026-01-16 10:09:26.728264-04	FCC-201	CATALYST_ACT	78.12	1	2026-01-16 10:09:27.257851-04
+552	2026-01-16 10:09:26.728282-04	HT-301	TEMP_HYDRO	308.16	1	2026-01-16 10:09:27.257851-04
+553	2026-01-16 10:09:26.728297-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:09:27.257851-04
+554	2026-01-16 10:09:32.433019-04	CDU-101	TEMP_TOWER	411.53	1	2026-01-16 10:09:33.051715-04
+555	2026-01-16 10:09:32.434329-04	CDU-101	PRESS_TOWER	4.02	1	2026-01-16 10:09:33.051715-04
+556	2026-01-16 10:09:32.4344-04	CDU-101	FLOW_FEED	9732.85	1	2026-01-16 10:09:33.051715-04
+557	2026-01-16 10:09:32.434422-04	FCC-201	TEMP_REACTOR	535.04	1	2026-01-16 10:09:33.051715-04
+558	2026-01-16 10:09:32.434441-04	FCC-201	CATALYST_ACT	74.52	1	2026-01-16 10:09:33.051715-04
+559	2026-01-16 10:09:32.434458-04	HT-301	TEMP_HYDRO	337.35	1	2026-01-16 10:09:33.051715-04
+560	2026-01-16 10:09:32.434477-04	HT-301	H2_PRESS	32.13	1	2026-01-16 10:09:33.051715-04
+561	2026-01-16 10:09:38.154915-04	CDU-101	TEMP_TOWER	417.95	1	2026-01-16 10:09:38.573307-04
+562	2026-01-16 10:09:38.154979-04	CDU-101	PRESS_TOWER	2.62	1	2026-01-16 10:09:38.573307-04
+563	2026-01-16 10:09:38.155-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:09:38.573307-04
+564	2026-01-16 10:09:38.15502-04	FCC-201	TEMP_REACTOR	512.54	1	2026-01-16 10:09:38.573307-04
+565	2026-01-16 10:09:38.155038-04	FCC-201	CATALYST_ACT	93.44	1	2026-01-16 10:09:38.573307-04
+566	2026-01-16 10:09:38.155055-04	HT-301	TEMP_HYDRO	331.92	1	2026-01-16 10:09:38.573307-04
+567	2026-01-16 10:09:38.155071-04	HT-301	H2_PRESS	39.82	1	2026-01-16 10:09:38.573307-04
+568	2026-01-16 10:09:43.743069-04	CDU-101	TEMP_TOWER	396.23	1	2026-01-16 10:09:44.473329-04
+569	2026-01-16 10:09:43.743134-04	CDU-101	PRESS_TOWER	3.76	1	2026-01-16 10:09:44.473329-04
+570	2026-01-16 10:09:43.743155-04	CDU-101	FLOW_FEED	10844.6	1	2026-01-16 10:09:44.473329-04
+571	2026-01-16 10:09:43.743174-04	FCC-201	TEMP_REACTOR	546.25	1	2026-01-16 10:09:44.473329-04
+572	2026-01-16 10:09:43.74319-04	FCC-201	CATALYST_ACT	89.77	1	2026-01-16 10:09:44.473329-04
+573	2026-01-16 10:09:43.743206-04	HT-301	TEMP_HYDRO	307.64	1	2026-01-16 10:09:44.473329-04
+574	2026-01-16 10:09:43.743221-04	HT-301	H2_PRESS	47.3	1	2026-01-16 10:09:44.473329-04
+575	2026-01-16 10:09:49.517626-04	CDU-101	TEMP_TOWER	436.52	1	2026-01-16 10:09:50.268867-04
+576	2026-01-16 10:09:49.517681-04	CDU-101	PRESS_TOWER	3.91	1	2026-01-16 10:09:50.268867-04
+577	2026-01-16 10:09:49.517699-04	CDU-101	FLOW_FEED	8288.3	1	2026-01-16 10:09:50.268867-04
+578	2026-01-16 10:09:49.517717-04	FCC-201	TEMP_REACTOR	545.04	1	2026-01-16 10:09:50.268867-04
+579	2026-01-16 10:09:49.517734-04	FCC-201	CATALYST_ACT	87.86	1	2026-01-16 10:09:50.268867-04
+580	2026-01-16 10:09:49.517751-04	HT-301	TEMP_HYDRO	317.1	1	2026-01-16 10:09:50.268867-04
+581	2026-01-16 10:09:49.517769-04	HT-301	H2_PRESS	37.75	1	2026-01-16 10:09:50.268867-04
+582	2026-01-16 10:09:55.383658-04	CDU-101	TEMP_TOWER	412.12	1	2026-01-16 10:09:56.078164-04
+583	2026-01-16 10:09:55.383717-04	CDU-101	PRESS_TOWER	4.34	1	2026-01-16 10:09:56.078164-04
+584	2026-01-16 10:09:55.383735-04	CDU-101	FLOW_FEED	10666.12	1	2026-01-16 10:09:56.078164-04
+585	2026-01-16 10:09:55.383754-04	FCC-201	TEMP_REACTOR	514.42	1	2026-01-16 10:09:56.078164-04
+586	2026-01-16 10:09:55.383771-04	FCC-201	CATALYST_ACT	78.62	1	2026-01-16 10:09:56.078164-04
+587	2026-01-16 10:09:55.383788-04	HT-301	TEMP_HYDRO	369.58	1	2026-01-16 10:09:56.078164-04
+588	2026-01-16 10:09:55.383803-04	HT-301	H2_PRESS	38.41	1	2026-01-16 10:09:56.078164-04
+589	2026-01-16 10:10:01.172685-04	CDU-101	TEMP_TOWER	430.63	1	2026-01-16 10:10:01.959461-04
+590	2026-01-16 10:10:01.172749-04	CDU-101	PRESS_TOWER	3.22	1	2026-01-16 10:10:01.959461-04
+591	2026-01-16 10:10:01.172769-04	CDU-101	FLOW_FEED	9679.78	1	2026-01-16 10:10:01.959461-04
+592	2026-01-16 10:10:01.172788-04	FCC-201	TEMP_REACTOR	491.99	1	2026-01-16 10:10:01.959461-04
+593	2026-01-16 10:10:01.172804-04	FCC-201	CATALYST_ACT	75.05	1	2026-01-16 10:10:01.959461-04
+594	2026-01-16 10:10:01.172821-04	HT-301	TEMP_HYDRO	362.35	1	2026-01-16 10:10:01.959461-04
+595	2026-01-16 10:10:01.172837-04	HT-301	H2_PRESS	48.29	1	2026-01-16 10:10:01.959461-04
+596	2026-01-16 10:10:07.453342-04	CDU-101	TEMP_TOWER	398.65	1	2026-01-16 10:10:09.175854-04
+597	2026-01-16 10:10:07.453401-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:10:09.175854-04
+598	2026-01-16 10:10:07.453419-04	CDU-101	FLOW_FEED	9660.72	1	2026-01-16 10:10:09.175854-04
+599	2026-01-16 10:10:07.453437-04	FCC-201	TEMP_REACTOR	519.1	1	2026-01-16 10:10:09.175854-04
+600	2026-01-16 10:10:07.453453-04	FCC-201	CATALYST_ACT	83.93	1	2026-01-16 10:10:09.175854-04
+601	2026-01-16 10:10:07.453469-04	HT-301	TEMP_HYDRO	325.93	1	2026-01-16 10:10:09.175854-04
+602	2026-01-16 10:10:07.453484-04	HT-301	H2_PRESS	44.51	1	2026-01-16 10:10:09.175854-04
+603	2026-01-16 10:10:14.263994-04	CDU-101	TEMP_TOWER	401.98	1	2026-01-16 10:10:14.602756-04
+604	2026-01-16 10:10:14.264055-04	CDU-101	PRESS_TOWER	2.89	1	2026-01-16 10:10:14.602756-04
+605	2026-01-16 10:10:14.264074-04	CDU-101	FLOW_FEED	9734.2	1	2026-01-16 10:10:14.602756-04
+606	2026-01-16 10:10:14.264092-04	FCC-201	TEMP_REACTOR	502.21	1	2026-01-16 10:10:14.602756-04
+607	2026-01-16 10:10:14.264109-04	FCC-201	CATALYST_ACT	71.14	1	2026-01-16 10:10:14.602756-04
+608	2026-01-16 10:10:14.264127-04	HT-301	TEMP_HYDRO	356.23	1	2026-01-16 10:10:14.602756-04
+609	2026-01-16 10:10:14.264143-04	HT-301	H2_PRESS	30.61	1	2026-01-16 10:10:14.602756-04
+610	2026-01-16 10:10:19.702369-04	CDU-101	TEMP_TOWER	388.23	1	2026-01-16 10:10:20.276746-04
+611	2026-01-16 10:10:19.702425-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:10:20.276746-04
+612	2026-01-16 10:10:19.702442-04	CDU-101	FLOW_FEED	10559.28	1	2026-01-16 10:10:20.276746-04
+613	2026-01-16 10:10:19.702459-04	FCC-201	TEMP_REACTOR	534.34	1	2026-01-16 10:10:20.276746-04
+614	2026-01-16 10:10:19.702475-04	FCC-201	CATALYST_ACT	90.06	1	2026-01-16 10:10:20.276746-04
+615	2026-01-16 10:10:19.702491-04	HT-301	TEMP_HYDRO	308.75	1	2026-01-16 10:10:20.276746-04
+616	2026-01-16 10:10:19.702507-04	HT-301	H2_PRESS	38.2	1	2026-01-16 10:10:20.276746-04
+617	2026-01-16 10:10:25.39917-04	CDU-101	TEMP_TOWER	406.84	1	2026-01-16 10:10:25.788487-04
+618	2026-01-16 10:10:25.399227-04	CDU-101	PRESS_TOWER	3.56	1	2026-01-16 10:10:25.788487-04
+619	2026-01-16 10:10:25.399246-04	CDU-101	FLOW_FEED	10291.69	1	2026-01-16 10:10:25.788487-04
+620	2026-01-16 10:10:25.399263-04	FCC-201	TEMP_REACTOR	481.65	1	2026-01-16 10:10:25.788487-04
+621	2026-01-16 10:10:25.399279-04	FCC-201	CATALYST_ACT	77.4	1	2026-01-16 10:10:25.788487-04
+622	2026-01-16 10:10:25.399296-04	HT-301	TEMP_HYDRO	314.25	1	2026-01-16 10:10:25.788487-04
+623	2026-01-16 10:10:25.399312-04	HT-301	H2_PRESS	37.23	1	2026-01-16 10:10:25.788487-04
+624	2026-01-16 10:10:30.898369-04	CDU-101	TEMP_TOWER	410.52	1	2026-01-16 10:10:31.546032-04
+625	2026-01-16 10:10:30.898444-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:10:31.546032-04
+626	2026-01-16 10:10:30.898465-04	CDU-101	FLOW_FEED	11087.77	1	2026-01-16 10:10:31.546032-04
+627	2026-01-16 10:10:30.898484-04	FCC-201	TEMP_REACTOR	487.2	1	2026-01-16 10:10:31.546032-04
+628	2026-01-16 10:10:30.898502-04	FCC-201	CATALYST_ACT	82.46	1	2026-01-16 10:10:31.546032-04
+629	2026-01-16 10:10:30.898519-04	HT-301	TEMP_HYDRO	345.89	1	2026-01-16 10:10:31.546032-04
+630	2026-01-16 10:10:30.898536-04	HT-301	H2_PRESS	37.99	1	2026-01-16 10:10:31.546032-04
+631	2026-01-16 10:10:36.626385-04	CDU-101	TEMP_TOWER	365.5	1	2026-01-16 10:10:36.904497-04
+632	2026-01-16 10:10:36.626437-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:10:36.904497-04
+633	2026-01-16 10:10:36.626454-04	CDU-101	FLOW_FEED	9603.14	1	2026-01-16 10:10:36.904497-04
+634	2026-01-16 10:10:36.626472-04	FCC-201	TEMP_REACTOR	515.26	1	2026-01-16 10:10:36.904497-04
+635	2026-01-16 10:10:36.626487-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 10:10:36.904497-04
+636	2026-01-16 10:10:36.626504-04	HT-301	TEMP_HYDRO	306.97	1	2026-01-16 10:10:36.904497-04
+637	2026-01-16 10:10:36.626521-04	HT-301	H2_PRESS	31.17	1	2026-01-16 10:10:36.904497-04
+638	2026-01-16 10:10:41.937432-04	CDU-101	TEMP_TOWER	438.93	1	2026-01-16 10:10:42.485514-04
+639	2026-01-16 10:10:41.937493-04	CDU-101	PRESS_TOWER	4.63	1	2026-01-16 10:10:42.485514-04
+640	2026-01-16 10:10:41.937513-04	CDU-101	FLOW_FEED	8685.25	1	2026-01-16 10:10:42.485514-04
+641	2026-01-16 10:10:41.93753-04	FCC-201	TEMP_REACTOR	543.37	1	2026-01-16 10:10:42.485514-04
+642	2026-01-16 10:10:41.937548-04	FCC-201	CATALYST_ACT	79.91	1	2026-01-16 10:10:42.485514-04
+643	2026-01-16 10:10:41.937566-04	HT-301	TEMP_HYDRO	354.33	1	2026-01-16 10:10:42.485514-04
+644	2026-01-16 10:10:41.937584-04	HT-301	H2_PRESS	30.19	1	2026-01-16 10:10:42.485514-04
+645	2026-01-16 10:10:47.548803-04	CDU-101	TEMP_TOWER	354.38	1	2026-01-16 10:10:48.188065-04
+646	2026-01-16 10:10:47.548871-04	CDU-101	PRESS_TOWER	4.55	1	2026-01-16 10:10:48.188065-04
+647	2026-01-16 10:10:47.548889-04	CDU-101	FLOW_FEED	8589.09	1	2026-01-16 10:10:48.188065-04
+648	2026-01-16 10:10:47.548907-04	FCC-201	TEMP_REACTOR	534.62	1	2026-01-16 10:10:48.188065-04
+649	2026-01-16 10:10:47.548923-04	FCC-201	CATALYST_ACT	84.66	1	2026-01-16 10:10:48.188065-04
+650	2026-01-16 10:10:47.54894-04	HT-301	TEMP_HYDRO	359.7	1	2026-01-16 10:10:48.188065-04
+651	2026-01-16 10:10:47.548957-04	HT-301	H2_PRESS	42.57	1	2026-01-16 10:10:48.188065-04
+652	2026-01-16 10:10:53.249152-04	CDU-101	TEMP_TOWER	364.57	1	2026-01-16 10:10:54.766173-04
+653	2026-01-16 10:10:53.249217-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:10:54.766173-04
+654	2026-01-16 10:10:53.249237-04	CDU-101	FLOW_FEED	8482.94	1	2026-01-16 10:10:54.766173-04
+655	2026-01-16 10:10:53.249256-04	FCC-201	TEMP_REACTOR	505.02	1	2026-01-16 10:10:54.766173-04
+656	2026-01-16 10:10:53.249273-04	FCC-201	CATALYST_ACT	88.07	1	2026-01-16 10:10:54.766173-04
+657	2026-01-16 10:10:53.249292-04	HT-301	TEMP_HYDRO	358.76	1	2026-01-16 10:10:54.766173-04
+658	2026-01-16 10:10:53.249309-04	HT-301	H2_PRESS	36.92	1	2026-01-16 10:10:54.766173-04
+659	2026-01-16 10:11:00.012543-04	CDU-101	TEMP_TOWER	352.79	1	2026-01-16 10:11:00.345359-04
+660	2026-01-16 10:11:00.012603-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:11:00.345359-04
+661	2026-01-16 10:11:00.012624-04	CDU-101	FLOW_FEED	8288.23	1	2026-01-16 10:11:00.345359-04
+662	2026-01-16 10:11:00.012642-04	FCC-201	TEMP_REACTOR	527.23	1	2026-01-16 10:11:00.345359-04
+663	2026-01-16 10:11:00.012658-04	FCC-201	CATALYST_ACT	70.65	1	2026-01-16 10:11:00.345359-04
+664	2026-01-16 10:11:00.012675-04	HT-301	TEMP_HYDRO	308.32	1	2026-01-16 10:11:00.345359-04
+665	2026-01-16 10:11:00.012692-04	HT-301	H2_PRESS	34.55	1	2026-01-16 10:11:00.345359-04
+666	2026-01-16 10:11:05.426656-04	CDU-101	TEMP_TOWER	359.96	1	2026-01-16 10:11:05.959417-04
+667	2026-01-16 10:11:05.426709-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:11:05.959417-04
+668	2026-01-16 10:11:05.426726-04	CDU-101	FLOW_FEED	11029.8	1	2026-01-16 10:11:05.959417-04
+669	2026-01-16 10:11:05.426742-04	FCC-201	TEMP_REACTOR	488.54	1	2026-01-16 10:11:05.959417-04
+670	2026-01-16 10:11:05.426758-04	FCC-201	CATALYST_ACT	83.4	1	2026-01-16 10:11:05.959417-04
+671	2026-01-16 10:11:05.426774-04	HT-301	TEMP_HYDRO	342.4	1	2026-01-16 10:11:05.959417-04
+672	2026-01-16 10:11:05.42679-04	HT-301	H2_PRESS	47.82	1	2026-01-16 10:11:05.959417-04
+673	2026-01-16 10:11:11.007003-04	CDU-101	TEMP_TOWER	434.59	1	2026-01-16 10:11:11.258225-04
+674	2026-01-16 10:11:11.007067-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:11:11.258225-04
+675	2026-01-16 10:11:11.007088-04	CDU-101	FLOW_FEED	10612.94	1	2026-01-16 10:11:11.258225-04
+676	2026-01-16 10:11:11.007107-04	FCC-201	TEMP_REACTOR	545.96	1	2026-01-16 10:11:11.258225-04
+677	2026-01-16 10:11:11.007125-04	FCC-201	CATALYST_ACT	77.1	1	2026-01-16 10:11:11.258225-04
+678	2026-01-16 10:11:11.007143-04	HT-301	TEMP_HYDRO	327.44	1	2026-01-16 10:11:11.258225-04
+679	2026-01-16 10:11:11.007161-04	HT-301	H2_PRESS	41.21	1	2026-01-16 10:11:11.258225-04
+680	2026-01-16 10:22:31.026173-04	CDU-101	TEMP_TOWER	358.98	1	2026-01-16 10:22:33.358948-04
+681	2026-01-16 10:22:31.026253-04	CDU-101	PRESS_TOWER	3.08	1	2026-01-16 10:22:33.358948-04
+682	2026-01-16 10:22:31.026279-04	CDU-101	FLOW_FEED	10326.75	1	2026-01-16 10:22:33.358948-04
+683	2026-01-16 10:22:31.026301-04	FCC-201	TEMP_REACTOR	531.72	1	2026-01-16 10:22:33.358948-04
+684	2026-01-16 10:22:31.02632-04	FCC-201	CATALYST_ACT	85.4	1	2026-01-16 10:22:33.358948-04
+685	2026-01-16 10:22:31.026339-04	HT-301	TEMP_HYDRO	340.9	1	2026-01-16 10:22:33.358948-04
+686	2026-01-16 10:22:31.026357-04	HT-301	H2_PRESS	49.04	1	2026-01-16 10:22:33.358948-04
+687	2026-01-16 10:22:39.426801-04	CDU-101	TEMP_TOWER	440.3	1	2026-01-16 10:22:39.634186-04
+688	2026-01-16 10:22:39.42685-04	CDU-101	PRESS_TOWER	3.16	1	2026-01-16 10:22:39.634186-04
+689	2026-01-16 10:22:39.426867-04	CDU-101	FLOW_FEED	10129	1	2026-01-16 10:22:39.634186-04
+690	2026-01-16 10:22:39.426883-04	FCC-201	TEMP_REACTOR	519.24	1	2026-01-16 10:22:39.634186-04
+691	2026-01-16 10:22:39.426899-04	FCC-201	CATALYST_ACT	90.96	1	2026-01-16 10:22:39.634186-04
+692	2026-01-16 10:22:39.426915-04	HT-301	TEMP_HYDRO	320.38	1	2026-01-16 10:22:39.634186-04
+693	2026-01-16 10:22:39.42693-04	HT-301	H2_PRESS	36.82	1	2026-01-16 10:22:39.634186-04
+694	2026-01-16 10:22:44.762972-04	CDU-101	TEMP_TOWER	416.18	1	2026-01-16 10:22:45.213068-04
+695	2026-01-16 10:22:44.763025-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:22:45.213068-04
+696	2026-01-16 10:22:44.763042-04	CDU-101	FLOW_FEED	11696.57	1	2026-01-16 10:22:45.213068-04
+697	2026-01-16 10:22:44.76306-04	FCC-201	TEMP_REACTOR	486.74	1	2026-01-16 10:22:45.213068-04
+698	2026-01-16 10:22:44.763076-04	FCC-201	CATALYST_ACT	93.27	1	2026-01-16 10:22:45.213068-04
+699	2026-01-16 10:22:44.763093-04	HT-301	TEMP_HYDRO	308.53	1	2026-01-16 10:22:45.213068-04
+700	2026-01-16 10:22:44.763109-04	HT-301	H2_PRESS	42.9	1	2026-01-16 10:22:45.213068-04
+701	2026-01-16 10:22:50.273965-04	CDU-101	TEMP_TOWER	420.77	1	2026-01-16 10:22:52.507711-04
+702	2026-01-16 10:22:50.274021-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:22:52.507711-04
+703	2026-01-16 10:22:50.274039-04	CDU-101	FLOW_FEED	8544.89	1	2026-01-16 10:22:52.507711-04
+704	2026-01-16 10:22:50.274056-04	FCC-201	TEMP_REACTOR	518.24	1	2026-01-16 10:22:52.507711-04
+705	2026-01-16 10:22:50.274073-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:22:52.507711-04
+706	2026-01-16 10:22:50.274092-04	HT-301	TEMP_HYDRO	352.22	1	2026-01-16 10:22:52.507711-04
+707	2026-01-16 10:22:50.27411-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:22:52.507711-04
+708	2026-01-16 10:22:57.55014-04	CDU-101	TEMP_TOWER	444.5	1	2026-01-16 10:23:00.071391-04
+709	2026-01-16 10:22:57.550193-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:23:00.071391-04
+710	2026-01-16 10:22:57.550211-04	CDU-101	FLOW_FEED	8955.9	1	2026-01-16 10:23:00.071391-04
+711	2026-01-16 10:22:57.550228-04	FCC-201	TEMP_REACTOR	482.05	1	2026-01-16 10:23:00.071391-04
+712	2026-01-16 10:22:57.550244-04	FCC-201	CATALYST_ACT	94.06	1	2026-01-16 10:23:00.071391-04
+713	2026-01-16 10:22:57.550261-04	HT-301	TEMP_HYDRO	352.7	1	2026-01-16 10:23:00.071391-04
+714	2026-01-16 10:22:57.550277-04	HT-301	H2_PRESS	38.07	1	2026-01-16 10:23:00.071391-04
+715	2026-01-16 10:23:09.820166-04	CDU-101	TEMP_TOWER	381.8	1	2026-01-16 10:23:12.875869-04
+716	2026-01-16 10:23:09.82023-04	CDU-101	PRESS_TOWER	4.69	1	2026-01-16 10:23:12.875869-04
+717	2026-01-16 10:23:09.820249-04	CDU-101	FLOW_FEED	11129.83	1	2026-01-16 10:23:12.875869-04
+718	2026-01-16 10:23:09.820268-04	FCC-201	TEMP_REACTOR	544.36	1	2026-01-16 10:23:12.875869-04
+719	2026-01-16 10:23:09.820285-04	FCC-201	CATALYST_ACT	78.46	1	2026-01-16 10:23:12.875869-04
+720	2026-01-16 10:23:09.820303-04	HT-301	TEMP_HYDRO	305.24	1	2026-01-16 10:23:12.875869-04
+721	2026-01-16 10:23:09.820319-04	HT-301	H2_PRESS	43.74	1	2026-01-16 10:23:12.875869-04
+722	2026-01-16 10:23:17.917636-04	CDU-101	TEMP_TOWER	371.72	1	2026-01-16 10:23:20.163172-04
+723	2026-01-16 10:23:17.917705-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:23:20.163172-04
+724	2026-01-16 10:23:17.917722-04	CDU-101	FLOW_FEED	11924.52	1	2026-01-16 10:23:20.163172-04
+725	2026-01-16 10:23:17.917741-04	FCC-201	TEMP_REACTOR	505.61	1	2026-01-16 10:23:20.163172-04
+726	2026-01-16 10:23:17.917759-04	FCC-201	CATALYST_ACT	89.61	1	2026-01-16 10:23:20.163172-04
+727	2026-01-16 10:23:17.917778-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:23:20.163172-04
+728	2026-01-16 10:23:17.917795-04	HT-301	H2_PRESS	35.92	1	2026-01-16 10:23:20.163172-04
+729	2026-01-16 10:23:25.213596-04	CDU-101	TEMP_TOWER	371.21	1	2026-01-16 10:23:27.858328-04
+730	2026-01-16 10:23:25.213661-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:23:27.858328-04
+731	2026-01-16 10:23:25.213681-04	CDU-101	FLOW_FEED	11264.42	1	2026-01-16 10:23:27.858328-04
+732	2026-01-16 10:23:25.213702-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:23:27.858328-04
+733	2026-01-16 10:23:25.213719-04	FCC-201	CATALYST_ACT	73.28	1	2026-01-16 10:23:27.858328-04
+734	2026-01-16 10:23:25.213736-04	HT-301	TEMP_HYDRO	304.66	1	2026-01-16 10:23:27.858328-04
+735	2026-01-16 10:23:25.213752-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:23:27.858328-04
+736	2026-01-16 10:23:32.904164-04	CDU-101	TEMP_TOWER	445.75	1	2026-01-16 10:23:33.246675-04
+737	2026-01-16 10:23:32.904218-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:23:33.246675-04
+738	2026-01-16 10:23:32.904235-04	CDU-101	FLOW_FEED	10727.24	1	2026-01-16 10:23:33.246675-04
+739	2026-01-16 10:23:32.904252-04	FCC-201	TEMP_REACTOR	547.9	1	2026-01-16 10:23:33.246675-04
+740	2026-01-16 10:23:32.904268-04	FCC-201	CATALYST_ACT	80.09	1	2026-01-16 10:23:33.246675-04
+741	2026-01-16 10:23:32.904284-04	HT-301	TEMP_HYDRO	327.38	1	2026-01-16 10:23:33.246675-04
+742	2026-01-16 10:23:32.904299-04	HT-301	H2_PRESS	48.61	1	2026-01-16 10:23:33.246675-04
+743	2026-01-16 10:23:38.275745-04	CDU-101	TEMP_TOWER	409.25	1	2026-01-16 10:23:40.867905-04
+744	2026-01-16 10:23:38.275807-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:23:40.867905-04
+745	2026-01-16 10:23:38.275826-04	CDU-101	FLOW_FEED	8468.85	1	2026-01-16 10:23:40.867905-04
+746	2026-01-16 10:23:38.275845-04	FCC-201	TEMP_REACTOR	539.57	1	2026-01-16 10:23:40.867905-04
+747	2026-01-16 10:23:38.27586-04	FCC-201	CATALYST_ACT	87.58	1	2026-01-16 10:23:40.867905-04
+748	2026-01-16 10:23:38.275877-04	HT-301	TEMP_HYDRO	338.61	1	2026-01-16 10:23:40.867905-04
+749	2026-01-16 10:23:38.275892-04	HT-301	H2_PRESS	41.75	1	2026-01-16 10:23:40.867905-04
+750	2026-01-16 10:23:45.946101-04	CDU-101	TEMP_TOWER	383.69	1	2026-01-16 10:23:46.231207-04
+751	2026-01-16 10:23:45.946159-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:23:46.231207-04
+752	2026-01-16 10:23:45.946177-04	CDU-101	FLOW_FEED	9468	1	2026-01-16 10:23:46.231207-04
+753	2026-01-16 10:23:45.946195-04	FCC-201	TEMP_REACTOR	491.29	1	2026-01-16 10:23:46.231207-04
+754	2026-01-16 10:23:45.946211-04	FCC-201	CATALYST_ACT	74.68	1	2026-01-16 10:23:46.231207-04
+755	2026-01-16 10:23:45.946227-04	HT-301	TEMP_HYDRO	338.66	1	2026-01-16 10:23:46.231207-04
+756	2026-01-16 10:23:45.946244-04	HT-301	H2_PRESS	39.52	1	2026-01-16 10:23:46.231207-04
+757	2026-01-16 10:23:51.263802-04	CDU-101	TEMP_TOWER	423.45	1	2026-01-16 10:23:51.80562-04
+758	2026-01-16 10:23:51.265008-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:23:51.80562-04
+759	2026-01-16 10:23:51.265086-04	CDU-101	FLOW_FEED	9566.36	1	2026-01-16 10:23:51.80562-04
+760	2026-01-16 10:23:51.265108-04	FCC-201	TEMP_REACTOR	492.29	1	2026-01-16 10:23:51.80562-04
+761	2026-01-16 10:23:51.265127-04	FCC-201	CATALYST_ACT	77.5	1	2026-01-16 10:23:51.80562-04
+762	2026-01-16 10:23:51.265145-04	HT-301	TEMP_HYDRO	300.93	1	2026-01-16 10:23:51.80562-04
+763	2026-01-16 10:23:51.265163-04	HT-301	H2_PRESS	48.18	1	2026-01-16 10:23:51.80562-04
+764	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:07.10153-04
+765	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:07.10153-04
+766	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:07.10153-04
+767	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:07.10153-04
+768	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:07.10153-04
+769	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:07.10153-04
+770	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:07.10153-04
+771	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:09.662083-04
+772	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:09.662083-04
+773	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:09.662083-04
+774	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:09.662083-04
+775	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:09.662083-04
+776	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:09.662083-04
+777	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:09.662083-04
+778	2026-01-16 10:24:14.922041-04	CDU-101	TEMP_TOWER	410.66	1	2026-01-16 10:24:15.125166-04
+779	2026-01-16 10:24:14.922107-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:24:15.125166-04
+780	2026-01-16 10:24:14.922168-04	CDU-101	FLOW_FEED	10547.47	1	2026-01-16 10:24:15.125166-04
+781	2026-01-16 10:24:14.922189-04	FCC-201	TEMP_REACTOR	526.99	1	2026-01-16 10:24:15.125166-04
+782	2026-01-16 10:24:14.922205-04	FCC-201	CATALYST_ACT	78.75	1	2026-01-16 10:24:15.125166-04
+783	2026-01-16 10:24:14.922225-04	HT-301	TEMP_HYDRO	325.18	1	2026-01-16 10:24:15.125166-04
+784	2026-01-16 10:24:14.922241-04	HT-301	H2_PRESS	47.97	1	2026-01-16 10:24:15.125166-04
+785	2026-01-16 10:24:20.192866-04	CDU-101	TEMP_TOWER	353.73	1	2026-01-16 10:24:20.683471-04
+786	2026-01-16 10:24:20.192923-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:24:20.683471-04
+787	2026-01-16 10:24:20.19294-04	CDU-101	FLOW_FEED	8834.56	1	2026-01-16 10:24:20.683471-04
+788	2026-01-16 10:24:20.192957-04	FCC-201	TEMP_REACTOR	495.19	1	2026-01-16 10:24:20.683471-04
+789	2026-01-16 10:24:20.192972-04	FCC-201	CATALYST_ACT	86.04	1	2026-01-16 10:24:20.683471-04
+790	2026-01-16 10:24:20.192987-04	HT-301	TEMP_HYDRO	368.94	1	2026-01-16 10:24:20.683471-04
+791	2026-01-16 10:24:20.193001-04	HT-301	H2_PRESS	39.98	1	2026-01-16 10:24:20.683471-04
+792	2026-01-16 10:24:25.723755-04	CDU-101	TEMP_TOWER	408.59	1	2026-01-16 10:24:25.921512-04
+793	2026-01-16 10:24:25.723802-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:24:25.921512-04
+794	2026-01-16 10:24:25.723819-04	CDU-101	FLOW_FEED	10353.57	1	2026-01-16 10:24:25.921512-04
+795	2026-01-16 10:24:25.723836-04	FCC-201	TEMP_REACTOR	536.57	1	2026-01-16 10:24:25.921512-04
+796	2026-01-16 10:24:25.72385-04	FCC-201	CATALYST_ACT	70.85	1	2026-01-16 10:24:25.921512-04
+797	2026-01-16 10:24:25.723866-04	HT-301	TEMP_HYDRO	335.36	1	2026-01-16 10:24:25.921512-04
+798	2026-01-16 10:24:25.72388-04	HT-301	H2_PRESS	46.27	1	2026-01-16 10:24:25.921512-04
+799	2026-01-16 10:24:30.972691-04	CDU-101	TEMP_TOWER	418.73	1	2026-01-16 10:24:33.439834-04
+800	2026-01-16 10:24:30.972748-04	CDU-101	PRESS_TOWER	4.26	1	2026-01-16 10:24:33.439834-04
+801	2026-01-16 10:24:30.972767-04	CDU-101	FLOW_FEED	8943.52	1	2026-01-16 10:24:33.439834-04
+802	2026-01-16 10:24:30.972785-04	FCC-201	TEMP_REACTOR	490.15	1	2026-01-16 10:24:33.439834-04
+803	2026-01-16 10:24:30.972802-04	FCC-201	CATALYST_ACT	88.79	1	2026-01-16 10:24:33.439834-04
+804	2026-01-16 10:24:30.972818-04	HT-301	TEMP_HYDRO	372.1	1	2026-01-16 10:24:33.439834-04
+805	2026-01-16 10:24:30.972834-04	HT-301	H2_PRESS	34.99	1	2026-01-16 10:24:33.439834-04
+806	2026-01-16 10:24:38.48167-04	CDU-101	TEMP_TOWER	436.15	1	2026-01-16 10:24:38.679329-04
+807	2026-01-16 10:24:38.481719-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:24:38.679329-04
+808	2026-01-16 10:24:38.481735-04	CDU-101	FLOW_FEED	10006.84	1	2026-01-16 10:24:38.679329-04
+809	2026-01-16 10:24:38.481752-04	FCC-201	TEMP_REACTOR	482.7	1	2026-01-16 10:24:38.679329-04
+810	2026-01-16 10:24:38.481767-04	FCC-201	CATALYST_ACT	85.82	1	2026-01-16 10:24:38.679329-04
+811	2026-01-16 10:24:38.481782-04	HT-301	TEMP_HYDRO	360.97	1	2026-01-16 10:24:38.679329-04
+812	2026-01-16 10:24:38.481797-04	HT-301	H2_PRESS	43.11	1	2026-01-16 10:24:38.679329-04
+813	2026-01-16 10:24:43.705794-04	CDU-101	TEMP_TOWER	401.51	1	2026-01-16 10:24:44.171045-04
+814	2026-01-16 10:24:43.705842-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:24:44.171045-04
+815	2026-01-16 10:24:43.705858-04	CDU-101	FLOW_FEED	9772.79	1	2026-01-16 10:24:44.171045-04
+816	2026-01-16 10:24:43.705874-04	FCC-201	TEMP_REACTOR	493.79	1	2026-01-16 10:24:44.171045-04
+817	2026-01-16 10:24:43.705889-04	FCC-201	CATALYST_ACT	70.86	1	2026-01-16 10:24:44.171045-04
+818	2026-01-16 10:24:43.705904-04	HT-301	TEMP_HYDRO	300.42	1	2026-01-16 10:24:44.171045-04
+819	2026-01-16 10:24:43.705919-04	HT-301	H2_PRESS	33.5	1	2026-01-16 10:24:44.171045-04
+820	2026-01-16 10:24:49.207696-04	CDU-101	TEMP_TOWER	438.37	1	2026-01-16 10:24:49.404001-04
+821	2026-01-16 10:24:49.207741-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:24:49.404001-04
+822	2026-01-16 10:24:49.207758-04	CDU-101	FLOW_FEED	9095.93	1	2026-01-16 10:24:49.404001-04
+823	2026-01-16 10:24:49.207774-04	FCC-201	TEMP_REACTOR	508.84	1	2026-01-16 10:24:49.404001-04
+824	2026-01-16 10:24:49.207789-04	FCC-201	CATALYST_ACT	71.28	1	2026-01-16 10:24:49.404001-04
+825	2026-01-16 10:24:49.207804-04	HT-301	TEMP_HYDRO	312.47	1	2026-01-16 10:24:49.404001-04
+826	2026-01-16 10:24:49.207819-04	HT-301	H2_PRESS	40.83	1	2026-01-16 10:24:49.404001-04
+827	2026-01-16 10:24:54.441585-04	CDU-101	TEMP_TOWER	365.77	1	2026-01-16 10:24:56.924932-04
+828	2026-01-16 10:24:54.441641-04	CDU-101	PRESS_TOWER	3.74	1	2026-01-16 10:24:56.924932-04
+829	2026-01-16 10:24:54.441727-04	CDU-101	FLOW_FEED	11448.45	1	2026-01-16 10:24:56.924932-04
+830	2026-01-16 10:24:54.441759-04	FCC-201	TEMP_REACTOR	519.71	1	2026-01-16 10:24:56.924932-04
+831	2026-01-16 10:24:54.441778-04	FCC-201	CATALYST_ACT	73.81	1	2026-01-16 10:24:56.924932-04
+832	2026-01-16 10:24:54.441822-04	HT-301	TEMP_HYDRO	312.68	1	2026-01-16 10:24:56.924932-04
+833	2026-01-16 10:24:54.441848-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:24:56.924932-04
+834	2026-01-16 10:25:01.958688-04	CDU-101	TEMP_TOWER	436.54	1	2026-01-16 10:25:02.153953-04
+835	2026-01-16 10:25:01.958734-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:25:02.153953-04
+836	2026-01-16 10:25:01.958751-04	CDU-101	FLOW_FEED	8121.98	1	2026-01-16 10:25:02.153953-04
+837	2026-01-16 10:25:01.958767-04	FCC-201	TEMP_REACTOR	519.88	1	2026-01-16 10:25:02.153953-04
+838	2026-01-16 10:25:01.958782-04	FCC-201	CATALYST_ACT	87.38	1	2026-01-16 10:25:02.153953-04
+839	2026-01-16 10:25:01.958797-04	HT-301	TEMP_HYDRO	331.13	1	2026-01-16 10:25:02.153953-04
+840	2026-01-16 10:25:01.958812-04	HT-301	H2_PRESS	35.16	1	2026-01-16 10:25:02.153953-04
+841	2026-01-16 10:25:07.1926-04	CDU-101	TEMP_TOWER	386.03	1	2026-01-16 10:25:07.651512-04
+842	2026-01-16 10:25:07.192666-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:25:07.651512-04
+843	2026-01-16 10:25:07.192684-04	CDU-101	FLOW_FEED	10693.3	1	2026-01-16 10:25:07.651512-04
+844	2026-01-16 10:25:07.192703-04	FCC-201	TEMP_REACTOR	548.94	1	2026-01-16 10:25:07.651512-04
+845	2026-01-16 10:25:07.192721-04	FCC-201	CATALYST_ACT	89.09	1	2026-01-16 10:25:07.651512-04
+846	2026-01-16 10:25:07.192738-04	HT-301	TEMP_HYDRO	368.74	1	2026-01-16 10:25:07.651512-04
+847	2026-01-16 10:25:07.192754-04	HT-301	H2_PRESS	30.92	1	2026-01-16 10:25:07.651512-04
+848	2026-01-16 10:25:12.685617-04	CDU-101	TEMP_TOWER	413.64	1	2026-01-16 10:25:14.89209-04
+849	2026-01-16 10:25:12.685675-04	CDU-101	PRESS_TOWER	2.66	1	2026-01-16 10:25:14.89209-04
+850	2026-01-16 10:25:12.685694-04	CDU-101	FLOW_FEED	9565.77	1	2026-01-16 10:25:14.89209-04
+851	2026-01-16 10:25:12.685713-04	FCC-201	TEMP_REACTOR	520.31	1	2026-01-16 10:25:14.89209-04
+852	2026-01-16 10:25:12.685729-04	FCC-201	CATALYST_ACT	78.36	1	2026-01-16 10:25:14.89209-04
+853	2026-01-16 10:25:12.685746-04	HT-301	TEMP_HYDRO	370.73	1	2026-01-16 10:25:14.89209-04
+854	2026-01-16 10:25:12.685763-04	HT-301	H2_PRESS	43.42	1	2026-01-16 10:25:14.89209-04
+855	2026-01-16 10:25:19.918858-04	CDU-101	TEMP_TOWER	405.66	1	2026-01-16 10:25:20.394652-04
+856	2026-01-16 10:25:19.918906-04	CDU-101	PRESS_TOWER	3.02	1	2026-01-16 10:25:20.394652-04
+857	2026-01-16 10:25:19.918923-04	CDU-101	FLOW_FEED	10081.2	1	2026-01-16 10:25:20.394652-04
+858	2026-01-16 10:25:19.918939-04	FCC-201	TEMP_REACTOR	507.95	1	2026-01-16 10:25:20.394652-04
+859	2026-01-16 10:25:19.918954-04	FCC-201	CATALYST_ACT	85.14	1	2026-01-16 10:25:20.394652-04
+860	2026-01-16 10:25:19.91897-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:25:20.394652-04
+861	2026-01-16 10:25:19.918984-04	HT-301	H2_PRESS	49.57	1	2026-01-16 10:25:20.394652-04
+862	2026-01-16 10:25:25.428324-04	CDU-101	TEMP_TOWER	389.09	1	2026-01-16 10:25:25.62286-04
+863	2026-01-16 10:25:25.428375-04	CDU-101	PRESS_TOWER	3.17	1	2026-01-16 10:25:25.62286-04
+864	2026-01-16 10:25:25.428392-04	CDU-101	FLOW_FEED	8504.42	1	2026-01-16 10:25:25.62286-04
+865	2026-01-16 10:25:25.428407-04	FCC-201	TEMP_REACTOR	503.79	1	2026-01-16 10:25:25.62286-04
+866	2026-01-16 10:25:25.428422-04	FCC-201	CATALYST_ACT	76.98	1	2026-01-16 10:25:25.62286-04
+867	2026-01-16 10:25:25.428437-04	HT-301	TEMP_HYDRO	372.74	1	2026-01-16 10:25:25.62286-04
+868	2026-01-16 10:25:25.428452-04	HT-301	H2_PRESS	44.53	1	2026-01-16 10:25:25.62286-04
+869	2026-01-16 10:25:30.66533-04	CDU-101	TEMP_TOWER	371.07	1	2026-01-16 10:25:33.134725-04
+870	2026-01-16 10:25:30.66539-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:25:33.134725-04
+871	2026-01-16 10:25:30.665408-04	CDU-101	FLOW_FEED	8786.6	1	2026-01-16 10:25:33.134725-04
+872	2026-01-16 10:25:30.665425-04	FCC-201	TEMP_REACTOR	488.73	1	2026-01-16 10:25:33.134725-04
+873	2026-01-16 10:25:30.66544-04	FCC-201	CATALYST_ACT	88.69	1	2026-01-16 10:25:33.134725-04
+874	2026-01-16 10:25:30.665455-04	HT-301	TEMP_HYDRO	312.62	1	2026-01-16 10:25:33.134725-04
+875	2026-01-16 10:25:30.66547-04	HT-301	H2_PRESS	40.08	1	2026-01-16 10:25:33.134725-04
+876	2026-01-16 10:25:38.175427-04	CDU-101	TEMP_TOWER	361.94	1	2026-01-16 10:25:38.391081-04
+877	2026-01-16 10:25:38.175484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:25:38.391081-04
+878	2026-01-16 10:25:38.175503-04	CDU-101	FLOW_FEED	10299.44	1	2026-01-16 10:25:38.391081-04
+879	2026-01-16 10:25:38.17552-04	FCC-201	TEMP_REACTOR	490.94	1	2026-01-16 10:25:38.391081-04
+880	2026-01-16 10:25:38.175536-04	FCC-201	CATALYST_ACT	78.35	1	2026-01-16 10:25:38.391081-04
+881	2026-01-16 10:25:38.175552-04	HT-301	TEMP_HYDRO	339.51	1	2026-01-16 10:25:38.391081-04
+882	2026-01-16 10:25:38.175653-04	HT-301	H2_PRESS	38.35	1	2026-01-16 10:25:38.391081-04
+883	2026-01-16 10:25:43.44182-04	CDU-101	TEMP_TOWER	374.02	1	2026-01-16 10:25:43.929966-04
+884	2026-01-16 10:25:43.441884-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:43.929966-04
+885	2026-01-16 10:25:43.441903-04	CDU-101	FLOW_FEED	8917.93	1	2026-01-16 10:25:43.929966-04
+886	2026-01-16 10:25:43.441921-04	FCC-201	TEMP_REACTOR	547.99	1	2026-01-16 10:25:43.929966-04
+887	2026-01-16 10:25:43.441937-04	FCC-201	CATALYST_ACT	70.51	1	2026-01-16 10:25:43.929966-04
+888	2026-01-16 10:25:43.441955-04	HT-301	TEMP_HYDRO	304.49	1	2026-01-16 10:25:43.929966-04
+889	2026-01-16 10:25:43.441971-04	HT-301	H2_PRESS	34.82	1	2026-01-16 10:25:43.929966-04
+890	2026-01-16 10:25:48.962178-04	CDU-101	TEMP_TOWER	390.39	1	2026-01-16 10:25:51.181699-04
+891	2026-01-16 10:25:48.962237-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:51.181699-04
+892	2026-01-16 10:25:48.962257-04	CDU-101	FLOW_FEED	10329.41	1	2026-01-16 10:25:51.181699-04
+893	2026-01-16 10:25:48.962275-04	FCC-201	TEMP_REACTOR	548.1	1	2026-01-16 10:25:51.181699-04
+894	2026-01-16 10:25:48.962292-04	FCC-201	CATALYST_ACT	70.31	1	2026-01-16 10:25:51.181699-04
+895	2026-01-16 10:25:48.962308-04	HT-301	TEMP_HYDRO	372.19	1	2026-01-16 10:25:51.181699-04
+896	2026-01-16 10:25:48.962325-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:25:51.181699-04
+897	2026-01-16 10:25:56.385547-04	CDU-101	TEMP_TOWER	383.17	1	2026-01-16 10:25:56.877935-04
+898	2026-01-16 10:25:56.385608-04	CDU-101	PRESS_TOWER	3.2	1	2026-01-16 10:25:56.877935-04
+899	2026-01-16 10:25:56.385627-04	CDU-101	FLOW_FEED	11151.18	1	2026-01-16 10:25:56.877935-04
+900	2026-01-16 10:25:56.385648-04	FCC-201	TEMP_REACTOR	542.42	1	2026-01-16 10:25:56.877935-04
+901	2026-01-16 10:25:56.385664-04	FCC-201	CATALYST_ACT	87.15	1	2026-01-16 10:25:56.877935-04
+902	2026-01-16 10:25:56.385682-04	HT-301	TEMP_HYDRO	366.51	1	2026-01-16 10:25:56.877935-04
+903	2026-01-16 10:25:56.385698-04	HT-301	H2_PRESS	30.91	1	2026-01-16 10:25:56.877935-04
+904	2026-01-16 10:26:01.984273-04	CDU-101	TEMP_TOWER	411.67	1	2026-01-16 10:26:02.188-04
+905	2026-01-16 10:26:01.984322-04	CDU-101	PRESS_TOWER	3.27	1	2026-01-16 10:26:02.188-04
+906	2026-01-16 10:26:01.98434-04	CDU-101	FLOW_FEED	11397.47	1	2026-01-16 10:26:02.188-04
+907	2026-01-16 10:26:01.984357-04	FCC-201	TEMP_REACTOR	486.69	1	2026-01-16 10:26:02.188-04
+908	2026-01-16 10:26:01.984373-04	FCC-201	CATALYST_ACT	85.41	1	2026-01-16 10:26:02.188-04
+909	2026-01-16 10:26:01.984389-04	HT-301	TEMP_HYDRO	325.36	1	2026-01-16 10:26:02.188-04
+910	2026-01-16 10:26:01.984404-04	HT-301	H2_PRESS	37.81	1	2026-01-16 10:26:02.188-04
+911	2026-01-16 10:26:07.220643-04	CDU-101	TEMP_TOWER	363.33	1	2026-01-16 10:26:07.692443-04
+912	2026-01-16 10:26:07.220699-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:26:07.692443-04
+913	2026-01-16 10:26:07.220717-04	CDU-101	FLOW_FEED	10561.95	1	2026-01-16 10:26:07.692443-04
+914	2026-01-16 10:26:07.220735-04	FCC-201	TEMP_REACTOR	497.22	1	2026-01-16 10:26:07.692443-04
+915	2026-01-16 10:26:07.22075-04	FCC-201	CATALYST_ACT	94.2	1	2026-01-16 10:26:07.692443-04
+916	2026-01-16 10:26:07.220766-04	HT-301	TEMP_HYDRO	301.43	1	2026-01-16 10:26:07.692443-04
+917	2026-01-16 10:26:07.220781-04	HT-301	H2_PRESS	49.74	1	2026-01-16 10:26:07.692443-04
+918	2026-01-16 10:26:12.722608-04	CDU-101	TEMP_TOWER	357.97	1	2026-01-16 10:26:12.924255-04
+919	2026-01-16 10:26:12.722664-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:26:12.924255-04
+920	2026-01-16 10:26:12.722683-04	CDU-101	FLOW_FEED	11633.39	1	2026-01-16 10:26:12.924255-04
+921	2026-01-16 10:26:12.722701-04	FCC-201	TEMP_REACTOR	508.41	1	2026-01-16 10:26:12.924255-04
+922	2026-01-16 10:26:12.722718-04	FCC-201	CATALYST_ACT	82.49	1	2026-01-16 10:26:12.924255-04
+923	2026-01-16 10:26:12.722735-04	HT-301	TEMP_HYDRO	365.45	1	2026-01-16 10:26:12.924255-04
+924	2026-01-16 10:26:12.722751-04	HT-301	H2_PRESS	44.39	1	2026-01-16 10:26:12.924255-04
+925	2026-01-16 10:26:17.951141-04	CDU-101	TEMP_TOWER	352.65	1	2026-01-16 10:26:18.41653-04
+926	2026-01-16 10:26:17.951189-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:26:18.41653-04
+927	2026-01-16 10:26:17.951206-04	CDU-101	FLOW_FEED	9716.79	1	2026-01-16 10:26:18.41653-04
+928	2026-01-16 10:26:17.951222-04	FCC-201	TEMP_REACTOR	495.37	1	2026-01-16 10:26:18.41653-04
+929	2026-01-16 10:26:17.951237-04	FCC-201	CATALYST_ACT	89.93	1	2026-01-16 10:26:18.41653-04
+930	2026-01-16 10:26:17.951253-04	HT-301	TEMP_HYDRO	376.63	1	2026-01-16 10:26:18.41653-04
+931	2026-01-16 10:26:17.951268-04	HT-301	H2_PRESS	44.37	1	2026-01-16 10:26:18.41653-04
+932	2026-01-16 10:26:23.449916-04	CDU-101	TEMP_TOWER	408.89	1	2026-01-16 10:26:23.654996-04
+933	2026-01-16 10:26:23.449966-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:26:23.654996-04
+934	2026-01-16 10:26:23.449984-04	CDU-101	FLOW_FEED	8275.24	1	2026-01-16 10:26:23.654996-04
+935	2026-01-16 10:26:23.450001-04	FCC-201	TEMP_REACTOR	547.87	1	2026-01-16 10:26:23.654996-04
+936	2026-01-16 10:26:23.450017-04	FCC-201	CATALYST_ACT	89.24	1	2026-01-16 10:26:23.654996-04
+937	2026-01-16 10:26:23.450032-04	HT-301	TEMP_HYDRO	366.4	1	2026-01-16 10:26:23.654996-04
+938	2026-01-16 10:26:23.450047-04	HT-301	H2_PRESS	45.25	1	2026-01-16 10:26:23.654996-04
+939	2026-01-16 10:26:28.907667-04	CDU-101	TEMP_TOWER	354.69	1	2026-01-16 10:26:29.411128-04
+940	2026-01-16 10:26:28.907732-04	CDU-101	PRESS_TOWER	4.35	1	2026-01-16 10:26:29.411128-04
+941	2026-01-16 10:26:28.90775-04	CDU-101	FLOW_FEED	8499.95	1	2026-01-16 10:26:29.411128-04
+942	2026-01-16 10:26:28.907767-04	FCC-201	TEMP_REACTOR	528.69	1	2026-01-16 10:26:29.411128-04
+943	2026-01-16 10:26:28.907783-04	FCC-201	CATALYST_ACT	80.39	1	2026-01-16 10:26:29.411128-04
+944	2026-01-16 10:26:28.907798-04	HT-301	TEMP_HYDRO	339.05	1	2026-01-16 10:26:29.411128-04
+945	2026-01-16 10:26:28.907813-04	HT-301	H2_PRESS	36.94	1	2026-01-16 10:26:29.411128-04
+946	2026-01-16 10:26:34.441743-04	CDU-101	TEMP_TOWER	429.69	1	2026-01-16 10:26:36.676509-04
+947	2026-01-16 10:26:34.441803-04	CDU-101	PRESS_TOWER	4.89	1	2026-01-16 10:26:36.676509-04
+948	2026-01-16 10:26:34.441824-04	CDU-101	FLOW_FEED	10249.63	1	2026-01-16 10:26:36.676509-04
+949	2026-01-16 10:26:34.441842-04	FCC-201	TEMP_REACTOR	520.53	1	2026-01-16 10:26:36.676509-04
+950	2026-01-16 10:26:34.441859-04	FCC-201	CATALYST_ACT	88.99	1	2026-01-16 10:26:36.676509-04
+951	2026-01-16 10:26:34.441875-04	HT-301	TEMP_HYDRO	326.87	1	2026-01-16 10:26:36.676509-04
+952	2026-01-16 10:26:34.441891-04	HT-301	H2_PRESS	32.16	1	2026-01-16 10:26:36.676509-04
+953	2026-01-16 10:26:41.704094-04	CDU-101	TEMP_TOWER	410.01	1	2026-01-16 10:26:44.193435-04
+954	2026-01-16 10:26:41.704161-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 10:26:44.193435-04
+955	2026-01-16 10:26:41.704179-04	CDU-101	FLOW_FEED	10806.24	1	2026-01-16 10:26:44.193435-04
+956	2026-01-16 10:26:41.704196-04	FCC-201	TEMP_REACTOR	509.04	1	2026-01-16 10:26:44.193435-04
+957	2026-01-16 10:26:41.704212-04	FCC-201	CATALYST_ACT	86.77	1	2026-01-16 10:26:44.193435-04
+958	2026-01-16 10:26:41.704228-04	HT-301	TEMP_HYDRO	309.14	1	2026-01-16 10:26:44.193435-04
+959	2026-01-16 10:26:41.704243-04	HT-301	H2_PRESS	41.23	1	2026-01-16 10:26:44.193435-04
+960	2026-01-16 10:26:49.236814-04	CDU-101	TEMP_TOWER	368.52	1	2026-01-16 10:26:49.435897-04
+961	2026-01-16 10:26:49.236863-04	CDU-101	PRESS_TOWER	4.83	1	2026-01-16 10:26:49.435897-04
+962	2026-01-16 10:26:49.23688-04	CDU-101	FLOW_FEED	11256.66	1	2026-01-16 10:26:49.435897-04
+963	2026-01-16 10:26:49.236896-04	FCC-201	TEMP_REACTOR	536.85	1	2026-01-16 10:26:49.435897-04
+964	2026-01-16 10:26:49.236911-04	FCC-201	CATALYST_ACT	79.42	1	2026-01-16 10:26:49.435897-04
+965	2026-01-16 10:26:49.236926-04	HT-301	TEMP_HYDRO	325.8	1	2026-01-16 10:26:49.435897-04
+966	2026-01-16 10:26:49.236941-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:26:49.435897-04
+967	2026-01-16 10:26:54.487623-04	CDU-101	TEMP_TOWER	392.86	1	2026-01-16 10:26:56.986218-04
+968	2026-01-16 10:26:54.487681-04	CDU-101	PRESS_TOWER	4.09	1	2026-01-16 10:26:56.986218-04
+969	2026-01-16 10:26:54.487699-04	CDU-101	FLOW_FEED	9070.59	1	2026-01-16 10:26:56.986218-04
+970	2026-01-16 10:26:54.487718-04	FCC-201	TEMP_REACTOR	485.72	1	2026-01-16 10:26:56.986218-04
+971	2026-01-16 10:26:54.487733-04	FCC-201	CATALYST_ACT	86.35	1	2026-01-16 10:26:56.986218-04
+972	2026-01-16 10:26:54.48775-04	HT-301	TEMP_HYDRO	314.18	1	2026-01-16 10:26:56.986218-04
+973	2026-01-16 10:26:54.487766-04	HT-301	H2_PRESS	30.72	1	2026-01-16 10:26:56.986218-04
+974	2026-01-16 10:27:02.037656-04	CDU-101	TEMP_TOWER	410.73	1	2026-01-16 10:27:02.240397-04
+975	2026-01-16 10:27:02.037722-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:27:02.240397-04
+976	2026-01-16 10:27:02.037761-04	CDU-101	FLOW_FEED	11284.66	1	2026-01-16 10:27:02.240397-04
+977	2026-01-16 10:27:02.037783-04	FCC-201	TEMP_REACTOR	486.05	1	2026-01-16 10:27:02.240397-04
+978	2026-01-16 10:27:02.037799-04	FCC-201	CATALYST_ACT	93.69	1	2026-01-16 10:27:02.240397-04
+979	2026-01-16 10:27:02.037815-04	HT-301	TEMP_HYDRO	345.25	1	2026-01-16 10:27:02.240397-04
+980	2026-01-16 10:27:02.03783-04	HT-301	H2_PRESS	40.89	1	2026-01-16 10:27:02.240397-04
+981	2026-01-16 10:27:07.328399-04	CDU-101	TEMP_TOWER	405.11	1	2026-01-16 10:27:07.78589-04
+982	2026-01-16 10:27:07.328448-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:27:07.78589-04
+983	2026-01-16 10:27:07.328465-04	CDU-101	FLOW_FEED	10000.77	1	2026-01-16 10:27:07.78589-04
+984	2026-01-16 10:27:07.328481-04	FCC-201	TEMP_REACTOR	544.72	1	2026-01-16 10:27:07.78589-04
+985	2026-01-16 10:27:07.328496-04	FCC-201	CATALYST_ACT	81.75	1	2026-01-16 10:27:07.78589-04
+986	2026-01-16 10:27:07.328511-04	HT-301	TEMP_HYDRO	323.08	1	2026-01-16 10:27:07.78589-04
+987	2026-01-16 10:27:07.328525-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:27:07.78589-04
+988	2026-01-16 10:27:12.832719-04	CDU-101	TEMP_TOWER	355.54	1	2026-01-16 10:27:13.03091-04
+989	2026-01-16 10:27:12.832778-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 10:27:13.03091-04
+990	2026-01-16 10:27:12.832798-04	CDU-101	FLOW_FEED	9969.96	1	2026-01-16 10:27:13.03091-04
+991	2026-01-16 10:27:12.832817-04	FCC-201	TEMP_REACTOR	521.73	1	2026-01-16 10:27:13.03091-04
+992	2026-01-16 10:27:12.832833-04	FCC-201	CATALYST_ACT	71.43	1	2026-01-16 10:27:13.03091-04
+993	2026-01-16 10:27:12.83285-04	HT-301	TEMP_HYDRO	329.63	1	2026-01-16 10:27:13.03091-04
+994	2026-01-16 10:27:12.832869-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:27:13.03091-04
+995	2026-01-16 10:27:18.084868-04	CDU-101	TEMP_TOWER	407.33	1	2026-01-16 10:27:18.563452-04
+996	2026-01-16 10:27:18.084935-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:27:18.563452-04
+997	2026-01-16 10:27:18.084954-04	CDU-101	FLOW_FEED	10807.02	1	2026-01-16 10:27:18.563452-04
+998	2026-01-16 10:27:18.084972-04	FCC-201	TEMP_REACTOR	481.66	1	2026-01-16 10:27:18.563452-04
+999	2026-01-16 10:27:18.084991-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 10:27:18.563452-04
+1000	2026-01-16 10:27:18.085008-04	HT-301	TEMP_HYDRO	335.97	1	2026-01-16 10:27:18.563452-04
+1001	2026-01-16 10:27:18.085024-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:27:18.563452-04
+1002	2026-01-16 10:27:23.602675-04	CDU-101	TEMP_TOWER	428.04	1	2026-01-16 10:27:23.801929-04
+1003	2026-01-16 10:27:23.602735-04	CDU-101	PRESS_TOWER	4.5	1	2026-01-16 10:27:23.801929-04
+1004	2026-01-16 10:27:23.602753-04	CDU-101	FLOW_FEED	11577.31	1	2026-01-16 10:27:23.801929-04
+1005	2026-01-16 10:27:23.602771-04	FCC-201	TEMP_REACTOR	514.85	1	2026-01-16 10:27:23.801929-04
+1006	2026-01-16 10:27:23.602786-04	FCC-201	CATALYST_ACT	85.3	1	2026-01-16 10:27:23.801929-04
+1007	2026-01-16 10:27:23.602802-04	HT-301	TEMP_HYDRO	371.88	1	2026-01-16 10:27:23.801929-04
+1008	2026-01-16 10:27:23.602818-04	HT-301	H2_PRESS	44.57	1	2026-01-16 10:27:23.801929-04
+1009	2026-01-16 10:27:28.833674-04	CDU-101	TEMP_TOWER	408.01	1	2026-01-16 10:27:29.297608-04
+1010	2026-01-16 10:27:28.833724-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:27:29.297608-04
+1011	2026-01-16 10:27:28.833741-04	CDU-101	FLOW_FEED	9583.36	1	2026-01-16 10:27:29.297608-04
+1012	2026-01-16 10:27:28.833757-04	FCC-201	TEMP_REACTOR	488.69	1	2026-01-16 10:27:29.297608-04
+1013	2026-01-16 10:27:28.833772-04	FCC-201	CATALYST_ACT	74.74	1	2026-01-16 10:27:29.297608-04
+1014	2026-01-16 10:27:28.833787-04	HT-301	TEMP_HYDRO	358.5	1	2026-01-16 10:27:29.297608-04
+1015	2026-01-16 10:27:28.833801-04	HT-301	H2_PRESS	38.9	1	2026-01-16 10:27:29.297608-04
+1016	2026-01-16 10:27:34.325241-04	CDU-101	TEMP_TOWER	441.23	1	2026-01-16 10:27:34.525996-04
+1017	2026-01-16 10:27:34.325296-04	CDU-101	PRESS_TOWER	4.76	1	2026-01-16 10:27:34.525996-04
+1018	2026-01-16 10:27:34.325313-04	CDU-101	FLOW_FEED	10076.64	1	2026-01-16 10:27:34.525996-04
+1019	2026-01-16 10:27:34.32533-04	FCC-201	TEMP_REACTOR	526.87	1	2026-01-16 10:27:34.525996-04
+1020	2026-01-16 10:27:34.325346-04	FCC-201	CATALYST_ACT	72.68	1	2026-01-16 10:27:34.525996-04
+1021	2026-01-16 10:27:34.325363-04	HT-301	TEMP_HYDRO	341.3	1	2026-01-16 10:27:34.525996-04
+1022	2026-01-16 10:27:34.325379-04	HT-301	H2_PRESS	41.57	1	2026-01-16 10:27:34.525996-04
+1023	2026-01-16 10:27:39.567608-04	CDU-101	TEMP_TOWER	371.79	1	2026-01-16 10:27:40.029484-04
+1024	2026-01-16 10:27:39.567673-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 10:27:40.029484-04
+1025	2026-01-16 10:27:39.567693-04	CDU-101	FLOW_FEED	9698.52	1	2026-01-16 10:27:40.029484-04
+1026	2026-01-16 10:27:39.567713-04	FCC-201	TEMP_REACTOR	544.38	1	2026-01-16 10:27:40.029484-04
+1027	2026-01-16 10:27:39.56773-04	FCC-201	CATALYST_ACT	77.14	1	2026-01-16 10:27:40.029484-04
+1028	2026-01-16 10:27:39.567746-04	HT-301	TEMP_HYDRO	323.05	1	2026-01-16 10:27:40.029484-04
+1029	2026-01-16 10:27:39.567764-04	HT-301	H2_PRESS	41.54	1	2026-01-16 10:27:40.029484-04
+1030	2026-01-16 10:27:45.080497-04	CDU-101	TEMP_TOWER	385.72	1	2026-01-16 10:27:45.339448-04
+1031	2026-01-16 10:27:45.080565-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:27:45.339448-04
+1032	2026-01-16 10:27:45.080583-04	CDU-101	FLOW_FEED	11079.8	1	2026-01-16 10:27:45.339448-04
+1033	2026-01-16 10:27:45.080602-04	FCC-201	TEMP_REACTOR	500.62	1	2026-01-16 10:27:45.339448-04
+1034	2026-01-16 10:27:45.080618-04	FCC-201	CATALYST_ACT	82.34	1	2026-01-16 10:27:45.339448-04
+1035	2026-01-16 10:27:45.080636-04	HT-301	TEMP_HYDRO	341.42	1	2026-01-16 10:27:45.339448-04
+1036	2026-01-16 10:27:45.080653-04	HT-301	H2_PRESS	39	1	2026-01-16 10:27:45.339448-04
+1037	2026-01-16 10:27:50.403439-04	CDU-101	TEMP_TOWER	413.22	1	2026-01-16 10:27:50.982057-04
+1038	2026-01-16 10:27:50.4035-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:27:50.982057-04
+1039	2026-01-16 10:27:50.403519-04	CDU-101	FLOW_FEED	10932.95	1	2026-01-16 10:27:50.982057-04
+1040	2026-01-16 10:27:50.403538-04	FCC-201	TEMP_REACTOR	540.44	1	2026-01-16 10:27:50.982057-04
+1041	2026-01-16 10:27:50.403555-04	FCC-201	CATALYST_ACT	73.09	1	2026-01-16 10:27:50.982057-04
+1042	2026-01-16 10:27:50.403572-04	HT-301	TEMP_HYDRO	324.46	1	2026-01-16 10:27:50.982057-04
+1043	2026-01-16 10:27:50.40359-04	HT-301	H2_PRESS	35.75	1	2026-01-16 10:27:50.982057-04
+1044	2026-01-16 10:27:56.024708-04	CDU-101	TEMP_TOWER	426.96	1	2026-01-16 10:27:56.229611-04
+1045	2026-01-16 10:27:56.024757-04	CDU-101	PRESS_TOWER	3.52	1	2026-01-16 10:27:56.229611-04
+1046	2026-01-16 10:27:56.024773-04	CDU-101	FLOW_FEED	8090.48	1	2026-01-16 10:27:56.229611-04
+1047	2026-01-16 10:27:56.024789-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:27:56.229611-04
+1048	2026-01-16 10:27:56.024804-04	FCC-201	CATALYST_ACT	77.24	1	2026-01-16 10:27:56.229611-04
+1049	2026-01-16 10:27:56.024819-04	HT-301	TEMP_HYDRO	359.65	1	2026-01-16 10:27:56.229611-04
+1050	2026-01-16 10:27:56.024834-04	HT-301	H2_PRESS	38.22	1	2026-01-16 10:27:56.229611-04
+1051	2026-01-16 10:28:01.279124-04	CDU-101	TEMP_TOWER	428.12	1	2026-01-16 10:28:03.773878-04
+1052	2026-01-16 10:28:01.279184-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:28:03.773878-04
+1053	2026-01-16 10:28:01.279204-04	CDU-101	FLOW_FEED	9945.52	1	2026-01-16 10:28:03.773878-04
+1054	2026-01-16 10:28:01.279221-04	FCC-201	TEMP_REACTOR	485.04	1	2026-01-16 10:28:03.773878-04
+1055	2026-01-16 10:28:01.279239-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 10:28:03.773878-04
+1056	2026-01-16 10:28:01.279256-04	HT-301	TEMP_HYDRO	360.02	1	2026-01-16 10:28:03.773878-04
+1057	2026-01-16 10:28:01.279274-04	HT-301	H2_PRESS	41.79	1	2026-01-16 10:28:03.773878-04
+1058	2026-01-16 10:28:08.83085-04	CDU-101	TEMP_TOWER	399.42	1	2026-01-16 10:28:09.041362-04
+1059	2026-01-16 10:28:08.830898-04	CDU-101	PRESS_TOWER	3.54	1	2026-01-16 10:28:09.041362-04
+1060	2026-01-16 10:28:08.830914-04	CDU-101	FLOW_FEED	8906.48	1	2026-01-16 10:28:09.041362-04
+1061	2026-01-16 10:28:08.830931-04	FCC-201	TEMP_REACTOR	525.86	1	2026-01-16 10:28:09.041362-04
+1062	2026-01-16 10:28:08.830946-04	FCC-201	CATALYST_ACT	90.39	1	2026-01-16 10:28:09.041362-04
+1063	2026-01-16 10:28:08.830961-04	HT-301	TEMP_HYDRO	379.73	1	2026-01-16 10:28:09.041362-04
+1064	2026-01-16 10:28:08.830976-04	HT-301	H2_PRESS	38.89	1	2026-01-16 10:28:09.041362-04
+1065	2026-01-16 10:28:14.119088-04	CDU-101	TEMP_TOWER	431.49	1	2026-01-16 10:28:14.585242-04
+1066	2026-01-16 10:28:14.119134-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:28:14.585242-04
+1067	2026-01-16 10:28:14.119151-04	CDU-101	FLOW_FEED	9598.56	1	2026-01-16 10:28:14.585242-04
+1068	2026-01-16 10:28:14.119167-04	FCC-201	TEMP_REACTOR	483.55	1	2026-01-16 10:28:14.585242-04
+1069	2026-01-16 10:28:14.119182-04	FCC-201	CATALYST_ACT	90.23	1	2026-01-16 10:28:14.585242-04
+1070	2026-01-16 10:28:14.119197-04	HT-301	TEMP_HYDRO	361.71	1	2026-01-16 10:28:14.585242-04
+1071	2026-01-16 10:28:14.119231-04	HT-301	H2_PRESS	45.95	1	2026-01-16 10:28:14.585242-04
+1072	2026-01-16 10:28:19.633631-04	CDU-101	TEMP_TOWER	390.77	1	2026-01-16 10:28:19.834349-04
+1073	2026-01-16 10:28:19.633689-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:28:19.834349-04
+1074	2026-01-16 10:28:19.633706-04	CDU-101	FLOW_FEED	11130.18	1	2026-01-16 10:28:19.834349-04
+1075	2026-01-16 10:28:19.633723-04	FCC-201	TEMP_REACTOR	546.82	1	2026-01-16 10:28:19.834349-04
+1076	2026-01-16 10:28:19.633738-04	FCC-201	CATALYST_ACT	79.09	1	2026-01-16 10:28:19.834349-04
+1077	2026-01-16 10:28:19.633753-04	HT-301	TEMP_HYDRO	318.43	1	2026-01-16 10:28:19.834349-04
+1078	2026-01-16 10:28:19.633767-04	HT-301	H2_PRESS	45.07	1	2026-01-16 10:28:19.834349-04
+1079	2026-01-16 10:28:24.871588-04	CDU-101	TEMP_TOWER	379.06	1	2026-01-16 10:28:25.381005-04
+1080	2026-01-16 10:28:24.871647-04	CDU-101	PRESS_TOWER	2.61	1	2026-01-16 10:28:25.381005-04
+1081	2026-01-16 10:28:24.871665-04	CDU-101	FLOW_FEED	10650.56	1	2026-01-16 10:28:25.381005-04
+1082	2026-01-16 10:28:24.871682-04	FCC-201	TEMP_REACTOR	526.08	1	2026-01-16 10:28:25.381005-04
+1083	2026-01-16 10:28:24.871698-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:28:25.381005-04
+1084	2026-01-16 10:28:24.871714-04	HT-301	TEMP_HYDRO	322.58	1	2026-01-16 10:28:25.381005-04
+1085	2026-01-16 10:28:24.87173-04	HT-301	H2_PRESS	43.55	1	2026-01-16 10:28:25.381005-04
+1086	2026-01-16 10:28:30.432187-04	CDU-101	TEMP_TOWER	390.08	1	2026-01-16 10:28:31.375496-04
+1087	2026-01-16 10:28:30.432254-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:28:31.375496-04
+1088	2026-01-16 10:28:30.432274-04	CDU-101	FLOW_FEED	10013.36	1	2026-01-16 10:28:31.375496-04
+1089	2026-01-16 10:28:30.432292-04	FCC-201	TEMP_REACTOR	511.73	1	2026-01-16 10:28:31.375496-04
+1090	2026-01-16 10:28:30.432307-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:28:31.375496-04
+1091	2026-01-16 10:28:30.432322-04	HT-301	TEMP_HYDRO	306.26	1	2026-01-16 10:28:31.375496-04
+1092	2026-01-16 10:28:30.432341-04	HT-301	H2_PRESS	31.34	1	2026-01-16 10:28:31.375496-04
+1093	2026-01-16 10:28:36.434876-04	CDU-101	TEMP_TOWER	420.32	1	2026-01-16 10:28:39.282138-04
+1094	2026-01-16 10:28:36.434936-04	CDU-101	PRESS_TOWER	4.74	1	2026-01-16 10:28:39.282138-04
+1095	2026-01-16 10:28:36.434956-04	CDU-101	FLOW_FEED	11317.28	1	2026-01-16 10:28:39.282138-04
+1096	2026-01-16 10:28:36.434974-04	FCC-201	TEMP_REACTOR	531.71	1	2026-01-16 10:28:39.282138-04
+1097	2026-01-16 10:28:36.43499-04	FCC-201	CATALYST_ACT	77.18	1	2026-01-16 10:28:39.282138-04
+1098	2026-01-16 10:28:36.435006-04	HT-301	TEMP_HYDRO	373.04	1	2026-01-16 10:28:39.282138-04
+1099	2026-01-16 10:28:36.435023-04	HT-301	H2_PRESS	44.55	1	2026-01-16 10:28:39.282138-04
+1100	2026-01-16 10:28:46.585833-04	CDU-101	TEMP_TOWER	397.18	1	2026-01-16 10:28:52.286659-04
+1101	2026-01-16 10:28:46.58591-04	CDU-101	PRESS_TOWER	4.71	1	2026-01-16 10:28:52.286659-04
+1102	2026-01-16 10:28:46.585927-04	CDU-101	FLOW_FEED	10179.37	1	2026-01-16 10:28:52.286659-04
+1103	2026-01-16 10:28:46.585945-04	FCC-201	TEMP_REACTOR	542.86	1	2026-01-16 10:28:52.286659-04
+1104	2026-01-16 10:28:46.585963-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:28:52.286659-04
+1105	2026-01-16 10:28:46.58598-04	HT-301	TEMP_HYDRO	326.83	1	2026-01-16 10:28:52.286659-04
+1106	2026-01-16 10:28:46.585995-04	HT-301	H2_PRESS	32.6	1	2026-01-16 10:28:52.286659-04
+1107	2026-01-16 10:28:57.387675-04	CDU-101	TEMP_TOWER	405.19	1	2026-01-16 10:28:57.766465-04
+1108	2026-01-16 10:28:57.387734-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:28:57.766465-04
+1109	2026-01-16 10:28:57.387751-04	CDU-101	FLOW_FEED	9510.35	1	2026-01-16 10:28:57.766465-04
+1110	2026-01-16 10:28:57.387768-04	FCC-201	TEMP_REACTOR	480.95	1	2026-01-16 10:28:57.766465-04
+1111	2026-01-16 10:28:57.387785-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:28:57.766465-04
+1112	2026-01-16 10:28:57.387802-04	HT-301	TEMP_HYDRO	325.25	1	2026-01-16 10:28:57.766465-04
+1113	2026-01-16 10:28:57.387818-04	HT-301	H2_PRESS	39.83	1	2026-01-16 10:28:57.766465-04
+1114	2026-01-16 10:29:02.833763-04	CDU-101	TEMP_TOWER	394.06	1	2026-01-16 10:29:03.346602-04
+1115	2026-01-16 10:29:02.833818-04	CDU-101	PRESS_TOWER	4.78	1	2026-01-16 10:29:03.346602-04
+1116	2026-01-16 10:29:02.833838-04	CDU-101	FLOW_FEED	10883.96	1	2026-01-16 10:29:03.346602-04
+1117	2026-01-16 10:29:02.833854-04	FCC-201	TEMP_REACTOR	537.98	1	2026-01-16 10:29:03.346602-04
+1118	2026-01-16 10:29:02.83387-04	FCC-201	CATALYST_ACT	74.42	1	2026-01-16 10:29:03.346602-04
+1119	2026-01-16 10:29:02.833885-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:29:03.346602-04
+1120	2026-01-16 10:29:02.8339-04	HT-301	H2_PRESS	49.53	1	2026-01-16 10:29:03.346602-04
+1121	2026-01-16 10:29:08.377875-04	CDU-101	TEMP_TOWER	410.05	1	2026-01-16 10:29:10.577338-04
+1122	2026-01-16 10:29:08.377935-04	CDU-101	PRESS_TOWER	4.97	1	2026-01-16 10:29:10.577338-04
+1123	2026-01-16 10:29:08.377955-04	CDU-101	FLOW_FEED	11330.81	1	2026-01-16 10:29:10.577338-04
+1124	2026-01-16 10:29:08.377972-04	FCC-201	TEMP_REACTOR	503.53	1	2026-01-16 10:29:10.577338-04
+1125	2026-01-16 10:29:08.377989-04	FCC-201	CATALYST_ACT	84.9	1	2026-01-16 10:29:10.577338-04
+1126	2026-01-16 10:29:08.378006-04	HT-301	TEMP_HYDRO	358.81	1	2026-01-16 10:29:10.577338-04
+1127	2026-01-16 10:29:08.378022-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:29:10.577338-04
+1128	2026-01-16 10:29:15.624626-04	CDU-101	TEMP_TOWER	422.5	1	2026-01-16 10:29:18.212705-04
+1129	2026-01-16 10:29:15.624686-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:18.212705-04
+1130	2026-01-16 10:29:15.624705-04	CDU-101	FLOW_FEED	9802.32	1	2026-01-16 10:29:18.212705-04
+1131	2026-01-16 10:29:15.624724-04	FCC-201	TEMP_REACTOR	487.49	1	2026-01-16 10:29:18.212705-04
+1132	2026-01-16 10:29:15.624741-04	FCC-201	CATALYST_ACT	94.62	1	2026-01-16 10:29:18.212705-04
+1133	2026-01-16 10:29:15.624758-04	HT-301	TEMP_HYDRO	334.33	1	2026-01-16 10:29:18.212705-04
+1134	2026-01-16 10:29:15.624775-04	HT-301	H2_PRESS	31.95	1	2026-01-16 10:29:18.212705-04
+1135	2026-01-16 10:29:23.296516-04	CDU-101	TEMP_TOWER	356.92	1	2026-01-16 10:29:23.562659-04
+1136	2026-01-16 10:29:23.296578-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:29:23.562659-04
+1137	2026-01-16 10:29:23.296595-04	CDU-101	FLOW_FEED	11852.17	1	2026-01-16 10:29:23.562659-04
+1138	2026-01-16 10:29:23.296611-04	FCC-201	TEMP_REACTOR	517.64	1	2026-01-16 10:29:23.562659-04
+1139	2026-01-16 10:29:23.296626-04	FCC-201	CATALYST_ACT	90.05	1	2026-01-16 10:29:23.562659-04
+1140	2026-01-16 10:29:23.296642-04	HT-301	TEMP_HYDRO	351.82	1	2026-01-16 10:29:23.562659-04
+1141	2026-01-16 10:29:23.296657-04	HT-301	H2_PRESS	45.04	1	2026-01-16 10:29:23.562659-04
+1142	2026-01-16 10:29:28.703804-04	CDU-101	TEMP_TOWER	386.52	1	2026-01-16 10:29:29.195216-04
+1143	2026-01-16 10:29:28.703862-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:29.195216-04
+1144	2026-01-16 10:29:28.70388-04	CDU-101	FLOW_FEED	8608.47	1	2026-01-16 10:29:29.195216-04
+1145	2026-01-16 10:29:28.703897-04	FCC-201	TEMP_REACTOR	501.03	1	2026-01-16 10:29:29.195216-04
+1146	2026-01-16 10:29:28.703913-04	FCC-201	CATALYST_ACT	85.46	1	2026-01-16 10:29:29.195216-04
+1147	2026-01-16 10:29:28.70393-04	HT-301	TEMP_HYDRO	371.69	1	2026-01-16 10:29:29.195216-04
+1148	2026-01-16 10:29:28.703947-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:29:29.195216-04
+1149	2026-01-16 10:29:34.22273-04	CDU-101	TEMP_TOWER	355.56	1	2026-01-16 10:29:34.438862-04
+1150	2026-01-16 10:29:34.222777-04	CDU-101	PRESS_TOWER	3.3	1	2026-01-16 10:29:34.438862-04
+1151	2026-01-16 10:29:34.222793-04	CDU-101	FLOW_FEED	11455.22	1	2026-01-16 10:29:34.438862-04
+1152	2026-01-16 10:29:34.222809-04	FCC-201	TEMP_REACTOR	542.09	1	2026-01-16 10:29:34.438862-04
+1153	2026-01-16 10:29:34.222824-04	FCC-201	CATALYST_ACT	79.77	1	2026-01-16 10:29:34.438862-04
+1154	2026-01-16 10:29:34.222839-04	HT-301	TEMP_HYDRO	338.86	1	2026-01-16 10:29:34.438862-04
+1155	2026-01-16 10:29:34.222854-04	HT-301	H2_PRESS	49.16	1	2026-01-16 10:29:34.438862-04
+1156	2026-01-16 10:29:39.473288-04	CDU-101	TEMP_TOWER	378.7	1	2026-01-16 10:29:39.944023-04
+1157	2026-01-16 10:29:39.473354-04	CDU-101	PRESS_TOWER	2.81	1	2026-01-16 10:29:39.944023-04
+1158	2026-01-16 10:29:39.473372-04	CDU-101	FLOW_FEED	10990.54	1	2026-01-16 10:29:39.944023-04
+1159	2026-01-16 10:29:39.473392-04	FCC-201	TEMP_REACTOR	541.95	1	2026-01-16 10:29:39.944023-04
+1160	2026-01-16 10:29:39.473408-04	FCC-201	CATALYST_ACT	84.65	1	2026-01-16 10:29:39.944023-04
+1161	2026-01-16 10:29:39.473425-04	HT-301	TEMP_HYDRO	348.03	1	2026-01-16 10:29:39.944023-04
+1162	2026-01-16 10:29:39.473441-04	HT-301	H2_PRESS	46.22	1	2026-01-16 10:29:39.944023-04
+1163	2026-01-16 10:29:44.970842-04	CDU-101	TEMP_TOWER	434.33	1	2026-01-16 10:29:45.171287-04
+1164	2026-01-16 10:29:44.970904-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:29:45.171287-04
+1165	2026-01-16 10:29:44.970924-04	CDU-101	FLOW_FEED	9846.45	1	2026-01-16 10:29:45.171287-04
+1166	2026-01-16 10:29:44.97094-04	FCC-201	TEMP_REACTOR	499.19	1	2026-01-16 10:29:45.171287-04
+1167	2026-01-16 10:29:44.970955-04	FCC-201	CATALYST_ACT	74.13	1	2026-01-16 10:29:45.171287-04
+1168	2026-01-16 10:29:44.970971-04	HT-301	TEMP_HYDRO	377.38	1	2026-01-16 10:29:45.171287-04
+1169	2026-01-16 10:29:44.970986-04	HT-301	H2_PRESS	37.27	1	2026-01-16 10:29:45.171287-04
+1170	2026-01-16 10:29:50.21744-04	CDU-101	TEMP_TOWER	423.31	1	2026-01-16 10:29:50.710103-04
+1171	2026-01-16 10:29:50.217495-04	CDU-101	PRESS_TOWER	2.65	1	2026-01-16 10:29:50.710103-04
+1172	2026-01-16 10:29:50.217512-04	CDU-101	FLOW_FEED	11312.31	1	2026-01-16 10:29:50.710103-04
+1173	2026-01-16 10:29:50.217529-04	FCC-201	TEMP_REACTOR	539.19	1	2026-01-16 10:29:50.710103-04
+1174	2026-01-16 10:29:50.217545-04	FCC-201	CATALYST_ACT	72.65	1	2026-01-16 10:29:50.710103-04
+1175	2026-01-16 10:29:50.217561-04	HT-301	TEMP_HYDRO	346.56	1	2026-01-16 10:29:50.710103-04
+1176	2026-01-16 10:29:50.217577-04	HT-301	H2_PRESS	38.16	1	2026-01-16 10:29:50.710103-04
+1177	2026-01-16 10:29:55.762175-04	CDU-101	TEMP_TOWER	397.87	1	2026-01-16 10:29:55.998134-04
+1178	2026-01-16 10:29:55.762233-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:29:55.998134-04
+1179	2026-01-16 10:29:55.762253-04	CDU-101	FLOW_FEED	11751.32	1	2026-01-16 10:29:55.998134-04
+1180	2026-01-16 10:29:55.762271-04	FCC-201	TEMP_REACTOR	548.44	1	2026-01-16 10:29:55.998134-04
+1181	2026-01-16 10:29:55.762288-04	FCC-201	CATALYST_ACT	71.03	1	2026-01-16 10:29:55.998134-04
+1182	2026-01-16 10:29:55.762305-04	HT-301	TEMP_HYDRO	347.62	1	2026-01-16 10:29:55.998134-04
+1183	2026-01-16 10:29:55.762324-04	HT-301	H2_PRESS	35.93	1	2026-01-16 10:29:55.998134-04
+1184	2026-01-16 10:30:01.041043-04	CDU-101	TEMP_TOWER	402.09	1	2026-01-16 10:30:01.532518-04
+1185	2026-01-16 10:30:01.041091-04	CDU-101	PRESS_TOWER	4.75	1	2026-01-16 10:30:01.532518-04
+1186	2026-01-16 10:30:01.041108-04	CDU-101	FLOW_FEED	11624.26	1	2026-01-16 10:30:01.532518-04
+1187	2026-01-16 10:30:01.041124-04	FCC-201	TEMP_REACTOR	506.18	1	2026-01-16 10:30:01.532518-04
+1188	2026-01-16 10:30:01.041139-04	FCC-201	CATALYST_ACT	75.98	1	2026-01-16 10:30:01.532518-04
+1189	2026-01-16 10:30:01.041157-04	HT-301	TEMP_HYDRO	366.47	1	2026-01-16 10:30:01.532518-04
+1190	2026-01-16 10:30:01.041173-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:30:01.532518-04
+1191	2026-01-16 10:30:06.571181-04	CDU-101	TEMP_TOWER	440.17	1	2026-01-16 10:30:12.745873-04
+1192	2026-01-16 10:30:06.571239-04	CDU-101	PRESS_TOWER	3.55	1	2026-01-16 10:30:12.745873-04
+1193	2026-01-16 10:30:06.571259-04	CDU-101	FLOW_FEED	11972.92	1	2026-01-16 10:30:12.745873-04
+1194	2026-01-16 10:30:06.571278-04	FCC-201	TEMP_REACTOR	517.11	1	2026-01-16 10:30:12.745873-04
+1195	2026-01-16 10:30:06.571293-04	FCC-201	CATALYST_ACT	72.51	1	2026-01-16 10:30:12.745873-04
+1196	2026-01-16 10:30:06.57131-04	HT-301	TEMP_HYDRO	371.91	1	2026-01-16 10:30:12.745873-04
+1197	2026-01-16 10:30:06.571326-04	HT-301	H2_PRESS	48.21	1	2026-01-16 10:30:12.745873-04
+1198	2026-01-16 10:30:17.778307-04	CDU-101	TEMP_TOWER	353.74	1	2026-01-16 10:30:18.439965-04
+1199	2026-01-16 10:30:17.77837-04	CDU-101	PRESS_TOWER	4.47	1	2026-01-16 10:30:18.439965-04
+1200	2026-01-16 10:30:17.778389-04	CDU-101	FLOW_FEED	9174.31	1	2026-01-16 10:30:18.439965-04
+1201	2026-01-16 10:30:17.778407-04	FCC-201	TEMP_REACTOR	481.95	1	2026-01-16 10:30:18.439965-04
+1202	2026-01-16 10:30:17.778423-04	FCC-201	CATALYST_ACT	84.19	1	2026-01-16 10:30:18.439965-04
+1203	2026-01-16 10:30:17.778442-04	HT-301	TEMP_HYDRO	352.91	1	2026-01-16 10:30:18.439965-04
+1204	2026-01-16 10:30:17.778458-04	HT-301	H2_PRESS	34.78	1	2026-01-16 10:30:18.439965-04
+1205	2026-01-16 10:30:23.497972-04	CDU-101	TEMP_TOWER	414.89	1	2026-01-16 10:30:23.823558-04
+1206	2026-01-16 10:30:23.498019-04	CDU-101	PRESS_TOWER	4.43	1	2026-01-16 10:30:23.823558-04
+1207	2026-01-16 10:30:23.498036-04	CDU-101	FLOW_FEED	11808.42	1	2026-01-16 10:30:23.823558-04
+1208	2026-01-16 10:30:23.498052-04	FCC-201	TEMP_REACTOR	536.89	1	2026-01-16 10:30:23.823558-04
+1209	2026-01-16 10:30:23.498067-04	FCC-201	CATALYST_ACT	91.54	1	2026-01-16 10:30:23.823558-04
+1210	2026-01-16 10:30:23.498081-04	HT-301	TEMP_HYDRO	376.32	1	2026-01-16 10:30:23.823558-04
+1211	2026-01-16 10:30:23.498096-04	HT-301	H2_PRESS	33.8	1	2026-01-16 10:30:23.823558-04
+1212	2026-01-16 10:30:28.895949-04	CDU-101	TEMP_TOWER	408.34	1	2026-01-16 10:30:29.357518-04
+1213	2026-01-16 10:30:28.895997-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:30:29.357518-04
+1214	2026-01-16 10:30:28.896014-04	CDU-101	FLOW_FEED	9884.94	1	2026-01-16 10:30:29.357518-04
+1215	2026-01-16 10:30:28.89603-04	FCC-201	TEMP_REACTOR	506.77	1	2026-01-16 10:30:29.357518-04
+1216	2026-01-16 10:30:28.896045-04	FCC-201	CATALYST_ACT	93.46	1	2026-01-16 10:30:29.357518-04
+1217	2026-01-16 10:30:28.89606-04	HT-301	TEMP_HYDRO	310.88	1	2026-01-16 10:30:29.357518-04
+1218	2026-01-16 10:30:28.896075-04	HT-301	H2_PRESS	34.23	1	2026-01-16 10:30:29.357518-04
+1219	2026-01-16 10:30:34.516517-04	CDU-101	TEMP_TOWER	411.95	1	2026-01-16 10:30:38.218901-04
+1220	2026-01-16 10:30:34.517033-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:38.218901-04
+1221	2026-01-16 10:30:34.517096-04	CDU-101	FLOW_FEED	10174.93	1	2026-01-16 10:30:38.218901-04
+1222	2026-01-16 10:30:34.51712-04	FCC-201	TEMP_REACTOR	493.46	1	2026-01-16 10:30:38.218901-04
+1223	2026-01-16 10:30:34.517138-04	FCC-201	CATALYST_ACT	87.59	1	2026-01-16 10:30:38.218901-04
+1224	2026-01-16 10:30:34.517154-04	HT-301	TEMP_HYDRO	361.29	1	2026-01-16 10:30:38.218901-04
+1225	2026-01-16 10:30:34.517171-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:30:38.218901-04
+1226	2026-01-16 10:30:43.265957-04	CDU-101	TEMP_TOWER	379.2	1	2026-01-16 10:30:43.782537-04
+1227	2026-01-16 10:30:43.266007-04	CDU-101	PRESS_TOWER	3.59	1	2026-01-16 10:30:43.782537-04
+1228	2026-01-16 10:30:43.266025-04	CDU-101	FLOW_FEED	11635.26	1	2026-01-16 10:30:43.782537-04
+1229	2026-01-16 10:30:43.266042-04	FCC-201	TEMP_REACTOR	495.85	1	2026-01-16 10:30:43.782537-04
+1230	2026-01-16 10:30:43.266057-04	FCC-201	CATALYST_ACT	73.83	1	2026-01-16 10:30:43.782537-04
+1231	2026-01-16 10:30:43.266072-04	HT-301	TEMP_HYDRO	335.67	1	2026-01-16 10:30:43.782537-04
+1232	2026-01-16 10:30:43.266088-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:30:43.782537-04
+1233	2026-01-16 10:30:48.83423-04	CDU-101	TEMP_TOWER	377.54	1	2026-01-16 10:30:51.190296-04
+1234	2026-01-16 10:30:48.834458-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:51.190296-04
+1235	2026-01-16 10:30:48.834485-04	CDU-101	FLOW_FEED	8851.93	1	2026-01-16 10:30:51.190296-04
+1236	2026-01-16 10:30:48.834503-04	FCC-201	TEMP_REACTOR	518.66	1	2026-01-16 10:30:51.190296-04
+1237	2026-01-16 10:30:48.834522-04	FCC-201	CATALYST_ACT	71.54	1	2026-01-16 10:30:51.190296-04
+1238	2026-01-16 10:30:48.834542-04	HT-301	TEMP_HYDRO	373.84	1	2026-01-16 10:30:51.190296-04
+1239	2026-01-16 10:30:48.83456-04	HT-301	H2_PRESS	48.79	1	2026-01-16 10:30:51.190296-04
+1240	2026-01-16 10:30:56.255287-04	CDU-101	TEMP_TOWER	404.37	1	2026-01-16 10:30:56.729258-04
+1241	2026-01-16 10:30:56.255348-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:30:56.729258-04
+1242	2026-01-16 10:30:56.255366-04	CDU-101	FLOW_FEED	9682.12	1	2026-01-16 10:30:56.729258-04
+1243	2026-01-16 10:30:56.255383-04	FCC-201	TEMP_REACTOR	547.67	1	2026-01-16 10:30:56.729258-04
+1244	2026-01-16 10:30:56.255398-04	FCC-201	CATALYST_ACT	94.66	1	2026-01-16 10:30:56.729258-04
+1245	2026-01-16 10:30:56.255413-04	HT-301	TEMP_HYDRO	349.46	1	2026-01-16 10:30:56.729258-04
+1246	2026-01-16 10:30:56.255428-04	HT-301	H2_PRESS	36.31	1	2026-01-16 10:30:56.729258-04
+1247	2026-01-16 10:31:01.770982-04	CDU-101	TEMP_TOWER	394.97	1	2026-01-16 10:31:02.607016-04
+1248	2026-01-16 10:31:01.771081-04	CDU-101	PRESS_TOWER	2.64	1	2026-01-16 10:31:02.607016-04
+1249	2026-01-16 10:31:01.771107-04	CDU-101	FLOW_FEED	10800.69	1	2026-01-16 10:31:02.607016-04
+1250	2026-01-16 10:31:01.771126-04	FCC-201	TEMP_REACTOR	548.12	1	2026-01-16 10:31:02.607016-04
+1251	2026-01-16 10:31:01.771143-04	FCC-201	CATALYST_ACT	82.85	1	2026-01-16 10:31:02.607016-04
+1252	2026-01-16 10:31:01.771201-04	HT-301	TEMP_HYDRO	377.28	1	2026-01-16 10:31:02.607016-04
+1253	2026-01-16 10:31:01.771219-04	HT-301	H2_PRESS	44.48	1	2026-01-16 10:31:02.607016-04
+1254	2026-01-16 10:31:07.64956-04	CDU-101	TEMP_TOWER	400.73	1	2026-01-16 10:31:14.284358-04
+1255	2026-01-16 10:31:07.649685-04	CDU-101	PRESS_TOWER	4.27	1	2026-01-16 10:31:14.284358-04
+1256	2026-01-16 10:31:07.649705-04	CDU-101	FLOW_FEED	9229.64	1	2026-01-16 10:31:14.284358-04
+1257	2026-01-16 10:31:07.649723-04	FCC-201	TEMP_REACTOR	519.64	1	2026-01-16 10:31:14.284358-04
+1258	2026-01-16 10:31:07.64974-04	FCC-201	CATALYST_ACT	77.66	1	2026-01-16 10:31:14.284358-04
+1259	2026-01-16 10:31:07.649756-04	HT-301	TEMP_HYDRO	308.24	1	2026-01-16 10:31:14.284358-04
+1260	2026-01-16 10:31:07.649774-04	HT-301	H2_PRESS	30.08	1	2026-01-16 10:31:14.284358-04
+1261	2026-01-16 10:31:19.317384-04	CDU-101	TEMP_TOWER	357.18	1	2026-01-16 10:31:20.117792-04
+1262	2026-01-16 10:31:19.317434-04	CDU-101	PRESS_TOWER	4.84	1	2026-01-16 10:31:20.117792-04
+1263	2026-01-16 10:31:19.31745-04	CDU-101	FLOW_FEED	10250.33	1	2026-01-16 10:31:20.117792-04
+1264	2026-01-16 10:31:19.317466-04	FCC-201	TEMP_REACTOR	491.17	1	2026-01-16 10:31:20.117792-04
+1265	2026-01-16 10:31:19.317481-04	FCC-201	CATALYST_ACT	74.91	1	2026-01-16 10:31:20.117792-04
+1266	2026-01-16 10:31:19.317497-04	HT-301	TEMP_HYDRO	346.28	1	2026-01-16 10:31:20.117792-04
+1267	2026-01-16 10:31:19.317511-04	HT-301	H2_PRESS	45.98	1	2026-01-16 10:31:20.117792-04
+1268	2026-01-16 10:31:25.23139-04	CDU-101	TEMP_TOWER	424.02	1	2026-01-16 10:31:25.851161-04
+1269	2026-01-16 10:31:25.231471-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:31:25.851161-04
+1270	2026-01-16 10:31:25.231489-04	CDU-101	FLOW_FEED	8703.81	1	2026-01-16 10:31:25.851161-04
+1271	2026-01-16 10:31:25.231508-04	FCC-201	TEMP_REACTOR	515.76	1	2026-01-16 10:31:25.851161-04
+1272	2026-01-16 10:31:25.231525-04	FCC-201	CATALYST_ACT	71.45	1	2026-01-16 10:31:25.851161-04
+1273	2026-01-16 10:31:25.231541-04	HT-301	TEMP_HYDRO	356.49	1	2026-01-16 10:31:25.851161-04
+1274	2026-01-16 10:31:25.231559-04	HT-301	H2_PRESS	47.33	1	2026-01-16 10:31:25.851161-04
+1275	2026-01-16 10:31:30.939591-04	CDU-101	TEMP_TOWER	360.94	1	2026-01-16 10:31:34.171122-04
+1276	2026-01-16 10:31:30.939652-04	CDU-101	PRESS_TOWER	2.54	1	2026-01-16 10:31:34.171122-04
+1277	2026-01-16 10:31:30.939673-04	CDU-101	FLOW_FEED	8136.45	1	2026-01-16 10:31:34.171122-04
+1278	2026-01-16 10:31:30.93969-04	FCC-201	TEMP_REACTOR	518.25	1	2026-01-16 10:31:34.171122-04
+1279	2026-01-16 10:31:30.939707-04	FCC-201	CATALYST_ACT	78.95	1	2026-01-16 10:31:34.171122-04
+1280	2026-01-16 10:31:30.939723-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:31:34.171122-04
+1281	2026-01-16 10:31:30.939741-04	HT-301	H2_PRESS	35.76	1	2026-01-16 10:31:34.171122-04
+1282	2026-01-16 10:31:39.407564-04	CDU-101	TEMP_TOWER	363.29	1	2026-01-16 10:31:40.538398-04
+1283	2026-01-16 10:31:39.40765-04	CDU-101	PRESS_TOWER	3.97	1	2026-01-16 10:31:40.538398-04
+1284	2026-01-16 10:31:39.407668-04	CDU-101	FLOW_FEED	10670.08	1	2026-01-16 10:31:40.538398-04
+1285	2026-01-16 10:31:39.407685-04	FCC-201	TEMP_REACTOR	524.02	1	2026-01-16 10:31:40.538398-04
+1286	2026-01-16 10:31:39.4077-04	FCC-201	CATALYST_ACT	71.26	1	2026-01-16 10:31:40.538398-04
+1287	2026-01-16 10:31:39.407716-04	HT-301	TEMP_HYDRO	301.55	1	2026-01-16 10:31:40.538398-04
+1288	2026-01-16 10:31:39.407731-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:31:40.538398-04
+1289	2026-01-16 10:31:45.867603-04	CDU-101	TEMP_TOWER	419.42	1	2026-01-16 10:31:46.555631-04
+1290	2026-01-16 10:31:45.86772-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:31:46.555631-04
+1291	2026-01-16 10:31:45.867741-04	CDU-101	FLOW_FEED	11225.31	1	2026-01-16 10:31:46.555631-04
+1292	2026-01-16 10:31:45.867761-04	FCC-201	TEMP_REACTOR	544.47	1	2026-01-16 10:31:46.555631-04
+1293	2026-01-16 10:31:45.867778-04	FCC-201	CATALYST_ACT	85.69	1	2026-01-16 10:31:46.555631-04
+1294	2026-01-16 10:31:45.867795-04	HT-301	TEMP_HYDRO	304.73	1	2026-01-16 10:31:46.555631-04
+1295	2026-01-16 10:31:45.867815-04	HT-301	H2_PRESS	38.71	1	2026-01-16 10:31:46.555631-04
+1296	2026-01-16 10:31:51.664903-04	CDU-101	TEMP_TOWER	406.4	1	2026-01-16 10:31:54.476581-04
+1297	2026-01-16 10:31:51.664971-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:31:54.476581-04
+1298	2026-01-16 10:31:51.66499-04	CDU-101	FLOW_FEED	8392.11	1	2026-01-16 10:31:54.476581-04
+1299	2026-01-16 10:31:51.66501-04	FCC-201	TEMP_REACTOR	526.16	1	2026-01-16 10:31:54.476581-04
+1300	2026-01-16 10:31:51.665027-04	FCC-201	CATALYST_ACT	71.94	1	2026-01-16 10:31:54.476581-04
+1301	2026-01-16 10:31:51.665044-04	HT-301	TEMP_HYDRO	343.15	1	2026-01-16 10:31:54.476581-04
+1302	2026-01-16 10:31:51.66506-04	HT-301	H2_PRESS	31.83	1	2026-01-16 10:31:54.476581-04
+1303	2026-01-16 10:32:00.615406-04	CDU-101	TEMP_TOWER	443.45	1	2026-01-16 10:32:01.599685-04
+1304	2026-01-16 10:32:00.615503-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:32:01.599685-04
+1305	2026-01-16 10:32:00.615523-04	CDU-101	FLOW_FEED	9016.95	1	2026-01-16 10:32:01.599685-04
+1306	2026-01-16 10:32:00.615589-04	FCC-201	TEMP_REACTOR	530.01	1	2026-01-16 10:32:01.599685-04
+1307	2026-01-16 10:32:00.615609-04	FCC-201	CATALYST_ACT	91.76	1	2026-01-16 10:32:01.599685-04
+1308	2026-01-16 10:32:00.615625-04	HT-301	TEMP_HYDRO	353.24	1	2026-01-16 10:32:01.599685-04
+1309	2026-01-16 10:32:00.615645-04	HT-301	H2_PRESS	49.49	1	2026-01-16 10:32:01.599685-04
+1310	2026-01-16 10:32:09.326671-04	CDU-101	TEMP_TOWER	388.31	1	2026-01-16 10:32:12.204717-04
+1311	2026-01-16 10:32:09.326737-04	CDU-101	PRESS_TOWER	4.23	1	2026-01-16 10:32:12.204717-04
+1312	2026-01-16 10:32:09.326759-04	CDU-101	FLOW_FEED	8401.27	1	2026-01-16 10:32:12.204717-04
+1313	2026-01-16 10:32:09.326778-04	FCC-201	TEMP_REACTOR	494.36	1	2026-01-16 10:32:12.204717-04
+1314	2026-01-16 10:32:09.326796-04	FCC-201	CATALYST_ACT	91	1	2026-01-16 10:32:12.204717-04
+1315	2026-01-16 10:32:09.326814-04	HT-301	TEMP_HYDRO	359.89	1	2026-01-16 10:32:12.204717-04
+1316	2026-01-16 10:32:09.326829-04	HT-301	H2_PRESS	40.67	1	2026-01-16 10:32:12.204717-04
+1317	2026-01-16 10:32:17.396486-04	CDU-101	TEMP_TOWER	358.4	1	2026-01-16 10:32:17.738737-04
+1318	2026-01-16 10:32:17.396559-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:32:17.738737-04
+1319	2026-01-16 10:32:17.396579-04	CDU-101	FLOW_FEED	9768.87	1	2026-01-16 10:32:17.738737-04
+1320	2026-01-16 10:32:17.3966-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:32:17.738737-04
+1321	2026-01-16 10:32:17.396617-04	FCC-201	CATALYST_ACT	85.1	1	2026-01-16 10:32:17.738737-04
+1322	2026-01-16 10:32:17.396634-04	HT-301	TEMP_HYDRO	369.4	1	2026-01-16 10:32:17.738737-04
+1323	2026-01-16 10:32:17.396651-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:32:17.738737-04
+1324	2026-01-16 10:32:22.872986-04	CDU-101	TEMP_TOWER	419.35	1	2026-01-16 10:32:24.235468-04
+1325	2026-01-16 10:32:22.873065-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:32:24.235468-04
+1326	2026-01-16 10:32:22.873085-04	CDU-101	FLOW_FEED	8581.79	1	2026-01-16 10:32:24.235468-04
+1327	2026-01-16 10:32:22.873104-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:32:24.235468-04
+1328	2026-01-16 10:32:22.873122-04	FCC-201	CATALYST_ACT	75.79	1	2026-01-16 10:32:24.235468-04
+1329	2026-01-16 10:32:22.873138-04	HT-301	TEMP_HYDRO	368.58	1	2026-01-16 10:32:24.235468-04
+1330	2026-01-16 10:32:22.873155-04	HT-301	H2_PRESS	35.54	1	2026-01-16 10:32:24.235468-04
+1331	2026-01-16 10:32:29.896867-04	CDU-101	TEMP_TOWER	362.48	1	2026-01-16 10:32:30.281874-04
+1332	2026-01-16 10:32:29.896927-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:32:30.281874-04
+1333	2026-01-16 10:32:29.896949-04	CDU-101	FLOW_FEED	9186.29	1	2026-01-16 10:32:30.281874-04
+1334	2026-01-16 10:32:29.896967-04	FCC-201	TEMP_REACTOR	495.6	1	2026-01-16 10:32:30.281874-04
+1335	2026-01-16 10:32:29.896983-04	FCC-201	CATALYST_ACT	84.52	1	2026-01-16 10:32:30.281874-04
+1336	2026-01-16 10:32:29.897001-04	HT-301	TEMP_HYDRO	349.92	1	2026-01-16 10:32:30.281874-04
+1337	2026-01-16 10:32:29.89702-04	HT-301	H2_PRESS	47.73	1	2026-01-16 10:32:30.281874-04
+1338	2026-01-16 10:32:35.393358-04	CDU-101	TEMP_TOWER	381.03	1	2026-01-16 10:32:36.064363-04
+1339	2026-01-16 10:32:35.39342-04	CDU-101	PRESS_TOWER	2.95	1	2026-01-16 10:32:36.064363-04
+1340	2026-01-16 10:32:35.393438-04	CDU-101	FLOW_FEED	8166.6	1	2026-01-16 10:32:36.064363-04
+1341	2026-01-16 10:32:35.393456-04	FCC-201	TEMP_REACTOR	531.02	1	2026-01-16 10:32:36.064363-04
+1342	2026-01-16 10:32:35.393472-04	FCC-201	CATALYST_ACT	80.94	1	2026-01-16 10:32:36.064363-04
+1343	2026-01-16 10:32:35.393489-04	HT-301	TEMP_HYDRO	301.58	1	2026-01-16 10:32:36.064363-04
+1344	2026-01-16 10:32:35.393507-04	HT-301	H2_PRESS	44.78	1	2026-01-16 10:32:36.064363-04
+1345	2026-01-16 10:32:41.211862-04	CDU-101	TEMP_TOWER	423.36	1	2026-01-16 10:32:41.521975-04
+1346	2026-01-16 10:32:41.21192-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:32:41.521975-04
+1347	2026-01-16 10:32:41.211938-04	CDU-101	FLOW_FEED	9548.44	1	2026-01-16 10:32:41.521975-04
+1348	2026-01-16 10:32:41.211957-04	FCC-201	TEMP_REACTOR	532.23	1	2026-01-16 10:32:41.521975-04
+1349	2026-01-16 10:32:41.211973-04	FCC-201	CATALYST_ACT	77.48	1	2026-01-16 10:32:41.521975-04
+1350	2026-01-16 10:32:41.211989-04	HT-301	TEMP_HYDRO	372.69	1	2026-01-16 10:32:41.521975-04
+1351	2026-01-16 10:32:41.212005-04	HT-301	H2_PRESS	30.38	1	2026-01-16 10:32:41.521975-04
+1352	2026-01-16 10:32:46.552203-04	CDU-101	TEMP_TOWER	397.47	1	2026-01-16 10:32:49.218202-04
+1353	2026-01-16 10:32:46.552262-04	CDU-101	PRESS_TOWER	4.01	1	2026-01-16 10:32:49.218202-04
+1354	2026-01-16 10:32:46.552283-04	CDU-101	FLOW_FEED	11476.17	1	2026-01-16 10:32:49.218202-04
+1355	2026-01-16 10:32:46.552302-04	FCC-201	TEMP_REACTOR	515.12	1	2026-01-16 10:32:49.218202-04
+1356	2026-01-16 10:32:46.552321-04	FCC-201	CATALYST_ACT	92.45	1	2026-01-16 10:32:49.218202-04
+1357	2026-01-16 10:32:46.552339-04	HT-301	TEMP_HYDRO	342.45	1	2026-01-16 10:32:49.218202-04
+1358	2026-01-16 10:32:46.552356-04	HT-301	H2_PRESS	31.27	1	2026-01-16 10:32:49.218202-04
+1359	2026-01-16 10:32:54.296948-04	CDU-101	TEMP_TOWER	385.75	1	2026-01-16 10:32:54.493525-04
+1360	2026-01-16 10:32:54.296998-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:32:54.493525-04
+1361	2026-01-16 10:32:54.297015-04	CDU-101	FLOW_FEED	8096.41	1	2026-01-16 10:32:54.493525-04
+1362	2026-01-16 10:32:54.297032-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:32:54.493525-04
+1363	2026-01-16 10:32:54.297046-04	FCC-201	CATALYST_ACT	80.43	1	2026-01-16 10:32:54.493525-04
+1364	2026-01-16 10:32:54.297063-04	HT-301	TEMP_HYDRO	359.25	1	2026-01-16 10:32:54.493525-04
+1365	2026-01-16 10:32:54.297078-04	HT-301	H2_PRESS	41.7	1	2026-01-16 10:32:54.493525-04
+1366	2026-01-16 10:32:59.555964-04	CDU-101	TEMP_TOWER	377.09	1	2026-01-16 10:33:02.164792-04
+1367	2026-01-16 10:32:59.556023-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:33:02.164792-04
+1368	2026-01-16 10:32:59.556042-04	CDU-101	FLOW_FEED	8561.83	1	2026-01-16 10:33:02.164792-04
+1369	2026-01-16 10:32:59.55606-04	FCC-201	TEMP_REACTOR	523.35	1	2026-01-16 10:33:02.164792-04
+1370	2026-01-16 10:32:59.556076-04	FCC-201	CATALYST_ACT	85.72	1	2026-01-16 10:33:02.164792-04
+1371	2026-01-16 10:32:59.556093-04	HT-301	TEMP_HYDRO	358.33	1	2026-01-16 10:33:02.164792-04
+1372	2026-01-16 10:32:59.55611-04	HT-301	H2_PRESS	35.36	1	2026-01-16 10:33:02.164792-04
+1373	2026-01-16 10:33:07.273094-04	CDU-101	TEMP_TOWER	406.61	1	2026-01-16 10:33:07.497101-04
+1374	2026-01-16 10:33:07.273143-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 10:33:07.497101-04
+1375	2026-01-16 10:33:07.273161-04	CDU-101	FLOW_FEED	8137.3	1	2026-01-16 10:33:07.497101-04
+1376	2026-01-16 10:33:07.273178-04	FCC-201	TEMP_REACTOR	517.25	1	2026-01-16 10:33:07.497101-04
+1377	2026-01-16 10:33:07.273193-04	FCC-201	CATALYST_ACT	92.65	1	2026-01-16 10:33:07.497101-04
+1378	2026-01-16 10:33:07.273208-04	HT-301	TEMP_HYDRO	318.42	1	2026-01-16 10:33:07.497101-04
+1379	2026-01-16 10:33:07.273223-04	HT-301	H2_PRESS	40.73	1	2026-01-16 10:33:07.497101-04
+1380	2026-01-16 10:33:12.529268-04	CDU-101	TEMP_TOWER	385.52	1	2026-01-16 10:33:13.00047-04
+1381	2026-01-16 10:33:12.529329-04	CDU-101	PRESS_TOWER	3.63	1	2026-01-16 10:33:13.00047-04
+1382	2026-01-16 10:33:12.529347-04	CDU-101	FLOW_FEED	10373.21	1	2026-01-16 10:33:13.00047-04
+1383	2026-01-16 10:33:12.529364-04	FCC-201	TEMP_REACTOR	524.69	1	2026-01-16 10:33:13.00047-04
+1384	2026-01-16 10:33:12.52938-04	FCC-201	CATALYST_ACT	92.35	1	2026-01-16 10:33:13.00047-04
+1385	2026-01-16 10:33:12.529395-04	HT-301	TEMP_HYDRO	320.21	1	2026-01-16 10:33:13.00047-04
+1386	2026-01-16 10:33:12.52941-04	HT-301	H2_PRESS	46.63	1	2026-01-16 10:33:13.00047-04
+1387	2026-01-16 10:33:21.248244-04	CDU-101	TEMP_TOWER	399.47	1	2026-01-16 10:33:21.640509-04
+1388	2026-01-16 10:33:21.24832-04	CDU-101	PRESS_TOWER	4.9	1	2026-01-16 10:33:21.640509-04
+1389	2026-01-16 10:33:21.248339-04	CDU-101	FLOW_FEED	10195.7	1	2026-01-16 10:33:21.640509-04
+1390	2026-01-16 10:33:21.248356-04	FCC-201	TEMP_REACTOR	549.71	1	2026-01-16 10:33:21.640509-04
+1391	2026-01-16 10:33:21.248373-04	FCC-201	CATALYST_ACT	74.43	1	2026-01-16 10:33:21.640509-04
+1392	2026-01-16 10:33:21.248389-04	HT-301	TEMP_HYDRO	377.12	1	2026-01-16 10:33:21.640509-04
+1393	2026-01-16 10:33:21.248406-04	HT-301	H2_PRESS	36.56	1	2026-01-16 10:33:21.640509-04
+1394	2026-01-16 10:33:26.694202-04	CDU-101	TEMP_TOWER	433.79	1	2026-01-16 10:33:27.157112-04
+1395	2026-01-16 10:33:26.694261-04	CDU-101	PRESS_TOWER	3.39	1	2026-01-16 10:33:27.157112-04
+1396	2026-01-16 10:33:26.69428-04	CDU-101	FLOW_FEED	9751.95	1	2026-01-16 10:33:27.157112-04
+1397	2026-01-16 10:33:26.694297-04	FCC-201	TEMP_REACTOR	505.57	1	2026-01-16 10:33:27.157112-04
+1398	2026-01-16 10:33:26.694314-04	FCC-201	CATALYST_ACT	80.74	1	2026-01-16 10:33:27.157112-04
+1399	2026-01-16 10:33:26.69433-04	HT-301	TEMP_HYDRO	333.75	1	2026-01-16 10:33:27.157112-04
+1400	2026-01-16 10:33:26.694346-04	HT-301	H2_PRESS	39.23	1	2026-01-16 10:33:27.157112-04
+1401	2026-01-16 10:33:32.202708-04	CDU-101	TEMP_TOWER	429.51	1	2026-01-16 10:33:32.4361-04
+1402	2026-01-16 10:33:32.202768-04	CDU-101	PRESS_TOWER	2.87	1	2026-01-16 10:33:32.4361-04
+1403	2026-01-16 10:33:32.202789-04	CDU-101	FLOW_FEED	8275.45	1	2026-01-16 10:33:32.4361-04
+1404	2026-01-16 10:33:32.202806-04	FCC-201	TEMP_REACTOR	548.04	1	2026-01-16 10:33:32.4361-04
+1405	2026-01-16 10:33:32.202823-04	FCC-201	CATALYST_ACT	76.81	1	2026-01-16 10:33:32.4361-04
+1406	2026-01-16 10:33:32.202839-04	HT-301	TEMP_HYDRO	368.22	1	2026-01-16 10:33:32.4361-04
+1407	2026-01-16 10:33:32.202855-04	HT-301	H2_PRESS	42.27	1	2026-01-16 10:33:32.4361-04
+1408	2026-01-16 10:33:37.477779-04	CDU-101	TEMP_TOWER	386.89	1	2026-01-16 10:33:39.983945-04
+1409	2026-01-16 10:33:37.477837-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 10:33:39.983945-04
+1410	2026-01-16 10:33:37.477854-04	CDU-101	FLOW_FEED	9034.87	1	2026-01-16 10:33:39.983945-04
+1411	2026-01-16 10:33:37.477872-04	FCC-201	TEMP_REACTOR	488.96	1	2026-01-16 10:33:39.983945-04
+1412	2026-01-16 10:33:37.477886-04	FCC-201	CATALYST_ACT	80.46	1	2026-01-16 10:33:39.983945-04
+1413	2026-01-16 10:33:37.477902-04	HT-301	TEMP_HYDRO	332.33	1	2026-01-16 10:33:39.983945-04
+1414	2026-01-16 10:33:37.477917-04	HT-301	H2_PRESS	34.54	1	2026-01-16 10:33:39.983945-04
+1415	2026-01-16 10:33:45.036201-04	CDU-101	TEMP_TOWER	424.83	1	2026-01-16 10:33:45.262717-04
+1416	2026-01-16 10:33:45.036255-04	CDU-101	PRESS_TOWER	4.48	1	2026-01-16 10:33:45.262717-04
+1417	2026-01-16 10:33:45.036273-04	CDU-101	FLOW_FEED	10095.67	1	2026-01-16 10:33:45.262717-04
+1418	2026-01-16 10:33:45.036289-04	FCC-201	TEMP_REACTOR	523.18	1	2026-01-16 10:33:45.262717-04
+1419	2026-01-16 10:33:45.036304-04	FCC-201	CATALYST_ACT	71.74	1	2026-01-16 10:33:45.262717-04
+1420	2026-01-16 10:33:45.036319-04	HT-301	TEMP_HYDRO	330.83	1	2026-01-16 10:33:45.262717-04
+1421	2026-01-16 10:33:45.036334-04	HT-301	H2_PRESS	32.19	1	2026-01-16 10:33:45.262717-04
+1422	2026-01-16 10:33:50.326776-04	CDU-101	TEMP_TOWER	403.86	1	2026-01-16 10:33:58.55448-04
+1423	2026-01-16 10:33:50.32684-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:33:58.55448-04
+1424	2026-01-16 10:33:50.326858-04	CDU-101	FLOW_FEED	8652.82	1	2026-01-16 10:33:58.55448-04
+1425	2026-01-16 10:33:50.326877-04	FCC-201	TEMP_REACTOR	532.66	1	2026-01-16 10:33:58.55448-04
+1426	2026-01-16 10:33:50.326894-04	FCC-201	CATALYST_ACT	78.32	1	2026-01-16 10:33:58.55448-04
+1427	2026-01-16 10:33:50.32691-04	HT-301	TEMP_HYDRO	362.01	1	2026-01-16 10:33:58.55448-04
+1428	2026-01-16 10:33:50.326926-04	HT-301	H2_PRESS	42.52	1	2026-01-16 10:33:58.55448-04
+1429	2026-01-16 10:34:03.622918-04	CDU-101	TEMP_TOWER	386.46	1	2026-01-16 10:34:04.164338-04
+1430	2026-01-16 10:34:03.622984-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:34:04.164338-04
+1431	2026-01-16 10:34:03.623005-04	CDU-101	FLOW_FEED	11742.54	1	2026-01-16 10:34:04.164338-04
+1432	2026-01-16 10:34:03.623024-04	FCC-201	TEMP_REACTOR	501.34	1	2026-01-16 10:34:04.164338-04
+1433	2026-01-16 10:34:03.623041-04	FCC-201	CATALYST_ACT	72.8	1	2026-01-16 10:34:04.164338-04
+1434	2026-01-16 10:34:03.623058-04	HT-301	TEMP_HYDRO	335.7	1	2026-01-16 10:34:04.164338-04
+1435	2026-01-16 10:34:03.623075-04	HT-301	H2_PRESS	43.57	1	2026-01-16 10:34:04.164338-04
+1436	2026-01-16 10:34:09.206976-04	CDU-101	TEMP_TOWER	350.46	1	2026-01-16 10:34:09.450243-04
+1437	2026-01-16 10:34:09.207045-04	CDU-101	PRESS_TOWER	2.82	1	2026-01-16 10:34:09.450243-04
+1438	2026-01-16 10:34:09.207064-04	CDU-101	FLOW_FEED	10611.57	1	2026-01-16 10:34:09.450243-04
+1439	2026-01-16 10:34:09.207081-04	FCC-201	TEMP_REACTOR	510.62	1	2026-01-16 10:34:09.450243-04
+1440	2026-01-16 10:34:09.207099-04	FCC-201	CATALYST_ACT	81.4	1	2026-01-16 10:34:09.450243-04
+1441	2026-01-16 10:34:09.207117-04	HT-301	TEMP_HYDRO	328.49	1	2026-01-16 10:34:09.450243-04
+1442	2026-01-16 10:34:09.207134-04	HT-301	H2_PRESS	34.87	1	2026-01-16 10:34:09.450243-04
+1443	2026-01-16 10:34:14.48283-04	CDU-101	TEMP_TOWER	414.51	1	2026-01-16 10:34:17.00368-04
+1444	2026-01-16 10:34:14.482891-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:34:17.00368-04
+1445	2026-01-16 10:34:14.482909-04	CDU-101	FLOW_FEED	9838.7	1	2026-01-16 10:34:17.00368-04
+1446	2026-01-16 10:34:14.482927-04	FCC-201	TEMP_REACTOR	542.14	1	2026-01-16 10:34:17.00368-04
+1447	2026-01-16 10:34:14.482943-04	FCC-201	CATALYST_ACT	77.34	1	2026-01-16 10:34:17.00368-04
+1448	2026-01-16 10:34:14.482958-04	HT-301	TEMP_HYDRO	378.14	1	2026-01-16 10:34:17.00368-04
+1449	2026-01-16 10:34:14.482974-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:34:17.00368-04
+1450	2026-01-16 10:34:22.038612-04	CDU-101	TEMP_TOWER	365.68	1	2026-01-16 10:34:22.30655-04
+1451	2026-01-16 10:34:22.038673-04	CDU-101	PRESS_TOWER	4.95	1	2026-01-16 10:34:22.30655-04
+1452	2026-01-16 10:34:22.038693-04	CDU-101	FLOW_FEED	8800.62	1	2026-01-16 10:34:22.30655-04
+1453	2026-01-16 10:34:22.038712-04	FCC-201	TEMP_REACTOR	480.01	1	2026-01-16 10:34:22.30655-04
+1454	2026-01-16 10:34:22.038727-04	FCC-201	CATALYST_ACT	77.11	1	2026-01-16 10:34:22.30655-04
+1455	2026-01-16 10:34:22.038743-04	HT-301	TEMP_HYDRO	337.39	1	2026-01-16 10:34:22.30655-04
+1456	2026-01-16 10:34:22.03876-04	HT-301	H2_PRESS	36.09	1	2026-01-16 10:34:22.30655-04
+1457	2026-01-16 10:34:27.339392-04	CDU-101	TEMP_TOWER	395.05	1	2026-01-16 10:34:27.883442-04
+1458	2026-01-16 10:34:27.339473-04	CDU-101	PRESS_TOWER	3.81	1	2026-01-16 10:34:27.883442-04
+1459	2026-01-16 10:34:27.339492-04	CDU-101	FLOW_FEED	8415.83	1	2026-01-16 10:34:27.883442-04
+1460	2026-01-16 10:34:27.339513-04	FCC-201	TEMP_REACTOR	546.22	1	2026-01-16 10:34:27.883442-04
+1461	2026-01-16 10:34:27.339531-04	FCC-201	CATALYST_ACT	79.24	1	2026-01-16 10:34:27.883442-04
+1462	2026-01-16 10:34:27.339547-04	HT-301	TEMP_HYDRO	365.73	1	2026-01-16 10:34:27.883442-04
+1463	2026-01-16 10:34:27.339563-04	HT-301	H2_PRESS	49.99	1	2026-01-16 10:34:27.883442-04
+1464	2026-01-16 10:34:32.918522-04	CDU-101	TEMP_TOWER	422.03	1	2026-01-16 10:34:33.110994-04
+1465	2026-01-16 10:34:32.918573-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:34:33.110994-04
+1466	2026-01-16 10:34:32.918589-04	CDU-101	FLOW_FEED	8067.06	1	2026-01-16 10:34:33.110994-04
+1467	2026-01-16 10:34:32.918605-04	FCC-201	TEMP_REACTOR	508.55	1	2026-01-16 10:34:33.110994-04
+1468	2026-01-16 10:34:32.91862-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:34:33.110994-04
+1469	2026-01-16 10:34:32.918635-04	HT-301	TEMP_HYDRO	371.39	1	2026-01-16 10:34:33.110994-04
+1470	2026-01-16 10:34:32.91865-04	HT-301	H2_PRESS	47.63	1	2026-01-16 10:34:33.110994-04
+1471	2026-01-16 10:34:38.186718-04	CDU-101	TEMP_TOWER	375.55	1	2026-01-16 10:34:38.654647-04
+1472	2026-01-16 10:34:38.186775-04	CDU-101	PRESS_TOWER	3.78	1	2026-01-16 10:34:38.654647-04
+1473	2026-01-16 10:34:38.186793-04	CDU-101	FLOW_FEED	11036.33	1	2026-01-16 10:34:38.654647-04
+1474	2026-01-16 10:34:38.186813-04	FCC-201	TEMP_REACTOR	491.23	1	2026-01-16 10:34:38.654647-04
+1475	2026-01-16 10:34:38.18683-04	FCC-201	CATALYST_ACT	93.71	1	2026-01-16 10:34:38.654647-04
+1476	2026-01-16 10:34:38.186846-04	HT-301	TEMP_HYDRO	323.31	1	2026-01-16 10:34:38.654647-04
+1477	2026-01-16 10:34:38.186862-04	HT-301	H2_PRESS	44.74	1	2026-01-16 10:34:38.654647-04
+1478	2026-01-16 10:34:43.718707-04	CDU-101	TEMP_TOWER	430.54	1	2026-01-16 10:34:45.919293-04
+1479	2026-01-16 10:34:43.718766-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:34:45.919293-04
+1480	2026-01-16 10:34:43.718785-04	CDU-101	FLOW_FEED	9808.91	1	2026-01-16 10:34:45.919293-04
+1481	2026-01-16 10:34:43.718802-04	FCC-201	TEMP_REACTOR	547.88	1	2026-01-16 10:34:45.919293-04
+1482	2026-01-16 10:34:43.718819-04	FCC-201	CATALYST_ACT	75.57	1	2026-01-16 10:34:45.919293-04
+1483	2026-01-16 10:34:43.718836-04	HT-301	TEMP_HYDRO	303.23	1	2026-01-16 10:34:45.919293-04
+1484	2026-01-16 10:34:43.718852-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:34:45.919293-04
+1485	2026-01-16 10:34:50.978722-04	CDU-101	TEMP_TOWER	431.68	1	2026-01-16 10:34:51.429352-04
+1486	2026-01-16 10:34:50.978785-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:34:51.429352-04
+1487	2026-01-16 10:34:50.978803-04	CDU-101	FLOW_FEED	10576.43	1	2026-01-16 10:34:51.429352-04
+1488	2026-01-16 10:34:50.978824-04	FCC-201	TEMP_REACTOR	545.01	1	2026-01-16 10:34:51.429352-04
+1489	2026-01-16 10:34:50.978841-04	FCC-201	CATALYST_ACT	87.55	1	2026-01-16 10:34:51.429352-04
+1490	2026-01-16 10:34:50.978858-04	HT-301	TEMP_HYDRO	328.18	1	2026-01-16 10:34:51.429352-04
+1491	2026-01-16 10:34:50.978876-04	HT-301	H2_PRESS	40.99	1	2026-01-16 10:34:51.429352-04
+1492	2026-01-16 10:34:56.457603-04	CDU-101	TEMP_TOWER	415.03	1	2026-01-16 10:34:56.648045-04
+1493	2026-01-16 10:34:56.457657-04	CDU-101	PRESS_TOWER	2.77	1	2026-01-16 10:34:56.648045-04
+1494	2026-01-16 10:34:56.457674-04	CDU-101	FLOW_FEED	10877.67	1	2026-01-16 10:34:56.648045-04
+1495	2026-01-16 10:34:56.45769-04	FCC-201	TEMP_REACTOR	528.05	1	2026-01-16 10:34:56.648045-04
+1496	2026-01-16 10:34:56.457705-04	FCC-201	CATALYST_ACT	92.2	1	2026-01-16 10:34:56.648045-04
+1497	2026-01-16 10:34:56.45772-04	HT-301	TEMP_HYDRO	337.08	1	2026-01-16 10:34:56.648045-04
+1498	2026-01-16 10:34:56.457735-04	HT-301	H2_PRESS	49.6	1	2026-01-16 10:34:56.648045-04
+1499	2026-01-16 10:35:01.681978-04	CDU-101	TEMP_TOWER	433.68	1	2026-01-16 10:35:04.144458-04
+1500	2026-01-16 10:35:01.682036-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:35:04.144458-04
+1501	2026-01-16 10:35:01.682055-04	CDU-101	FLOW_FEED	10855.79	1	2026-01-16 10:35:04.144458-04
+1502	2026-01-16 10:35:01.682073-04	FCC-201	TEMP_REACTOR	533.64	1	2026-01-16 10:35:04.144458-04
+1503	2026-01-16 10:35:01.682091-04	FCC-201	CATALYST_ACT	87.92	1	2026-01-16 10:35:04.144458-04
+1504	2026-01-16 10:35:01.682108-04	HT-301	TEMP_HYDRO	345.07	1	2026-01-16 10:35:04.144458-04
+1505	2026-01-16 10:35:01.682127-04	HT-301	H2_PRESS	35.05	1	2026-01-16 10:35:04.144458-04
+1506	2026-01-16 10:35:09.173089-04	CDU-101	TEMP_TOWER	425.75	1	2026-01-16 10:35:09.371006-04
+1507	2026-01-16 10:35:09.173137-04	CDU-101	PRESS_TOWER	3.4	1	2026-01-16 10:35:09.371006-04
+1508	2026-01-16 10:35:09.173154-04	CDU-101	FLOW_FEED	11542.61	1	2026-01-16 10:35:09.371006-04
+1509	2026-01-16 10:35:09.173171-04	FCC-201	TEMP_REACTOR	490.07	1	2026-01-16 10:35:09.371006-04
+1510	2026-01-16 10:35:09.173187-04	FCC-201	CATALYST_ACT	86.67	1	2026-01-16 10:35:09.371006-04
+1511	2026-01-16 10:35:09.173202-04	HT-301	TEMP_HYDRO	311.71	1	2026-01-16 10:35:09.371006-04
+1512	2026-01-16 10:35:09.173218-04	HT-301	H2_PRESS	34.38	1	2026-01-16 10:35:09.371006-04
+1513	2026-01-16 10:35:14.406287-04	CDU-101	TEMP_TOWER	404.17	1	2026-01-16 10:35:16.883747-04
+1514	2026-01-16 10:35:14.406345-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:35:16.883747-04
+1515	2026-01-16 10:35:14.406364-04	CDU-101	FLOW_FEED	8004.3	1	2026-01-16 10:35:16.883747-04
+1516	2026-01-16 10:35:14.406382-04	FCC-201	TEMP_REACTOR	495.28	1	2026-01-16 10:35:16.883747-04
+1517	2026-01-16 10:35:14.406398-04	FCC-201	CATALYST_ACT	83.84	1	2026-01-16 10:35:16.883747-04
+1518	2026-01-16 10:35:14.406417-04	HT-301	TEMP_HYDRO	306.17	1	2026-01-16 10:35:16.883747-04
+1519	2026-01-16 10:35:14.406434-04	HT-301	H2_PRESS	44.61	1	2026-01-16 10:35:16.883747-04
+1520	2026-01-16 10:35:21.917377-04	CDU-101	TEMP_TOWER	377.52	1	2026-01-16 10:35:22.110085-04
+1521	2026-01-16 10:35:21.917439-04	CDU-101	PRESS_TOWER	3.29	1	2026-01-16 10:35:22.110085-04
+1522	2026-01-16 10:35:21.917458-04	CDU-101	FLOW_FEED	9448.95	1	2026-01-16 10:35:22.110085-04
+1523	2026-01-16 10:35:21.917476-04	FCC-201	TEMP_REACTOR	510.59	1	2026-01-16 10:35:22.110085-04
+1524	2026-01-16 10:35:21.917492-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:35:22.110085-04
+1525	2026-01-16 10:35:21.917507-04	HT-301	TEMP_HYDRO	311.21	1	2026-01-16 10:35:22.110085-04
+1526	2026-01-16 10:35:21.917522-04	HT-301	H2_PRESS	35.49	1	2026-01-16 10:35:22.110085-04
+1527	2026-01-16 10:35:27.143586-04	CDU-101	TEMP_TOWER	372.86	1	2026-01-16 10:35:29.60218-04
+1528	2026-01-16 10:35:27.143649-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:35:29.60218-04
+1529	2026-01-16 10:35:27.143667-04	CDU-101	FLOW_FEED	9155.05	1	2026-01-16 10:35:29.60218-04
+1530	2026-01-16 10:35:27.143685-04	FCC-201	TEMP_REACTOR	528.54	1	2026-01-16 10:35:29.60218-04
+1531	2026-01-16 10:35:27.143702-04	FCC-201	CATALYST_ACT	78.71	1	2026-01-16 10:35:29.60218-04
+1532	2026-01-16 10:35:27.143719-04	HT-301	TEMP_HYDRO	328.6	1	2026-01-16 10:35:29.60218-04
+1533	2026-01-16 10:35:27.143738-04	HT-301	H2_PRESS	43.26	1	2026-01-16 10:35:29.60218-04
+1534	2026-01-16 10:35:34.626863-04	CDU-101	TEMP_TOWER	382.32	1	2026-01-16 10:35:36.852263-04
+1535	2026-01-16 10:35:34.626922-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:35:36.852263-04
+1536	2026-01-16 10:35:34.626941-04	CDU-101	FLOW_FEED	8097.34	1	2026-01-16 10:35:36.852263-04
+1537	2026-01-16 10:35:34.626959-04	FCC-201	TEMP_REACTOR	545.07	1	2026-01-16 10:35:36.852263-04
+1538	2026-01-16 10:35:34.626976-04	FCC-201	CATALYST_ACT	78.24	1	2026-01-16 10:35:36.852263-04
+1539	2026-01-16 10:35:34.626992-04	HT-301	TEMP_HYDRO	369.02	1	2026-01-16 10:35:36.852263-04
+1540	2026-01-16 10:35:34.627009-04	HT-301	H2_PRESS	32.85	1	2026-01-16 10:35:36.852263-04
+1541	2026-01-16 10:35:41.884529-04	CDU-101	TEMP_TOWER	442.24	1	2026-01-16 10:35:44.434377-04
+1542	2026-01-16 10:35:41.884585-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:35:44.434377-04
+1543	2026-01-16 10:35:41.884604-04	CDU-101	FLOW_FEED	9108.04	1	2026-01-16 10:35:44.434377-04
+1544	2026-01-16 10:35:41.884622-04	FCC-201	TEMP_REACTOR	486.84	1	2026-01-16 10:35:44.434377-04
+1545	2026-01-16 10:35:41.884638-04	FCC-201	CATALYST_ACT	71.27	1	2026-01-16 10:35:44.434377-04
+1546	2026-01-16 10:35:41.884655-04	HT-301	TEMP_HYDRO	318.02	1	2026-01-16 10:35:44.434377-04
+1547	2026-01-16 10:35:41.884672-04	HT-301	H2_PRESS	40.13	1	2026-01-16 10:35:44.434377-04
+1548	2026-01-16 10:35:49.464505-04	CDU-101	TEMP_TOWER	408.92	1	2026-01-16 10:35:49.786845-04
+1549	2026-01-16 10:35:49.464568-04	CDU-101	PRESS_TOWER	2.59	1	2026-01-16 10:35:49.786845-04
+1550	2026-01-16 10:35:49.464587-04	CDU-101	FLOW_FEED	8892.7	1	2026-01-16 10:35:49.786845-04
+1551	2026-01-16 10:35:49.464606-04	FCC-201	TEMP_REACTOR	537.83	1	2026-01-16 10:35:49.786845-04
+1552	2026-01-16 10:35:49.464622-04	FCC-201	CATALYST_ACT	90.59	1	2026-01-16 10:35:49.786845-04
+1553	2026-01-16 10:35:49.464639-04	HT-301	TEMP_HYDRO	335.13	1	2026-01-16 10:35:49.786845-04
+1554	2026-01-16 10:35:49.464656-04	HT-301	H2_PRESS	42.21	1	2026-01-16 10:35:49.786845-04
+1555	2026-01-16 10:35:54.968581-04	CDU-101	TEMP_TOWER	420.68	1	2026-01-16 10:35:55.432417-04
+1556	2026-01-16 10:35:54.968629-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:35:55.432417-04
+1557	2026-01-16 10:35:54.968646-04	CDU-101	FLOW_FEED	8307.64	1	2026-01-16 10:35:55.432417-04
+1558	2026-01-16 10:35:54.968662-04	FCC-201	TEMP_REACTOR	532.44	1	2026-01-16 10:35:55.432417-04
+1559	2026-01-16 10:35:54.968677-04	FCC-201	CATALYST_ACT	92.78	1	2026-01-16 10:35:55.432417-04
+1560	2026-01-16 10:35:54.968692-04	HT-301	TEMP_HYDRO	310.02	1	2026-01-16 10:35:55.432417-04
+1561	2026-01-16 10:35:54.968707-04	HT-301	H2_PRESS	33.61	1	2026-01-16 10:35:55.432417-04
+\.
+
+
+--
+-- Data for Name: backup_process_data_20260131_142629; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.backup_process_data_20260131_142629 (id, "time", unit_id, tag_id, value, quality, created_at) FROM stdin;
+1	2026-01-16 13:03:27.796152-04	CDU-101	TEMP_TOWER	435.48	1	2026-01-16 09:03:31.52595-04
+2	2026-01-16 13:03:27.796232-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 09:03:31.52595-04
+3	2026-01-16 13:03:27.796255-04	CDU-101	FLOW_FEED	9105.04	1	2026-01-16 09:03:31.52595-04
+4	2026-01-16 13:03:27.796279-04	FCC-201	TEMP_REACTOR	345.33	1	2026-01-16 09:03:31.52595-04
+5	2026-01-16 13:03:27.796298-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 09:03:31.52595-04
+6	2026-01-16 13:03:27.796314-04	HT-301	TEMP_HYDRO	368.4	1	2026-01-16 09:03:31.52595-04
+7	2026-01-16 13:03:27.796332-04	HT-301	H2_PRESS	5.21	1	2026-01-16 09:03:31.52595-04
+8	2026-01-16 13:03:37.936045-04	CDU-101	TEMP_TOWER	397.79	1	2026-01-16 09:03:38.321619-04
+9	2026-01-16 13:03:37.936083-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:03:38.321619-04
+10	2026-01-16 13:03:37.936101-04	CDU-101	FLOW_FEED	11275.67	1	2026-01-16 09:03:38.321619-04
+11	2026-01-16 13:03:37.936115-04	FCC-201	TEMP_REACTOR	314.58	1	2026-01-16 09:03:38.321619-04
+12	2026-01-16 13:03:37.936131-04	FCC-201	CATALYST_ACT	94.92	1	2026-01-16 09:03:38.321619-04
+13	2026-01-16 13:03:37.936146-04	HT-301	TEMP_HYDRO	359.23	1	2026-01-16 09:03:38.321619-04
+14	2026-01-16 13:03:37.936159-04	HT-301	H2_PRESS	2.06	1	2026-01-16 09:03:38.321619-04
+15	2026-01-16 13:03:43.388523-04	CDU-101	TEMP_TOWER	453.53	1	2026-01-16 09:03:43.858564-04
+16	2026-01-16 13:03:43.388561-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 09:03:43.858564-04
+17	2026-01-16 13:03:43.388576-04	CDU-101	FLOW_FEED	9838.36	1	2026-01-16 09:03:43.858564-04
+18	2026-01-16 13:03:43.388591-04	FCC-201	TEMP_REACTOR	429.06	1	2026-01-16 09:03:43.858564-04
+19	2026-01-16 13:03:43.388605-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 09:03:43.858564-04
+20	2026-01-16 13:03:43.388619-04	HT-301	TEMP_HYDRO	475.95	1	2026-01-16 09:03:43.858564-04
+21	2026-01-16 13:03:43.388632-04	HT-301	H2_PRESS	4.36	1	2026-01-16 09:03:43.858564-04
+22	2026-01-16 13:03:48.903758-04	CDU-101	TEMP_TOWER	356.4	1	2026-01-16 09:03:49.102551-04
+23	2026-01-16 13:03:48.903801-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 09:03:49.102551-04
+24	2026-01-16 13:03:48.903817-04	CDU-101	FLOW_FEED	10528.7	1	2026-01-16 09:03:49.102551-04
+25	2026-01-16 13:03:48.903832-04	FCC-201	TEMP_REACTOR	475.5	1	2026-01-16 09:03:49.102551-04
+26	2026-01-16 13:03:48.903847-04	FCC-201	CATALYST_ACT	75.08	1	2026-01-16 09:03:49.102551-04
+27	2026-01-16 13:03:48.903862-04	HT-301	TEMP_HYDRO	341.99	1	2026-01-16 09:03:49.102551-04
+28	2026-01-16 13:03:48.903876-04	HT-301	H2_PRESS	4.96	1	2026-01-16 09:03:49.102551-04
+29	2026-01-16 13:04:04.159565-04	CDU-101	TEMP_TOWER	456.83	1	2026-01-16 09:04:04.629963-04
+30	2026-01-16 13:04:04.159602-04	CDU-101	PRESS_TOWER	5.33	1	2026-01-16 09:04:04.629963-04
+31	2026-01-16 13:04:04.159617-04	CDU-101	FLOW_FEED	8429.92	1	2026-01-16 09:04:04.629963-04
+32	2026-01-16 13:04:04.159631-04	FCC-201	TEMP_REACTOR	385.4	1	2026-01-16 09:04:04.629963-04
+33	2026-01-16 13:04:04.159646-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 09:04:04.629963-04
+34	2026-01-16 13:04:04.15966-04	HT-301	TEMP_HYDRO	351.18	1	2026-01-16 09:04:04.629963-04
+35	2026-01-16 13:04:04.159673-04	HT-301	H2_PRESS	5.31	1	2026-01-16 09:04:04.629963-04
+36	2026-01-16 13:04:19.688307-04	CDU-101	TEMP_TOWER	366.68	1	2026-01-16 09:04:20.267735-04
+37	2026-01-16 13:04:19.688343-04	CDU-101	PRESS_TOWER	4.44	1	2026-01-16 09:04:20.267735-04
+38	2026-01-16 13:04:19.688358-04	CDU-101	FLOW_FEED	9195.83	1	2026-01-16 09:04:20.267735-04
+39	2026-01-16 13:04:19.688372-04	FCC-201	TEMP_REACTOR	459.55	1	2026-01-16 09:04:20.267735-04
+40	2026-01-16 13:04:19.688387-04	FCC-201	CATALYST_ACT	90.44	1	2026-01-16 09:04:20.267735-04
+41	2026-01-16 13:04:19.6884-04	HT-301	TEMP_HYDRO	467.3	1	2026-01-16 09:04:20.267735-04
+42	2026-01-16 13:04:19.688413-04	HT-301	H2_PRESS	4.65	1	2026-01-16 09:04:20.267735-04
+43	2026-01-16 13:04:35.320255-04	CDU-101	TEMP_TOWER	479.73	1	2026-01-16 09:04:35.819354-04
+44	2026-01-16 13:04:35.320295-04	CDU-101	PRESS_TOWER	2.99	1	2026-01-16 09:04:35.819354-04
+45	2026-01-16 13:04:35.32031-04	CDU-101	FLOW_FEED	10685.03	1	2026-01-16 09:04:35.819354-04
+46	2026-01-16 13:04:35.320325-04	FCC-201	TEMP_REACTOR	414.4	1	2026-01-16 09:04:35.819354-04
+47	2026-01-16 13:04:35.320339-04	FCC-201	CATALYST_ACT	77.37	1	2026-01-16 09:04:35.819354-04
+48	2026-01-16 13:04:35.320353-04	HT-301	TEMP_HYDRO	477.04	1	2026-01-16 09:04:35.819354-04
+49	2026-01-16 13:04:35.320366-04	HT-301	H2_PRESS	2	1	2026-01-16 09:04:35.819354-04
+50	2026-01-16 13:04:50.868351-04	CDU-101	TEMP_TOWER	303.02	1	2026-01-16 09:04:51.32927-04
+51	2026-01-16 13:04:50.868388-04	CDU-101	PRESS_TOWER	4.58	1	2026-01-16 09:04:51.32927-04
+52	2026-01-16 13:04:50.868404-04	CDU-101	FLOW_FEED	8059.54	1	2026-01-16 09:04:51.32927-04
+53	2026-01-16 13:04:50.868418-04	FCC-201	TEMP_REACTOR	483.08	1	2026-01-16 09:04:51.32927-04
+54	2026-01-16 13:04:50.868432-04	FCC-201	CATALYST_ACT	94.46	1	2026-01-16 09:04:51.32927-04
+55	2026-01-16 13:04:50.868445-04	HT-301	TEMP_HYDRO	311.64	1	2026-01-16 09:04:51.32927-04
+56	2026-01-16 13:04:50.868458-04	HT-301	H2_PRESS	2.33	1	2026-01-16 09:04:51.32927-04
+57	2026-01-16 13:05:06.363567-04	CDU-101	TEMP_TOWER	427.64	1	2026-01-16 09:05:06.8233-04
+58	2026-01-16 13:05:06.363607-04	CDU-101	PRESS_TOWER	4.29	1	2026-01-16 09:05:06.8233-04
+59	2026-01-16 13:05:06.363622-04	CDU-101	FLOW_FEED	10755.15	1	2026-01-16 09:05:06.8233-04
+60	2026-01-16 13:05:06.363637-04	FCC-201	TEMP_REACTOR	408.77	1	2026-01-16 09:05:06.8233-04
+61	2026-01-16 13:05:06.363652-04	FCC-201	CATALYST_ACT	82.69	1	2026-01-16 09:05:06.8233-04
+62	2026-01-16 13:05:06.363665-04	HT-301	TEMP_HYDRO	347.47	1	2026-01-16 09:05:06.8233-04
+63	2026-01-16 13:05:06.363679-04	HT-301	H2_PRESS	5.37	1	2026-01-16 09:05:06.8233-04
+64	2026-01-16 13:05:21.875534-04	CDU-101	TEMP_TOWER	490.62	1	2026-01-16 09:05:22.349777-04
+65	2026-01-16 13:05:21.875572-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:22.349777-04
+66	2026-01-16 13:05:21.875587-04	CDU-101	FLOW_FEED	8355.27	1	2026-01-16 09:05:22.349777-04
+67	2026-01-16 13:05:21.875601-04	FCC-201	TEMP_REACTOR	442.57	1	2026-01-16 09:05:22.349777-04
+68	2026-01-16 13:05:21.875615-04	FCC-201	CATALYST_ACT	85.81	1	2026-01-16 09:05:22.349777-04
+69	2026-01-16 13:05:21.875628-04	HT-301	TEMP_HYDRO	386.37	1	2026-01-16 09:05:22.349777-04
+70	2026-01-16 13:05:21.875641-04	HT-301	H2_PRESS	4.31	1	2026-01-16 09:05:22.349777-04
+71	2026-01-16 13:05:37.37748-04	CDU-101	TEMP_TOWER	333.44	1	2026-01-16 09:05:37.967847-04
+72	2026-01-16 13:05:37.377522-04	CDU-101	PRESS_TOWER	2.45	1	2026-01-16 09:05:37.967847-04
+73	2026-01-16 13:05:37.377536-04	CDU-101	FLOW_FEED	10805.98	1	2026-01-16 09:05:37.967847-04
+74	2026-01-16 13:05:37.37755-04	FCC-201	TEMP_REACTOR	458.05	1	2026-01-16 09:05:37.967847-04
+75	2026-01-16 13:05:37.377564-04	FCC-201	CATALYST_ACT	85.74	1	2026-01-16 09:05:37.967847-04
+76	2026-01-16 13:05:37.377578-04	HT-301	TEMP_HYDRO	391.3	1	2026-01-16 09:05:37.967847-04
+77	2026-01-16 13:05:37.377591-04	HT-301	H2_PRESS	2.36	1	2026-01-16 09:05:37.967847-04
+78	2026-01-16 13:05:43.000343-04	CDU-101	TEMP_TOWER	442.57	1	2026-01-16 09:05:43.248149-04
+79	2026-01-16 13:05:43.000392-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:43.248149-04
+80	2026-01-16 13:05:43.00041-04	CDU-101	FLOW_FEED	10437.42	1	2026-01-16 09:05:43.248149-04
+81	2026-01-16 13:05:43.000427-04	FCC-201	TEMP_REACTOR	480.26	1	2026-01-16 09:05:43.248149-04
+82	2026-01-16 13:05:43.000442-04	FCC-201	CATALYST_ACT	89.69	1	2026-01-16 09:05:43.248149-04
+83	2026-01-16 13:05:43.000456-04	HT-301	TEMP_HYDRO	408.16	1	2026-01-16 09:05:43.248149-04
+84	2026-01-16 13:05:43.000471-04	HT-301	H2_PRESS	3.27	1	2026-01-16 09:05:43.248149-04
+85	2026-01-16 13:05:48.280753-04	CDU-101	TEMP_TOWER	384	1	2026-01-16 09:05:48.779269-04
+86	2026-01-16 13:05:48.280803-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 09:05:48.779269-04
+87	2026-01-16 13:05:48.280823-04	CDU-101	FLOW_FEED	8976.87	1	2026-01-16 09:05:48.779269-04
+88	2026-01-16 13:05:48.280837-04	FCC-201	TEMP_REACTOR	323.18	1	2026-01-16 09:05:48.779269-04
+89	2026-01-16 13:05:48.280852-04	FCC-201	CATALYST_ACT	90.7	1	2026-01-16 09:05:48.779269-04
+90	2026-01-16 13:05:48.280865-04	HT-301	TEMP_HYDRO	390.97	1	2026-01-16 09:05:48.779269-04
+91	2026-01-16 13:05:48.280879-04	HT-301	H2_PRESS	4.68	1	2026-01-16 09:05:48.779269-04
+92	2026-01-16 13:05:53.87347-04	CDU-101	TEMP_TOWER	309.65	1	2026-01-16 09:05:54.117406-04
+93	2026-01-16 13:05:53.873506-04	CDU-101	PRESS_TOWER	5.29	1	2026-01-16 09:05:54.117406-04
+94	2026-01-16 13:05:53.873521-04	CDU-101	FLOW_FEED	9258.11	1	2026-01-16 09:05:54.117406-04
+95	2026-01-16 13:05:53.873535-04	FCC-201	TEMP_REACTOR	421.63	1	2026-01-16 09:05:54.117406-04
+96	2026-01-16 13:05:53.873549-04	FCC-201	CATALYST_ACT	82.13	1	2026-01-16 09:05:54.117406-04
+97	2026-01-16 13:05:53.873563-04	HT-301	TEMP_HYDRO	354.51	1	2026-01-16 09:05:54.117406-04
+98	2026-01-16 13:05:53.873576-04	HT-301	H2_PRESS	4.04	1	2026-01-16 09:05:54.117406-04
+99	2026-01-16 13:05:59.145385-04	CDU-101	TEMP_TOWER	388.25	1	2026-01-16 09:05:59.607303-04
+100	2026-01-16 13:05:59.14543-04	CDU-101	PRESS_TOWER	4.2	1	2026-01-16 09:05:59.607303-04
+101	2026-01-16 13:05:59.145445-04	CDU-101	FLOW_FEED	8840.85	1	2026-01-16 09:05:59.607303-04
+102	2026-01-16 13:05:59.14546-04	FCC-201	TEMP_REACTOR	492.24	1	2026-01-16 09:05:59.607303-04
+103	2026-01-16 13:05:59.145475-04	FCC-201	CATALYST_ACT	85.85	1	2026-01-16 09:05:59.607303-04
+104	2026-01-16 13:05:59.145489-04	HT-301	TEMP_HYDRO	364.03	1	2026-01-16 09:05:59.607303-04
+105	2026-01-16 13:05:59.145504-04	HT-301	H2_PRESS	2.98	1	2026-01-16 09:05:59.607303-04
+106	2026-01-16 13:06:14.635842-04	CDU-101	TEMP_TOWER	472.18	1	2026-01-16 09:06:15.215849-04
+107	2026-01-16 13:06:14.635883-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 09:06:15.215849-04
+108	2026-01-16 13:06:14.635897-04	CDU-101	FLOW_FEED	8743.92	1	2026-01-16 09:06:15.215849-04
+109	2026-01-16 13:06:14.635912-04	FCC-201	TEMP_REACTOR	348.66	1	2026-01-16 09:06:15.215849-04
+110	2026-01-16 13:06:14.635928-04	FCC-201	CATALYST_ACT	92.68	1	2026-01-16 09:06:15.215849-04
+111	2026-01-16 13:06:14.635942-04	HT-301	TEMP_HYDRO	483.55	1	2026-01-16 09:06:15.215849-04
+112	2026-01-16 13:06:14.635957-04	HT-301	H2_PRESS	5.96	1	2026-01-16 09:06:15.215849-04
+113	2026-01-16 13:06:30.29029-04	CDU-101	TEMP_TOWER	333.59	1	2026-01-16 09:06:30.769451-04
+114	2026-01-16 13:06:30.290339-04	CDU-101	PRESS_TOWER	2.68	1	2026-01-16 09:06:30.769451-04
+115	2026-01-16 13:06:30.290355-04	CDU-101	FLOW_FEED	9582.04	1	2026-01-16 09:06:30.769451-04
+116	2026-01-16 13:06:30.290372-04	FCC-201	TEMP_REACTOR	405.3	1	2026-01-16 09:06:30.769451-04
+117	2026-01-16 13:06:30.290529-04	FCC-201	CATALYST_ACT	80.92	1	2026-01-16 09:06:30.769451-04
+118	2026-01-16 13:06:30.290588-04	HT-301	TEMP_HYDRO	479.09	1	2026-01-16 09:06:30.769451-04
+119	2026-01-16 13:06:30.290606-04	HT-301	H2_PRESS	3.72	1	2026-01-16 09:06:30.769451-04
+120	2026-01-16 13:06:47.61827-04	CDU-101	TEMP_TOWER	378.53	1	2026-01-16 09:06:48.355057-04
+121	2026-01-16 13:06:47.618312-04	CDU-101	PRESS_TOWER	2.05	1	2026-01-16 09:06:48.355057-04
+122	2026-01-16 13:06:47.618327-04	CDU-101	FLOW_FEED	10238.43	1	2026-01-16 09:06:48.355057-04
+123	2026-01-16 13:06:47.618341-04	FCC-201	TEMP_REACTOR	321.98	1	2026-01-16 09:06:48.355057-04
+124	2026-01-16 13:06:47.618355-04	FCC-201	CATALYST_ACT	79.9	1	2026-01-16 09:06:48.355057-04
+125	2026-01-16 13:06:47.618369-04	HT-301	TEMP_HYDRO	417.85	1	2026-01-16 09:06:48.355057-04
+126	2026-01-16 13:06:47.618384-04	HT-301	H2_PRESS	3.82	1	2026-01-16 09:06:48.355057-04
+127	2026-01-16 13:07:03.794913-04	CDU-101	TEMP_TOWER	334.77	1	2026-01-16 09:07:04.49108-04
+128	2026-01-16 13:07:03.794971-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 09:07:04.49108-04
+129	2026-01-16 13:07:03.794987-04	CDU-101	FLOW_FEED	11549.86	1	2026-01-16 09:07:04.49108-04
+130	2026-01-16 13:07:03.795002-04	FCC-201	TEMP_REACTOR	422.26	1	2026-01-16 09:07:04.49108-04
+131	2026-01-16 13:07:03.795017-04	FCC-201	CATALYST_ACT	94.48	1	2026-01-16 09:07:04.49108-04
+132	2026-01-16 13:07:03.795032-04	HT-301	TEMP_HYDRO	478.98	1	2026-01-16 09:07:04.49108-04
+133	2026-01-16 13:07:03.795047-04	HT-301	H2_PRESS	5.57	1	2026-01-16 09:07:04.49108-04
+134	2026-01-16 13:07:09.568115-04	CDU-101	TEMP_TOWER	493.75	1	2026-01-16 09:07:10.346155-04
+135	2026-01-16 13:07:09.568161-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 09:07:10.346155-04
+136	2026-01-16 13:07:09.568178-04	CDU-101	FLOW_FEED	11461.91	1	2026-01-16 09:07:10.346155-04
+137	2026-01-16 13:07:09.568193-04	FCC-201	TEMP_REACTOR	443.98	1	2026-01-16 09:07:10.346155-04
+138	2026-01-16 13:07:09.568207-04	FCC-201	CATALYST_ACT	77.45	1	2026-01-16 09:07:10.346155-04
+139	2026-01-16 13:07:09.568221-04	HT-301	TEMP_HYDRO	371.12	1	2026-01-16 09:07:10.346155-04
+140	2026-01-16 13:07:09.568236-04	HT-301	H2_PRESS	5.92	1	2026-01-16 09:07:10.346155-04
+141	2026-01-16 13:07:15.433081-04	CDU-101	TEMP_TOWER	318.86	1	2026-01-16 09:07:16.950729-04
+142	2026-01-16 13:07:15.433122-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 09:07:16.950729-04
+143	2026-01-16 13:07:15.433138-04	CDU-101	FLOW_FEED	11754.8	1	2026-01-16 09:07:16.950729-04
+144	2026-01-16 13:07:15.433152-04	FCC-201	TEMP_REACTOR	343.47	1	2026-01-16 09:07:16.950729-04
+145	2026-01-16 13:07:15.433166-04	FCC-201	CATALYST_ACT	93.61	1	2026-01-16 09:07:16.950729-04
+146	2026-01-16 13:07:15.43318-04	HT-301	TEMP_HYDRO	363.35	1	2026-01-16 09:07:16.950729-04
+147	2026-01-16 13:07:15.433193-04	HT-301	H2_PRESS	3.32	1	2026-01-16 09:07:16.950729-04
+148	2026-01-16 13:07:22.094229-04	CDU-101	TEMP_TOWER	431.69	1	2026-01-16 09:07:22.480409-04
+149	2026-01-16 13:07:22.094272-04	CDU-101	PRESS_TOWER	5.87	1	2026-01-16 09:07:22.480409-04
+150	2026-01-16 13:07:22.094287-04	CDU-101	FLOW_FEED	8430.56	1	2026-01-16 09:07:22.480409-04
+151	2026-01-16 13:07:22.094301-04	FCC-201	TEMP_REACTOR	358.1	1	2026-01-16 09:07:22.480409-04
+152	2026-01-16 13:07:22.094316-04	FCC-201	CATALYST_ACT	89.99	1	2026-01-16 09:07:22.480409-04
+153	2026-01-16 13:07:22.094331-04	HT-301	TEMP_HYDRO	416.68	1	2026-01-16 09:07:22.480409-04
+154	2026-01-16 13:07:22.094346-04	HT-301	H2_PRESS	2.41	1	2026-01-16 09:07:22.480409-04
+155	2026-01-16 13:07:27.523222-04	CDU-101	TEMP_TOWER	413.8	1	2026-01-16 09:07:28.425936-04
+156	2026-01-16 13:07:27.523273-04	CDU-101	PRESS_TOWER	4.11	1	2026-01-16 09:07:28.425936-04
+157	2026-01-16 13:07:27.52329-04	CDU-101	FLOW_FEED	9971.59	1	2026-01-16 09:07:28.425936-04
+158	2026-01-16 13:07:27.523306-04	FCC-201	TEMP_REACTOR	416.38	1	2026-01-16 09:07:28.425936-04
+159	2026-01-16 13:07:27.523321-04	FCC-201	CATALYST_ACT	79.92	1	2026-01-16 09:07:28.425936-04
+160	2026-01-16 13:07:27.523335-04	HT-301	TEMP_HYDRO	346.31	1	2026-01-16 09:07:28.425936-04
+161	2026-01-16 13:07:27.52335-04	HT-301	H2_PRESS	3.74	1	2026-01-16 09:07:28.425936-04
+162	2026-01-16 13:07:33.475271-04	CDU-101	TEMP_TOWER	444.63	1	2026-01-16 09:07:34.115338-04
+163	2026-01-16 13:07:33.475357-04	CDU-101	PRESS_TOWER	5.83	1	2026-01-16 09:07:34.115338-04
+164	2026-01-16 13:07:33.475375-04	CDU-101	FLOW_FEED	8845.99	1	2026-01-16 09:07:34.115338-04
+165	2026-01-16 13:07:33.475396-04	FCC-201	TEMP_REACTOR	336.78	1	2026-01-16 09:07:34.115338-04
+166	2026-01-16 13:07:33.475413-04	FCC-201	CATALYST_ACT	86.57	1	2026-01-16 09:07:34.115338-04
+167	2026-01-16 13:07:33.475429-04	HT-301	TEMP_HYDRO	467.39	1	2026-01-16 09:07:34.115338-04
+168	2026-01-16 13:07:33.475444-04	HT-301	H2_PRESS	5.77	1	2026-01-16 09:07:34.115338-04
+169	2026-01-16 13:07:39.183374-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 09:07:39.911031-04
+170	2026-01-16 13:07:39.183418-04	CDU-101	PRESS_TOWER	5.81	1	2026-01-16 09:07:39.911031-04
+171	2026-01-16 13:07:39.183437-04	CDU-101	FLOW_FEED	8899.33	1	2026-01-16 09:07:39.911031-04
+172	2026-01-16 13:07:39.183455-04	FCC-201	TEMP_REACTOR	469.41	1	2026-01-16 09:07:39.911031-04
+173	2026-01-16 13:07:39.183472-04	FCC-201	CATALYST_ACT	86.83	1	2026-01-16 09:07:39.911031-04
+174	2026-01-16 13:07:39.183487-04	HT-301	TEMP_HYDRO	323.03	1	2026-01-16 09:07:39.911031-04
+175	2026-01-16 13:07:39.183504-04	HT-301	H2_PRESS	4.62	1	2026-01-16 09:07:39.911031-04
+176	2026-01-16 13:07:44.958668-04	CDU-101	TEMP_TOWER	398.26	1	2026-01-16 09:07:45.348886-04
+177	2026-01-16 13:07:44.958718-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:07:45.348886-04
+178	2026-01-16 13:07:44.958736-04	CDU-101	FLOW_FEED	11037.5	1	2026-01-16 09:07:45.348886-04
+179	2026-01-16 13:07:44.958751-04	FCC-201	TEMP_REACTOR	430.01	1	2026-01-16 09:07:45.348886-04
+180	2026-01-16 13:07:44.958767-04	FCC-201	CATALYST_ACT	87.51	1	2026-01-16 09:07:45.348886-04
+181	2026-01-16 13:07:44.958782-04	HT-301	TEMP_HYDRO	368.2	1	2026-01-16 09:07:45.348886-04
+182	2026-01-16 13:07:44.958797-04	HT-301	H2_PRESS	3.26	1	2026-01-16 09:07:45.348886-04
+183	2026-01-16 10:03:56.951451-04	CDU-101	TEMP_TOWER	352.4	1	2026-01-16 10:03:57.667213-04
+184	2026-01-16 10:03:56.951774-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:03:57.667213-04
+185	2026-01-16 10:03:56.951827-04	CDU-101	FLOW_FEED	8101.68	1	2026-01-16 10:03:57.667213-04
+186	2026-01-16 10:03:56.95189-04	FCC-201	TEMP_REACTOR	497.97	1	2026-01-16 10:03:57.667213-04
+187	2026-01-16 10:03:56.951911-04	FCC-201	CATALYST_ACT	94.76	1	2026-01-16 10:03:57.667213-04
+188	2026-01-16 10:03:56.951929-04	HT-301	TEMP_HYDRO	356.4	1	2026-01-16 10:03:57.667213-04
+189	2026-01-16 10:03:56.951946-04	HT-301	H2_PRESS	33.98	1	2026-01-16 10:03:57.667213-04
+190	2026-01-16 10:04:02.976793-04	CDU-101	TEMP_TOWER	389.18	1	2026-01-16 10:04:03.183112-04
+191	2026-01-16 10:04:02.976852-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 10:04:03.183112-04
+192	2026-01-16 10:04:02.976872-04	CDU-101	FLOW_FEED	8839.96	1	2026-01-16 10:04:03.183112-04
+193	2026-01-16 10:04:02.976891-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:04:03.183112-04
+194	2026-01-16 10:04:02.976908-04	FCC-201	CATALYST_ACT	70.53	1	2026-01-16 10:04:03.183112-04
+195	2026-01-16 10:04:02.976926-04	HT-301	TEMP_HYDRO	332.45	1	2026-01-16 10:04:03.183112-04
+196	2026-01-16 10:04:02.976943-04	HT-301	H2_PRESS	32.84	1	2026-01-16 10:04:03.183112-04
+197	2026-01-16 10:04:08.207836-04	CDU-101	TEMP_TOWER	449.22	1	2026-01-16 10:04:08.66787-04
+198	2026-01-16 10:04:08.207884-04	CDU-101	PRESS_TOWER	3.88	1	2026-01-16 10:04:08.66787-04
+199	2026-01-16 10:04:08.207901-04	CDU-101	FLOW_FEED	9971.64	1	2026-01-16 10:04:08.66787-04
+200	2026-01-16 10:04:08.207917-04	FCC-201	TEMP_REACTOR	537.07	1	2026-01-16 10:04:08.66787-04
+201	2026-01-16 10:04:08.207933-04	FCC-201	CATALYST_ACT	76.2	1	2026-01-16 10:04:08.66787-04
+202	2026-01-16 10:04:08.207949-04	HT-301	TEMP_HYDRO	316.88	1	2026-01-16 10:04:08.66787-04
+203	2026-01-16 10:04:08.207965-04	HT-301	H2_PRESS	31.9	1	2026-01-16 10:04:08.66787-04
+204	2026-01-16 10:04:13.689478-04	CDU-101	TEMP_TOWER	369.09	1	2026-01-16 10:04:13.880748-04
+205	2026-01-16 10:04:13.689536-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 10:04:13.880748-04
+206	2026-01-16 10:04:13.689554-04	CDU-101	FLOW_FEED	11499.85	1	2026-01-16 10:04:13.880748-04
+207	2026-01-16 10:04:13.689573-04	FCC-201	TEMP_REACTOR	524.42	1	2026-01-16 10:04:13.880748-04
+208	2026-01-16 10:04:13.689589-04	FCC-201	CATALYST_ACT	83.31	1	2026-01-16 10:04:13.880748-04
+209	2026-01-16 10:04:13.689607-04	HT-301	TEMP_HYDRO	334.86	1	2026-01-16 10:04:13.880748-04
+210	2026-01-16 10:04:13.689623-04	HT-301	H2_PRESS	40.68	1	2026-01-16 10:04:13.880748-04
+211	2026-01-16 10:04:18.930435-04	CDU-101	TEMP_TOWER	405.79	1	2026-01-16 10:04:19.382986-04
+212	2026-01-16 10:04:18.930487-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:04:19.382986-04
+213	2026-01-16 10:04:18.930504-04	CDU-101	FLOW_FEED	9173.64	1	2026-01-16 10:04:19.382986-04
+214	2026-01-16 10:04:18.930521-04	FCC-201	TEMP_REACTOR	492.44	1	2026-01-16 10:04:19.382986-04
+215	2026-01-16 10:04:18.930537-04	FCC-201	CATALYST_ACT	86.29	1	2026-01-16 10:04:19.382986-04
+216	2026-01-16 10:04:18.930553-04	HT-301	TEMP_HYDRO	377.21	1	2026-01-16 10:04:19.382986-04
+217	2026-01-16 10:04:18.930569-04	HT-301	H2_PRESS	33.84	1	2026-01-16 10:04:19.382986-04
+218	2026-01-16 10:04:24.413697-04	CDU-101	TEMP_TOWER	383.77	1	2026-01-16 10:04:24.630658-04
+219	2026-01-16 10:04:24.413758-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:04:24.630658-04
+220	2026-01-16 10:04:24.413779-04	CDU-101	FLOW_FEED	11237.41	1	2026-01-16 10:04:24.630658-04
+221	2026-01-16 10:04:24.413798-04	FCC-201	TEMP_REACTOR	502.57	1	2026-01-16 10:04:24.630658-04
+222	2026-01-16 10:04:24.413816-04	FCC-201	CATALYST_ACT	83.18	1	2026-01-16 10:04:24.630658-04
+223	2026-01-16 10:04:24.413833-04	HT-301	TEMP_HYDRO	334.96	1	2026-01-16 10:04:24.630658-04
+224	2026-01-16 10:04:24.413851-04	HT-301	H2_PRESS	38	1	2026-01-16 10:04:24.630658-04
+225	2026-01-16 10:04:29.659097-04	CDU-101	TEMP_TOWER	354.1	1	2026-01-16 10:04:32.305584-04
+226	2026-01-16 10:04:29.659148-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:04:32.305584-04
+227	2026-01-16 10:04:29.659166-04	CDU-101	FLOW_FEED	10091.16	1	2026-01-16 10:04:32.305584-04
+228	2026-01-16 10:04:29.659183-04	FCC-201	TEMP_REACTOR	516.98	1	2026-01-16 10:04:32.305584-04
+229	2026-01-16 10:04:29.659199-04	FCC-201	CATALYST_ACT	84.63	1	2026-01-16 10:04:32.305584-04
+230	2026-01-16 10:04:29.659215-04	HT-301	TEMP_HYDRO	334.78	1	2026-01-16 10:04:32.305584-04
+231	2026-01-16 10:04:29.659231-04	HT-301	H2_PRESS	44.93	1	2026-01-16 10:04:32.305584-04
+232	2026-01-16 10:04:37.580101-04	CDU-101	TEMP_TOWER	371.11	1	2026-01-16 10:04:39.787697-04
+233	2026-01-16 10:04:37.580162-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:04:39.787697-04
+234	2026-01-16 10:04:37.580184-04	CDU-101	FLOW_FEED	11918.59	1	2026-01-16 10:04:39.787697-04
+235	2026-01-16 10:04:37.580203-04	FCC-201	TEMP_REACTOR	504.79	1	2026-01-16 10:04:39.787697-04
+236	2026-01-16 10:04:37.580221-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:04:39.787697-04
+237	2026-01-16 10:04:37.580241-04	HT-301	TEMP_HYDRO	322.2	1	2026-01-16 10:04:39.787697-04
+238	2026-01-16 10:04:37.580258-04	HT-301	H2_PRESS	40.24	1	2026-01-16 10:04:39.787697-04
+239	2026-01-16 10:04:44.815766-04	CDU-101	TEMP_TOWER	356.47	1	2026-01-16 10:04:45.292572-04
+240	2026-01-16 10:04:44.815818-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:04:45.292572-04
+241	2026-01-16 10:04:44.815835-04	CDU-101	FLOW_FEED	9365.71	1	2026-01-16 10:04:45.292572-04
+242	2026-01-16 10:04:44.815853-04	FCC-201	TEMP_REACTOR	496.02	1	2026-01-16 10:04:45.292572-04
+243	2026-01-16 10:04:44.81587-04	FCC-201	CATALYST_ACT	81.78	1	2026-01-16 10:04:45.292572-04
+244	2026-01-16 10:04:44.815888-04	HT-301	TEMP_HYDRO	312.36	1	2026-01-16 10:04:45.292572-04
+245	2026-01-16 10:04:44.815905-04	HT-301	H2_PRESS	42.39	1	2026-01-16 10:04:45.292572-04
+246	2026-01-16 10:04:50.800003-04	CDU-101	TEMP_TOWER	374.89	1	2026-01-16 10:04:50.997676-04
+247	2026-01-16 10:04:50.800052-04	CDU-101	PRESS_TOWER	4.24	1	2026-01-16 10:04:50.997676-04
+248	2026-01-16 10:04:50.800069-04	CDU-101	FLOW_FEED	9224.41	1	2026-01-16 10:04:50.997676-04
+249	2026-01-16 10:04:50.800085-04	FCC-201	TEMP_REACTOR	522.83	1	2026-01-16 10:04:50.997676-04
+250	2026-01-16 10:04:50.8001-04	FCC-201	CATALYST_ACT	79.22	1	2026-01-16 10:04:50.997676-04
+251	2026-01-16 10:04:50.800116-04	HT-301	TEMP_HYDRO	357.95	1	2026-01-16 10:04:50.997676-04
+252	2026-01-16 10:04:50.800131-04	HT-301	H2_PRESS	43.84	1	2026-01-16 10:04:50.997676-04
+253	2026-01-16 10:04:56.332522-04	CDU-101	TEMP_TOWER	409.43	1	2026-01-16 10:04:56.807144-04
+254	2026-01-16 10:04:56.332571-04	CDU-101	PRESS_TOWER	4.67	1	2026-01-16 10:04:56.807144-04
+255	2026-01-16 10:04:56.332588-04	CDU-101	FLOW_FEED	11449.48	1	2026-01-16 10:04:56.807144-04
+256	2026-01-16 10:04:56.332605-04	FCC-201	TEMP_REACTOR	522.96	1	2026-01-16 10:04:56.807144-04
+257	2026-01-16 10:04:56.33262-04	FCC-201	CATALYST_ACT	92.11	1	2026-01-16 10:04:56.807144-04
+258	2026-01-16 10:04:56.332636-04	HT-301	TEMP_HYDRO	365.18	1	2026-01-16 10:04:56.807144-04
+259	2026-01-16 10:04:56.332651-04	HT-301	H2_PRESS	44.66	1	2026-01-16 10:04:56.807144-04
+260	2026-01-16 10:05:01.856374-04	CDU-101	TEMP_TOWER	380.36	1	2026-01-16 10:05:02.0562-04
+261	2026-01-16 10:05:01.856431-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:05:02.0562-04
+262	2026-01-16 10:05:01.856448-04	CDU-101	FLOW_FEED	10762.63	1	2026-01-16 10:05:02.0562-04
+263	2026-01-16 10:05:01.856465-04	FCC-201	TEMP_REACTOR	543.58	1	2026-01-16 10:05:02.0562-04
+264	2026-01-16 10:05:01.856481-04	FCC-201	CATALYST_ACT	80.5	1	2026-01-16 10:05:02.0562-04
+265	2026-01-16 10:05:01.856496-04	HT-301	TEMP_HYDRO	353.13	1	2026-01-16 10:05:02.0562-04
+266	2026-01-16 10:05:01.856512-04	HT-301	H2_PRESS	48.92	1	2026-01-16 10:05:02.0562-04
+267	2026-01-16 10:05:07.092786-04	CDU-101	TEMP_TOWER	421.19	1	2026-01-16 10:05:07.554772-04
+268	2026-01-16 10:05:07.092852-04	CDU-101	PRESS_TOWER	3.42	1	2026-01-16 10:05:07.554772-04
+269	2026-01-16 10:05:07.092872-04	CDU-101	FLOW_FEED	10480.45	1	2026-01-16 10:05:07.554772-04
+270	2026-01-16 10:05:07.092891-04	FCC-201	TEMP_REACTOR	484.44	1	2026-01-16 10:05:07.554772-04
+271	2026-01-16 10:05:07.09291-04	FCC-201	CATALYST_ACT	93.59	1	2026-01-16 10:05:07.554772-04
+272	2026-01-16 10:05:07.092928-04	HT-301	TEMP_HYDRO	361.22	1	2026-01-16 10:05:07.554772-04
+273	2026-01-16 10:05:07.092945-04	HT-301	H2_PRESS	31.74	1	2026-01-16 10:05:07.554772-04
+274	2026-01-16 10:05:12.597506-04	CDU-101	TEMP_TOWER	361.86	1	2026-01-16 10:05:12.798954-04
+275	2026-01-16 10:05:12.597555-04	CDU-101	PRESS_TOWER	3.24	1	2026-01-16 10:05:12.798954-04
+276	2026-01-16 10:05:12.597572-04	CDU-101	FLOW_FEED	10781.3	1	2026-01-16 10:05:12.798954-04
+277	2026-01-16 10:05:12.597588-04	FCC-201	TEMP_REACTOR	546.37	1	2026-01-16 10:05:12.798954-04
+278	2026-01-16 10:05:12.597604-04	FCC-201	CATALYST_ACT	82.09	1	2026-01-16 10:05:12.798954-04
+279	2026-01-16 10:05:12.597619-04	HT-301	TEMP_HYDRO	308.08	1	2026-01-16 10:05:12.798954-04
+280	2026-01-16 10:05:12.597635-04	HT-301	H2_PRESS	33.77	1	2026-01-16 10:05:12.798954-04
+281	2026-01-16 10:05:17.833446-04	CDU-101	TEMP_TOWER	383.75	1	2026-01-16 10:05:24.183624-04
+282	2026-01-16 10:05:17.833512-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:05:24.183624-04
+283	2026-01-16 10:05:17.833534-04	CDU-101	FLOW_FEED	11317.5	1	2026-01-16 10:05:24.183624-04
+284	2026-01-16 10:05:17.833554-04	FCC-201	TEMP_REACTOR	505.08	1	2026-01-16 10:05:24.183624-04
+285	2026-01-16 10:05:17.83357-04	FCC-201	CATALYST_ACT	85.24	1	2026-01-16 10:05:24.183624-04
+286	2026-01-16 10:05:17.833589-04	HT-301	TEMP_HYDRO	346.26	1	2026-01-16 10:05:24.183624-04
+287	2026-01-16 10:05:17.833604-04	HT-301	H2_PRESS	46.76	1	2026-01-16 10:05:24.183624-04
+289	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:44.636139-04
+288	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:45.344061-04
+290	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:45.344061-04
+291	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:44.636139-04
+292	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:45.344061-04
+293	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:44.636139-04
+294	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:45.344061-04
+295	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:44.636139-04
+296	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:45.344061-04
+297	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:44.636139-04
+298	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:45.344061-04
+299	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:44.636139-04
+300	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:45.344061-04
+301	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:44.636139-04
+302	2026-01-16 10:05:52.463743-04	CDU-101	TEMP_TOWER	375.66	1	2026-01-16 10:05:53.012388-04
+303	2026-01-16 10:05:52.463943-04	CDU-101	PRESS_TOWER	4.52	1	2026-01-16 10:05:53.012388-04
+304	2026-01-16 10:05:52.463976-04	CDU-101	FLOW_FEED	9252.66	1	2026-01-16 10:05:53.012388-04
+305	2026-01-16 10:05:52.463996-04	FCC-201	TEMP_REACTOR	542.38	1	2026-01-16 10:05:53.012388-04
+306	2026-01-16 10:05:52.464013-04	FCC-201	CATALYST_ACT	81.93	1	2026-01-16 10:05:53.012388-04
+307	2026-01-16 10:05:52.464032-04	HT-301	TEMP_HYDRO	337.31	1	2026-01-16 10:05:53.012388-04
+308	2026-01-16 10:05:52.464048-04	HT-301	H2_PRESS	43.02	1	2026-01-16 10:05:53.012388-04
+309	2026-01-16 10:05:58.111733-04	CDU-101	TEMP_TOWER	397.95	1	2026-01-16 10:05:58.344071-04
+310	2026-01-16 10:05:58.111783-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:05:58.344071-04
+311	2026-01-16 10:05:58.1118-04	CDU-101	FLOW_FEED	8888.16	1	2026-01-16 10:05:58.344071-04
+312	2026-01-16 10:05:58.111816-04	FCC-201	TEMP_REACTOR	547.7	1	2026-01-16 10:05:58.344071-04
+313	2026-01-16 10:05:58.111832-04	FCC-201	CATALYST_ACT	87.63	1	2026-01-16 10:05:58.344071-04
+314	2026-01-16 10:05:58.111848-04	HT-301	TEMP_HYDRO	300.26	1	2026-01-16 10:05:58.344071-04
+315	2026-01-16 10:05:58.111863-04	HT-301	H2_PRESS	32.03	1	2026-01-16 10:05:58.344071-04
+316	2026-01-16 10:06:03.430558-04	CDU-101	TEMP_TOWER	409.01	1	2026-01-16 10:06:04.000085-04
+317	2026-01-16 10:06:03.430607-04	CDU-101	PRESS_TOWER	4.87	1	2026-01-16 10:06:04.000085-04
+318	2026-01-16 10:06:03.430624-04	CDU-101	FLOW_FEED	9647.13	1	2026-01-16 10:06:04.000085-04
+319	2026-01-16 10:06:03.430641-04	FCC-201	TEMP_REACTOR	516.9	1	2026-01-16 10:06:04.000085-04
+320	2026-01-16 10:06:03.430656-04	FCC-201	CATALYST_ACT	72.41	1	2026-01-16 10:06:04.000085-04
+321	2026-01-16 10:06:03.430672-04	HT-301	TEMP_HYDRO	328.27	1	2026-01-16 10:06:04.000085-04
+322	2026-01-16 10:06:03.430687-04	HT-301	H2_PRESS	35.33	1	2026-01-16 10:06:04.000085-04
+323	2026-01-16 10:06:10.167356-04	CDU-101	TEMP_TOWER	356.97	1	2026-01-16 10:06:12.378024-04
+324	2026-01-16 10:06:10.167418-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:06:12.378024-04
+325	2026-01-16 10:06:10.167437-04	CDU-101	FLOW_FEED	10333.11	1	2026-01-16 10:06:12.378024-04
+326	2026-01-16 10:06:10.167455-04	FCC-201	TEMP_REACTOR	484.88	1	2026-01-16 10:06:12.378024-04
+327	2026-01-16 10:06:10.167471-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:06:12.378024-04
+328	2026-01-16 10:06:10.167488-04	HT-301	TEMP_HYDRO	356.65	1	2026-01-16 10:06:12.378024-04
+329	2026-01-16 10:06:10.167504-04	HT-301	H2_PRESS	46.64	1	2026-01-16 10:06:12.378024-04
+330	2026-01-16 10:06:17.544049-04	CDU-101	TEMP_TOWER	422.8	1	2026-01-16 10:06:18.007316-04
+331	2026-01-16 10:06:17.544113-04	CDU-101	PRESS_TOWER	4.72	1	2026-01-16 10:06:18.007316-04
+332	2026-01-16 10:06:17.544131-04	CDU-101	FLOW_FEED	8988.96	1	2026-01-16 10:06:18.007316-04
+333	2026-01-16 10:06:17.544151-04	FCC-201	TEMP_REACTOR	510.25	1	2026-01-16 10:06:18.007316-04
+334	2026-01-16 10:06:17.544167-04	FCC-201	CATALYST_ACT	79.17	1	2026-01-16 10:06:18.007316-04
+335	2026-01-16 10:06:17.544182-04	HT-301	TEMP_HYDRO	352.5	1	2026-01-16 10:06:18.007316-04
+336	2026-01-16 10:06:17.544197-04	HT-301	H2_PRESS	38.57	1	2026-01-16 10:06:18.007316-04
+337	2026-01-16 10:06:23.066147-04	CDU-101	TEMP_TOWER	397.65	1	2026-01-16 10:06:23.270319-04
+338	2026-01-16 10:06:23.0662-04	CDU-101	PRESS_TOWER	4.14	1	2026-01-16 10:06:23.270319-04
+339	2026-01-16 10:06:23.066218-04	CDU-101	FLOW_FEED	9919.81	1	2026-01-16 10:06:23.270319-04
+340	2026-01-16 10:06:23.066234-04	FCC-201	TEMP_REACTOR	521.78	1	2026-01-16 10:06:23.270319-04
+341	2026-01-16 10:06:23.06625-04	FCC-201	CATALYST_ACT	71.31	1	2026-01-16 10:06:23.270319-04
+342	2026-01-16 10:06:23.066266-04	HT-301	TEMP_HYDRO	352.76	1	2026-01-16 10:06:23.270319-04
+343	2026-01-16 10:06:23.066281-04	HT-301	H2_PRESS	31.37	1	2026-01-16 10:06:23.270319-04
+344	2026-01-16 10:06:28.343391-04	CDU-101	TEMP_TOWER	435.81	1	2026-01-16 10:06:30.208065-04
+345	2026-01-16 10:06:28.343451-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:06:30.208065-04
+346	2026-01-16 10:06:28.343469-04	CDU-101	FLOW_FEED	9693.91	1	2026-01-16 10:06:30.208065-04
+347	2026-01-16 10:06:28.343486-04	FCC-201	TEMP_REACTOR	484.64	1	2026-01-16 10:06:30.208065-04
+348	2026-01-16 10:06:28.343505-04	FCC-201	CATALYST_ACT	85.37	1	2026-01-16 10:06:30.208065-04
+349	2026-01-16 10:06:28.343522-04	HT-301	TEMP_HYDRO	354.08	1	2026-01-16 10:06:30.208065-04
+350	2026-01-16 10:06:28.343539-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:06:30.208065-04
+351	2026-01-16 10:06:35.541447-04	CDU-101	TEMP_TOWER	375.52	1	2026-01-16 10:06:35.731474-04
+352	2026-01-16 10:06:35.541497-04	CDU-101	PRESS_TOWER	4.96	1	2026-01-16 10:06:35.731474-04
+353	2026-01-16 10:06:35.541514-04	CDU-101	FLOW_FEED	8197.28	1	2026-01-16 10:06:35.731474-04
+354	2026-01-16 10:06:35.54153-04	FCC-201	TEMP_REACTOR	527.99	1	2026-01-16 10:06:35.731474-04
+355	2026-01-16 10:06:35.541546-04	FCC-201	CATALYST_ACT	71.91	1	2026-01-16 10:06:35.731474-04
+356	2026-01-16 10:06:35.541562-04	HT-301	TEMP_HYDRO	333.35	1	2026-01-16 10:06:35.731474-04
+357	2026-01-16 10:06:35.541577-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:06:35.731474-04
+358	2026-01-16 10:06:40.871166-04	CDU-101	TEMP_TOWER	402.13	1	2026-01-16 10:06:41.369528-04
+359	2026-01-16 10:06:40.871217-04	CDU-101	PRESS_TOWER	3.92	1	2026-01-16 10:06:41.369528-04
+360	2026-01-16 10:06:40.871234-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:06:41.369528-04
+361	2026-01-16 10:06:40.871251-04	FCC-201	TEMP_REACTOR	539.43	1	2026-01-16 10:06:41.369528-04
+362	2026-01-16 10:06:40.871266-04	FCC-201	CATALYST_ACT	92.01	1	2026-01-16 10:06:41.369528-04
+363	2026-01-16 10:06:40.871282-04	HT-301	TEMP_HYDRO	348.91	1	2026-01-16 10:06:41.369528-04
+364	2026-01-16 10:06:40.871297-04	HT-301	H2_PRESS	37.72	1	2026-01-16 10:06:41.369528-04
+365	2026-01-16 10:06:46.410855-04	CDU-101	TEMP_TOWER	389.91	1	2026-01-16 10:06:46.618844-04
+366	2026-01-16 10:06:46.410904-04	CDU-101	PRESS_TOWER	4.73	1	2026-01-16 10:06:46.618844-04
+367	2026-01-16 10:06:46.410921-04	CDU-101	FLOW_FEED	10060.59	1	2026-01-16 10:06:46.618844-04
+368	2026-01-16 10:06:46.410937-04	FCC-201	TEMP_REACTOR	511.43	1	2026-01-16 10:06:46.618844-04
+369	2026-01-16 10:06:46.410952-04	FCC-201	CATALYST_ACT	91.93	1	2026-01-16 10:06:46.618844-04
+370	2026-01-16 10:06:46.410968-04	HT-301	TEMP_HYDRO	306.19	1	2026-01-16 10:06:46.618844-04
+371	2026-01-16 10:06:46.410983-04	HT-301	H2_PRESS	32.45	1	2026-01-16 10:06:46.618844-04
+372	2026-01-16 10:06:51.656548-04	CDU-101	TEMP_TOWER	414.53	1	2026-01-16 10:06:52.462667-04
+373	2026-01-16 10:06:51.656651-04	CDU-101	PRESS_TOWER	3.48	1	2026-01-16 10:06:52.462667-04
+374	2026-01-16 10:06:51.656671-04	CDU-101	FLOW_FEED	8093.31	1	2026-01-16 10:06:52.462667-04
+375	2026-01-16 10:06:51.656688-04	FCC-201	TEMP_REACTOR	521.92	1	2026-01-16 10:06:52.462667-04
+376	2026-01-16 10:06:51.656706-04	FCC-201	CATALYST_ACT	71.81	1	2026-01-16 10:06:52.462667-04
+377	2026-01-16 10:06:51.656723-04	HT-301	TEMP_HYDRO	337.82	1	2026-01-16 10:06:52.462667-04
+378	2026-01-16 10:06:51.656741-04	HT-301	H2_PRESS	48.36	1	2026-01-16 10:06:52.462667-04
+379	2026-01-16 10:06:57.530123-04	CDU-101	TEMP_TOWER	405.08	1	2026-01-16 10:06:58.679192-04
+380	2026-01-16 10:06:57.530237-04	CDU-101	PRESS_TOWER	2.71	1	2026-01-16 10:06:58.679192-04
+381	2026-01-16 10:06:57.530258-04	CDU-101	FLOW_FEED	10827.77	1	2026-01-16 10:06:58.679192-04
+382	2026-01-16 10:06:57.530279-04	FCC-201	TEMP_REACTOR	484.33	1	2026-01-16 10:06:58.679192-04
+383	2026-01-16 10:06:57.5303-04	FCC-201	CATALYST_ACT	93.03	1	2026-01-16 10:06:58.679192-04
+384	2026-01-16 10:06:57.530318-04	HT-301	TEMP_HYDRO	315.81	1	2026-01-16 10:06:58.679192-04
+385	2026-01-16 10:06:57.530337-04	HT-301	H2_PRESS	39.38	1	2026-01-16 10:06:58.679192-04
+386	2026-01-16 10:07:03.71444-04	CDU-101	TEMP_TOWER	435.11	1	2026-01-16 10:07:04.195054-04
+387	2026-01-16 10:07:03.714488-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:07:04.195054-04
+388	2026-01-16 10:07:03.714505-04	CDU-101	FLOW_FEED	8180.01	1	2026-01-16 10:07:04.195054-04
+389	2026-01-16 10:07:03.714522-04	FCC-201	TEMP_REACTOR	486.04	1	2026-01-16 10:07:04.195054-04
+390	2026-01-16 10:07:03.714537-04	FCC-201	CATALYST_ACT	87.04	1	2026-01-16 10:07:04.195054-04
+391	2026-01-16 10:07:03.714553-04	HT-301	TEMP_HYDRO	367.67	1	2026-01-16 10:07:04.195054-04
+392	2026-01-16 10:07:03.714568-04	HT-301	H2_PRESS	42.49	1	2026-01-16 10:07:04.195054-04
+393	2026-01-16 10:07:09.311177-04	CDU-101	TEMP_TOWER	412.37	1	2026-01-16 10:07:11.161039-04
+394	2026-01-16 10:07:09.311253-04	CDU-101	PRESS_TOWER	2.51	1	2026-01-16 10:07:11.161039-04
+395	2026-01-16 10:07:09.311271-04	CDU-101	FLOW_FEED	10679.76	1	2026-01-16 10:07:11.161039-04
+396	2026-01-16 10:07:09.311289-04	FCC-201	TEMP_REACTOR	519.01	1	2026-01-16 10:07:11.161039-04
+397	2026-01-16 10:07:09.311305-04	FCC-201	CATALYST_ACT	82.98	1	2026-01-16 10:07:11.161039-04
+398	2026-01-16 10:07:09.311324-04	HT-301	TEMP_HYDRO	378.81	1	2026-01-16 10:07:11.161039-04
+399	2026-01-16 10:07:09.31134-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:07:11.161039-04
+400	2026-01-16 10:07:16.35775-04	CDU-101	TEMP_TOWER	395.38	1	2026-01-16 10:07:16.865005-04
+401	2026-01-16 10:07:16.357815-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:07:16.865005-04
+402	2026-01-16 10:07:16.357835-04	CDU-101	FLOW_FEED	8029.76	1	2026-01-16 10:07:16.865005-04
+403	2026-01-16 10:07:16.357855-04	FCC-201	TEMP_REACTOR	495.99	1	2026-01-16 10:07:16.865005-04
+404	2026-01-16 10:07:16.357873-04	FCC-201	CATALYST_ACT	91.47	1	2026-01-16 10:07:16.865005-04
+405	2026-01-16 10:07:16.357892-04	HT-301	TEMP_HYDRO	340.32	1	2026-01-16 10:07:16.865005-04
+406	2026-01-16 10:07:16.35791-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:07:16.865005-04
+407	2026-01-16 10:07:21.905408-04	CDU-101	TEMP_TOWER	386.93	1	2026-01-16 10:07:22.224812-04
+408	2026-01-16 10:07:21.905455-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:07:22.224812-04
+409	2026-01-16 10:07:21.905472-04	CDU-101	FLOW_FEED	10315.72	1	2026-01-16 10:07:22.224812-04
+410	2026-01-16 10:07:21.905488-04	FCC-201	TEMP_REACTOR	490.09	1	2026-01-16 10:07:22.224812-04
+411	2026-01-16 10:07:21.905503-04	FCC-201	CATALYST_ACT	84.97	1	2026-01-16 10:07:22.224812-04
+412	2026-01-16 10:07:21.905519-04	HT-301	TEMP_HYDRO	343.96	1	2026-01-16 10:07:22.224812-04
+413	2026-01-16 10:07:21.905535-04	HT-301	H2_PRESS	33.3	1	2026-01-16 10:07:22.224812-04
+414	2026-01-16 10:07:27.357213-04	CDU-101	TEMP_TOWER	361.05	1	2026-01-16 10:07:27.835577-04
+415	2026-01-16 10:07:27.357272-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:07:27.835577-04
+416	2026-01-16 10:07:27.357292-04	CDU-101	FLOW_FEED	9837.49	1	2026-01-16 10:07:27.835577-04
+417	2026-01-16 10:07:27.35731-04	FCC-201	TEMP_REACTOR	494.78	1	2026-01-16 10:07:27.835577-04
+418	2026-01-16 10:07:27.357329-04	FCC-201	CATALYST_ACT	78.74	1	2026-01-16 10:07:27.835577-04
+419	2026-01-16 10:07:27.357347-04	HT-301	TEMP_HYDRO	327.25	1	2026-01-16 10:07:27.835577-04
+420	2026-01-16 10:07:27.357362-04	HT-301	H2_PRESS	32.07	1	2026-01-16 10:07:27.835577-04
+421	2026-01-16 10:07:32.87251-04	CDU-101	TEMP_TOWER	354.64	1	2026-01-16 10:07:35.629481-04
+422	2026-01-16 10:07:32.872573-04	CDU-101	PRESS_TOWER	3.57	1	2026-01-16 10:07:35.629481-04
+423	2026-01-16 10:07:32.872592-04	CDU-101	FLOW_FEED	9684.81	1	2026-01-16 10:07:35.629481-04
+424	2026-01-16 10:07:32.872609-04	FCC-201	TEMP_REACTOR	495.75	1	2026-01-16 10:07:35.629481-04
+425	2026-01-16 10:07:32.872625-04	FCC-201	CATALYST_ACT	72.72	1	2026-01-16 10:07:35.629481-04
+426	2026-01-16 10:07:32.872642-04	HT-301	TEMP_HYDRO	347.5	1	2026-01-16 10:07:35.629481-04
+427	2026-01-16 10:07:32.872658-04	HT-301	H2_PRESS	30.47	1	2026-01-16 10:07:35.629481-04
+428	2026-01-16 10:07:41.648851-04	CDU-101	TEMP_TOWER	390	1	2026-01-16 10:07:43.316851-04
+429	2026-01-16 10:07:41.648904-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:07:43.316851-04
+430	2026-01-16 10:07:41.648922-04	CDU-101	FLOW_FEED	10851.8	1	2026-01-16 10:07:43.316851-04
+431	2026-01-16 10:07:41.648941-04	FCC-201	TEMP_REACTOR	513.28	1	2026-01-16 10:07:43.316851-04
+432	2026-01-16 10:07:41.648957-04	FCC-201	CATALYST_ACT	78.97	1	2026-01-16 10:07:43.316851-04
+433	2026-01-16 10:07:41.648973-04	HT-301	TEMP_HYDRO	376.79	1	2026-01-16 10:07:43.316851-04
+434	2026-01-16 10:07:41.64899-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:07:43.316851-04
+435	2026-01-16 10:07:48.479585-04	CDU-101	TEMP_TOWER	391.32	1	2026-01-16 10:07:48.676279-04
+436	2026-01-16 10:07:48.479634-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:07:48.676279-04
+437	2026-01-16 10:07:48.479653-04	CDU-101	FLOW_FEED	11281.66	1	2026-01-16 10:07:48.676279-04
+438	2026-01-16 10:07:48.47967-04	FCC-201	TEMP_REACTOR	499.79	1	2026-01-16 10:07:48.676279-04
+439	2026-01-16 10:07:48.479685-04	FCC-201	CATALYST_ACT	83.13	1	2026-01-16 10:07:48.676279-04
+440	2026-01-16 10:07:48.479701-04	HT-301	TEMP_HYDRO	333.8	1	2026-01-16 10:07:48.676279-04
+441	2026-01-16 10:07:48.479716-04	HT-301	H2_PRESS	48.58	1	2026-01-16 10:07:48.676279-04
+442	2026-01-16 10:07:53.700453-04	CDU-101	TEMP_TOWER	422.67	1	2026-01-16 10:07:54.26598-04
+443	2026-01-16 10:07:53.700501-04	CDU-101	PRESS_TOWER	2.74	1	2026-01-16 10:07:54.26598-04
+444	2026-01-16 10:07:53.700519-04	CDU-101	FLOW_FEED	8007.86	1	2026-01-16 10:07:54.26598-04
+445	2026-01-16 10:07:53.700535-04	FCC-201	TEMP_REACTOR	507.45	1	2026-01-16 10:07:54.26598-04
+446	2026-01-16 10:07:53.700551-04	FCC-201	CATALYST_ACT	76.97	1	2026-01-16 10:07:54.26598-04
+447	2026-01-16 10:07:53.700567-04	HT-301	TEMP_HYDRO	316.26	1	2026-01-16 10:07:54.26598-04
+448	2026-01-16 10:07:53.700583-04	HT-301	H2_PRESS	32.17	1	2026-01-16 10:07:54.26598-04
+449	2026-01-16 10:07:59.318598-04	CDU-101	TEMP_TOWER	354.04	1	2026-01-16 10:07:59.574921-04
+450	2026-01-16 10:07:59.318661-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:07:59.574921-04
+451	2026-01-16 10:07:59.318681-04	CDU-101	FLOW_FEED	8760.45	1	2026-01-16 10:07:59.574921-04
+452	2026-01-16 10:07:59.318698-04	FCC-201	TEMP_REACTOR	508.73	1	2026-01-16 10:07:59.574921-04
+453	2026-01-16 10:07:59.318714-04	FCC-201	CATALYST_ACT	82.38	1	2026-01-16 10:07:59.574921-04
+454	2026-01-16 10:07:59.318733-04	HT-301	TEMP_HYDRO	353.31	1	2026-01-16 10:07:59.574921-04
+455	2026-01-16 10:07:59.318751-04	HT-301	H2_PRESS	43.91	1	2026-01-16 10:07:59.574921-04
+456	2026-01-16 10:08:04.6145-04	CDU-101	TEMP_TOWER	399.19	1	2026-01-16 10:08:05.151103-04
+457	2026-01-16 10:08:04.61456-04	CDU-101	PRESS_TOWER	2.97	1	2026-01-16 10:08:05.151103-04
+458	2026-01-16 10:08:04.614581-04	CDU-101	FLOW_FEED	9812.59	1	2026-01-16 10:08:05.151103-04
+459	2026-01-16 10:08:04.6146-04	FCC-201	TEMP_REACTOR	548.21	1	2026-01-16 10:08:05.151103-04
+460	2026-01-16 10:08:04.614617-04	FCC-201	CATALYST_ACT	90.3	1	2026-01-16 10:08:05.151103-04
+461	2026-01-16 10:08:04.614633-04	HT-301	TEMP_HYDRO	334.66	1	2026-01-16 10:08:05.151103-04
+462	2026-01-16 10:08:04.614649-04	HT-301	H2_PRESS	48.03	1	2026-01-16 10:08:05.151103-04
+463	2026-01-16 10:08:10.264078-04	CDU-101	TEMP_TOWER	431.23	1	2026-01-16 10:08:10.458495-04
+464	2026-01-16 10:08:10.264139-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:08:10.458495-04
+465	2026-01-16 10:08:10.26416-04	CDU-101	FLOW_FEED	11517.95	1	2026-01-16 10:08:10.458495-04
+466	2026-01-16 10:08:10.26418-04	FCC-201	TEMP_REACTOR	547.43	1	2026-01-16 10:08:10.458495-04
+467	2026-01-16 10:08:10.264196-04	FCC-201	CATALYST_ACT	84.28	1	2026-01-16 10:08:10.458495-04
+468	2026-01-16 10:08:10.264212-04	HT-301	TEMP_HYDRO	311.19	1	2026-01-16 10:08:10.458495-04
+469	2026-01-16 10:08:10.264227-04	HT-301	H2_PRESS	42.88	1	2026-01-16 10:08:10.458495-04
+470	2026-01-16 10:08:15.494727-04	CDU-101	TEMP_TOWER	380.68	1	2026-01-16 10:08:15.975589-04
+471	2026-01-16 10:08:15.494785-04	CDU-101	PRESS_TOWER	4.81	1	2026-01-16 10:08:15.975589-04
+472	2026-01-16 10:08:15.494803-04	CDU-101	FLOW_FEED	11878.68	1	2026-01-16 10:08:15.975589-04
+473	2026-01-16 10:08:15.49482-04	FCC-201	TEMP_REACTOR	510.84	1	2026-01-16 10:08:15.975589-04
+474	2026-01-16 10:08:15.494836-04	FCC-201	CATALYST_ACT	79.51	1	2026-01-16 10:08:15.975589-04
+475	2026-01-16 10:08:15.494853-04	HT-301	TEMP_HYDRO	371.52	1	2026-01-16 10:08:15.975589-04
+476	2026-01-16 10:08:15.494869-04	HT-301	H2_PRESS	47.32	1	2026-01-16 10:08:15.975589-04
+477	2026-01-16 10:08:21.027572-04	CDU-101	TEMP_TOWER	352.61	1	2026-01-16 10:08:21.244106-04
+478	2026-01-16 10:08:21.027619-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:08:21.244106-04
+479	2026-01-16 10:08:21.027637-04	CDU-101	FLOW_FEED	9103.04	1	2026-01-16 10:08:21.244106-04
+480	2026-01-16 10:08:21.027653-04	FCC-201	TEMP_REACTOR	480.04	1	2026-01-16 10:08:21.244106-04
+481	2026-01-16 10:08:21.027668-04	FCC-201	CATALYST_ACT	78.85	1	2026-01-16 10:08:21.244106-04
+482	2026-01-16 10:08:21.027683-04	HT-301	TEMP_HYDRO	376.51	1	2026-01-16 10:08:21.244106-04
+483	2026-01-16 10:08:21.027698-04	HT-301	H2_PRESS	38.93	1	2026-01-16 10:08:21.244106-04
+484	2026-01-16 10:08:32.018724-04	CDU-101	TEMP_TOWER	350.05	1	2026-01-16 10:08:34.47269-04
+485	2026-01-16 10:08:32.018787-04	CDU-101	PRESS_TOWER	2.53	1	2026-01-16 10:08:34.47269-04
+486	2026-01-16 10:08:32.018806-04	CDU-101	FLOW_FEED	9107.47	1	2026-01-16 10:08:34.47269-04
+487	2026-01-16 10:08:32.018826-04	FCC-201	TEMP_REACTOR	549.46	1	2026-01-16 10:08:34.47269-04
+488	2026-01-16 10:08:32.018842-04	FCC-201	CATALYST_ACT	82.26	1	2026-01-16 10:08:34.47269-04
+489	2026-01-16 10:08:32.018858-04	HT-301	TEMP_HYDRO	367.86	1	2026-01-16 10:08:34.47269-04
+490	2026-01-16 10:08:32.018874-04	HT-301	H2_PRESS	30.82	1	2026-01-16 10:08:34.47269-04
+491	2026-01-16 10:08:39.516184-04	CDU-101	TEMP_TOWER	419.2	1	2026-01-16 10:08:41.73235-04
+492	2026-01-16 10:08:39.516234-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:08:41.73235-04
+493	2026-01-16 10:08:39.516252-04	CDU-101	FLOW_FEED	9954	1	2026-01-16 10:08:41.73235-04
+494	2026-01-16 10:08:39.516268-04	FCC-201	TEMP_REACTOR	538.09	1	2026-01-16 10:08:41.73235-04
+495	2026-01-16 10:08:39.516284-04	FCC-201	CATALYST_ACT	72.78	1	2026-01-16 10:08:41.73235-04
+496	2026-01-16 10:08:39.516299-04	HT-301	TEMP_HYDRO	344.33	1	2026-01-16 10:08:41.73235-04
+497	2026-01-16 10:08:39.516314-04	HT-301	H2_PRESS	44.75	1	2026-01-16 10:08:41.73235-04
+498	2026-01-16 10:08:46.777615-04	CDU-101	TEMP_TOWER	379.07	1	2026-01-16 10:08:47.310346-04
+499	2026-01-16 10:08:46.777682-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 10:08:47.310346-04
+500	2026-01-16 10:08:46.777702-04	CDU-101	FLOW_FEED	10959.22	1	2026-01-16 10:08:47.310346-04
+501	2026-01-16 10:08:46.77772-04	FCC-201	TEMP_REACTOR	529.49	1	2026-01-16 10:08:47.310346-04
+502	2026-01-16 10:08:46.777741-04	FCC-201	CATALYST_ACT	85.67	1	2026-01-16 10:08:47.310346-04
+503	2026-01-16 10:08:46.777759-04	HT-301	TEMP_HYDRO	323.17	1	2026-01-16 10:08:47.310346-04
+504	2026-01-16 10:08:46.777776-04	HT-301	H2_PRESS	39.39	1	2026-01-16 10:08:47.310346-04
+505	2026-01-16 10:08:52.347689-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 10:08:52.542953-04
+506	2026-01-16 10:08:52.347737-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:52.542953-04
+507	2026-01-16 10:08:52.347754-04	CDU-101	FLOW_FEED	10036.84	1	2026-01-16 10:08:52.542953-04
+508	2026-01-16 10:08:52.347771-04	FCC-201	TEMP_REACTOR	529.18	1	2026-01-16 10:08:52.542953-04
+509	2026-01-16 10:08:52.347786-04	FCC-201	CATALYST_ACT	72.93	1	2026-01-16 10:08:52.542953-04
+510	2026-01-16 10:08:52.347801-04	HT-301	TEMP_HYDRO	362.29	1	2026-01-16 10:08:52.542953-04
+511	2026-01-16 10:08:52.347816-04	HT-301	H2_PRESS	36.72	1	2026-01-16 10:08:52.542953-04
+512	2026-01-16 10:08:57.58111-04	CDU-101	TEMP_TOWER	384.32	1	2026-01-16 10:08:58.030458-04
+513	2026-01-16 10:08:57.58117-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:58.030458-04
+514	2026-01-16 10:08:57.581189-04	CDU-101	FLOW_FEED	11213.62	1	2026-01-16 10:08:58.030458-04
+515	2026-01-16 10:08:57.581208-04	FCC-201	TEMP_REACTOR	505	1	2026-01-16 10:08:58.030458-04
+516	2026-01-16 10:08:57.581225-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:08:58.030458-04
+517	2026-01-16 10:08:57.581241-04	HT-301	TEMP_HYDRO	361.41	1	2026-01-16 10:08:58.030458-04
+518	2026-01-16 10:08:57.581257-04	HT-301	H2_PRESS	46.75	1	2026-01-16 10:08:58.030458-04
+519	2026-01-16 10:09:03.065275-04	CDU-101	TEMP_TOWER	427.32	1	2026-01-16 10:09:03.294004-04
+520	2026-01-16 10:09:03.065334-04	CDU-101	PRESS_TOWER	3.68	1	2026-01-16 10:09:03.294004-04
+521	2026-01-16 10:09:03.065354-04	CDU-101	FLOW_FEED	9069.18	1	2026-01-16 10:09:03.294004-04
+522	2026-01-16 10:09:03.065371-04	FCC-201	TEMP_REACTOR	514.13	1	2026-01-16 10:09:03.294004-04
+523	2026-01-16 10:09:03.065388-04	FCC-201	CATALYST_ACT	87.65	1	2026-01-16 10:09:03.294004-04
+524	2026-01-16 10:09:03.065404-04	HT-301	TEMP_HYDRO	330.91	1	2026-01-16 10:09:03.294004-04
+525	2026-01-16 10:09:03.065421-04	HT-301	H2_PRESS	49.02	1	2026-01-16 10:09:03.294004-04
+526	2026-01-16 10:09:08.32823-04	CDU-101	TEMP_TOWER	440.56	1	2026-01-16 10:09:08.794526-04
+527	2026-01-16 10:09:08.328293-04	CDU-101	PRESS_TOWER	4.08	1	2026-01-16 10:09:08.794526-04
+528	2026-01-16 10:09:08.328311-04	CDU-101	FLOW_FEED	11141.67	1	2026-01-16 10:09:08.794526-04
+529	2026-01-16 10:09:08.328328-04	FCC-201	TEMP_REACTOR	509.71	1	2026-01-16 10:09:08.794526-04
+530	2026-01-16 10:09:08.328343-04	FCC-201	CATALYST_ACT	83.15	1	2026-01-16 10:09:08.794526-04
+531	2026-01-16 10:09:08.328359-04	HT-301	TEMP_HYDRO	347.87	1	2026-01-16 10:09:08.794526-04
+532	2026-01-16 10:09:08.328374-04	HT-301	H2_PRESS	38.51	1	2026-01-16 10:09:08.794526-04
+533	2026-01-16 10:09:13.822302-04	CDU-101	TEMP_TOWER	359.04	1	2026-01-16 10:09:14.017219-04
+534	2026-01-16 10:09:13.82236-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:09:14.017219-04
+535	2026-01-16 10:09:13.82238-04	CDU-101	FLOW_FEED	10843.84	1	2026-01-16 10:09:14.017219-04
+536	2026-01-16 10:09:13.822397-04	FCC-201	TEMP_REACTOR	502.31	1	2026-01-16 10:09:14.017219-04
+537	2026-01-16 10:09:13.822414-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:09:14.017219-04
+538	2026-01-16 10:09:13.822429-04	HT-301	TEMP_HYDRO	326.07	1	2026-01-16 10:09:14.017219-04
+539	2026-01-16 10:09:13.822446-04	HT-301	H2_PRESS	47.76	1	2026-01-16 10:09:14.017219-04
+540	2026-01-16 10:09:19.041548-04	CDU-101	TEMP_TOWER	367.47	1	2026-01-16 10:09:19.57813-04
+541	2026-01-16 10:09:19.041619-04	CDU-101	PRESS_TOWER	4.17	1	2026-01-16 10:09:19.57813-04
+542	2026-01-16 10:09:19.041638-04	CDU-101	FLOW_FEED	11647.95	1	2026-01-16 10:09:19.57813-04
+543	2026-01-16 10:09:19.041656-04	FCC-201	TEMP_REACTOR	497.24	1	2026-01-16 10:09:19.57813-04
+544	2026-01-16 10:09:19.041675-04	FCC-201	CATALYST_ACT	74.56	1	2026-01-16 10:09:19.57813-04
+545	2026-01-16 10:09:19.041692-04	HT-301	TEMP_HYDRO	308.17	1	2026-01-16 10:09:19.57813-04
+546	2026-01-16 10:09:19.041708-04	HT-301	H2_PRESS	32.8	1	2026-01-16 10:09:19.57813-04
+547	2026-01-16 10:09:26.728146-04	CDU-101	TEMP_TOWER	394.08	1	2026-01-16 10:09:27.257851-04
+548	2026-01-16 10:09:26.728208-04	CDU-101	PRESS_TOWER	3	1	2026-01-16 10:09:27.257851-04
+549	2026-01-16 10:09:26.728228-04	CDU-101	FLOW_FEED	9999.6	1	2026-01-16 10:09:27.257851-04
+550	2026-01-16 10:09:26.728246-04	FCC-201	TEMP_REACTOR	511.66	1	2026-01-16 10:09:27.257851-04
+551	2026-01-16 10:09:26.728264-04	FCC-201	CATALYST_ACT	78.12	1	2026-01-16 10:09:27.257851-04
+552	2026-01-16 10:09:26.728282-04	HT-301	TEMP_HYDRO	308.16	1	2026-01-16 10:09:27.257851-04
+553	2026-01-16 10:09:26.728297-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:09:27.257851-04
+554	2026-01-16 10:09:32.433019-04	CDU-101	TEMP_TOWER	411.53	1	2026-01-16 10:09:33.051715-04
+555	2026-01-16 10:09:32.434329-04	CDU-101	PRESS_TOWER	4.02	1	2026-01-16 10:09:33.051715-04
+556	2026-01-16 10:09:32.4344-04	CDU-101	FLOW_FEED	9732.85	1	2026-01-16 10:09:33.051715-04
+557	2026-01-16 10:09:32.434422-04	FCC-201	TEMP_REACTOR	535.04	1	2026-01-16 10:09:33.051715-04
+558	2026-01-16 10:09:32.434441-04	FCC-201	CATALYST_ACT	74.52	1	2026-01-16 10:09:33.051715-04
+559	2026-01-16 10:09:32.434458-04	HT-301	TEMP_HYDRO	337.35	1	2026-01-16 10:09:33.051715-04
+560	2026-01-16 10:09:32.434477-04	HT-301	H2_PRESS	32.13	1	2026-01-16 10:09:33.051715-04
+561	2026-01-16 10:09:38.154915-04	CDU-101	TEMP_TOWER	417.95	1	2026-01-16 10:09:38.573307-04
+562	2026-01-16 10:09:38.154979-04	CDU-101	PRESS_TOWER	2.62	1	2026-01-16 10:09:38.573307-04
+563	2026-01-16 10:09:38.155-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:09:38.573307-04
+564	2026-01-16 10:09:38.15502-04	FCC-201	TEMP_REACTOR	512.54	1	2026-01-16 10:09:38.573307-04
+565	2026-01-16 10:09:38.155038-04	FCC-201	CATALYST_ACT	93.44	1	2026-01-16 10:09:38.573307-04
+566	2026-01-16 10:09:38.155055-04	HT-301	TEMP_HYDRO	331.92	1	2026-01-16 10:09:38.573307-04
+567	2026-01-16 10:09:38.155071-04	HT-301	H2_PRESS	39.82	1	2026-01-16 10:09:38.573307-04
+568	2026-01-16 10:09:43.743069-04	CDU-101	TEMP_TOWER	396.23	1	2026-01-16 10:09:44.473329-04
+569	2026-01-16 10:09:43.743134-04	CDU-101	PRESS_TOWER	3.76	1	2026-01-16 10:09:44.473329-04
+570	2026-01-16 10:09:43.743155-04	CDU-101	FLOW_FEED	10844.6	1	2026-01-16 10:09:44.473329-04
+571	2026-01-16 10:09:43.743174-04	FCC-201	TEMP_REACTOR	546.25	1	2026-01-16 10:09:44.473329-04
+572	2026-01-16 10:09:43.74319-04	FCC-201	CATALYST_ACT	89.77	1	2026-01-16 10:09:44.473329-04
+573	2026-01-16 10:09:43.743206-04	HT-301	TEMP_HYDRO	307.64	1	2026-01-16 10:09:44.473329-04
+574	2026-01-16 10:09:43.743221-04	HT-301	H2_PRESS	47.3	1	2026-01-16 10:09:44.473329-04
+575	2026-01-16 10:09:49.517626-04	CDU-101	TEMP_TOWER	436.52	1	2026-01-16 10:09:50.268867-04
+576	2026-01-16 10:09:49.517681-04	CDU-101	PRESS_TOWER	3.91	1	2026-01-16 10:09:50.268867-04
+577	2026-01-16 10:09:49.517699-04	CDU-101	FLOW_FEED	8288.3	1	2026-01-16 10:09:50.268867-04
+578	2026-01-16 10:09:49.517717-04	FCC-201	TEMP_REACTOR	545.04	1	2026-01-16 10:09:50.268867-04
+579	2026-01-16 10:09:49.517734-04	FCC-201	CATALYST_ACT	87.86	1	2026-01-16 10:09:50.268867-04
+580	2026-01-16 10:09:49.517751-04	HT-301	TEMP_HYDRO	317.1	1	2026-01-16 10:09:50.268867-04
+581	2026-01-16 10:09:49.517769-04	HT-301	H2_PRESS	37.75	1	2026-01-16 10:09:50.268867-04
+582	2026-01-16 10:09:55.383658-04	CDU-101	TEMP_TOWER	412.12	1	2026-01-16 10:09:56.078164-04
+583	2026-01-16 10:09:55.383717-04	CDU-101	PRESS_TOWER	4.34	1	2026-01-16 10:09:56.078164-04
+584	2026-01-16 10:09:55.383735-04	CDU-101	FLOW_FEED	10666.12	1	2026-01-16 10:09:56.078164-04
+585	2026-01-16 10:09:55.383754-04	FCC-201	TEMP_REACTOR	514.42	1	2026-01-16 10:09:56.078164-04
+586	2026-01-16 10:09:55.383771-04	FCC-201	CATALYST_ACT	78.62	1	2026-01-16 10:09:56.078164-04
+587	2026-01-16 10:09:55.383788-04	HT-301	TEMP_HYDRO	369.58	1	2026-01-16 10:09:56.078164-04
+588	2026-01-16 10:09:55.383803-04	HT-301	H2_PRESS	38.41	1	2026-01-16 10:09:56.078164-04
+589	2026-01-16 10:10:01.172685-04	CDU-101	TEMP_TOWER	430.63	1	2026-01-16 10:10:01.959461-04
+590	2026-01-16 10:10:01.172749-04	CDU-101	PRESS_TOWER	3.22	1	2026-01-16 10:10:01.959461-04
+591	2026-01-16 10:10:01.172769-04	CDU-101	FLOW_FEED	9679.78	1	2026-01-16 10:10:01.959461-04
+592	2026-01-16 10:10:01.172788-04	FCC-201	TEMP_REACTOR	491.99	1	2026-01-16 10:10:01.959461-04
+593	2026-01-16 10:10:01.172804-04	FCC-201	CATALYST_ACT	75.05	1	2026-01-16 10:10:01.959461-04
+594	2026-01-16 10:10:01.172821-04	HT-301	TEMP_HYDRO	362.35	1	2026-01-16 10:10:01.959461-04
+595	2026-01-16 10:10:01.172837-04	HT-301	H2_PRESS	48.29	1	2026-01-16 10:10:01.959461-04
+596	2026-01-16 10:10:07.453342-04	CDU-101	TEMP_TOWER	398.65	1	2026-01-16 10:10:09.175854-04
+597	2026-01-16 10:10:07.453401-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:10:09.175854-04
+598	2026-01-16 10:10:07.453419-04	CDU-101	FLOW_FEED	9660.72	1	2026-01-16 10:10:09.175854-04
+599	2026-01-16 10:10:07.453437-04	FCC-201	TEMP_REACTOR	519.1	1	2026-01-16 10:10:09.175854-04
+600	2026-01-16 10:10:07.453453-04	FCC-201	CATALYST_ACT	83.93	1	2026-01-16 10:10:09.175854-04
+601	2026-01-16 10:10:07.453469-04	HT-301	TEMP_HYDRO	325.93	1	2026-01-16 10:10:09.175854-04
+602	2026-01-16 10:10:07.453484-04	HT-301	H2_PRESS	44.51	1	2026-01-16 10:10:09.175854-04
+603	2026-01-16 10:10:14.263994-04	CDU-101	TEMP_TOWER	401.98	1	2026-01-16 10:10:14.602756-04
+604	2026-01-16 10:10:14.264055-04	CDU-101	PRESS_TOWER	2.89	1	2026-01-16 10:10:14.602756-04
+605	2026-01-16 10:10:14.264074-04	CDU-101	FLOW_FEED	9734.2	1	2026-01-16 10:10:14.602756-04
+606	2026-01-16 10:10:14.264092-04	FCC-201	TEMP_REACTOR	502.21	1	2026-01-16 10:10:14.602756-04
+607	2026-01-16 10:10:14.264109-04	FCC-201	CATALYST_ACT	71.14	1	2026-01-16 10:10:14.602756-04
+608	2026-01-16 10:10:14.264127-04	HT-301	TEMP_HYDRO	356.23	1	2026-01-16 10:10:14.602756-04
+609	2026-01-16 10:10:14.264143-04	HT-301	H2_PRESS	30.61	1	2026-01-16 10:10:14.602756-04
+610	2026-01-16 10:10:19.702369-04	CDU-101	TEMP_TOWER	388.23	1	2026-01-16 10:10:20.276746-04
+611	2026-01-16 10:10:19.702425-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:10:20.276746-04
+612	2026-01-16 10:10:19.702442-04	CDU-101	FLOW_FEED	10559.28	1	2026-01-16 10:10:20.276746-04
+613	2026-01-16 10:10:19.702459-04	FCC-201	TEMP_REACTOR	534.34	1	2026-01-16 10:10:20.276746-04
+614	2026-01-16 10:10:19.702475-04	FCC-201	CATALYST_ACT	90.06	1	2026-01-16 10:10:20.276746-04
+615	2026-01-16 10:10:19.702491-04	HT-301	TEMP_HYDRO	308.75	1	2026-01-16 10:10:20.276746-04
+616	2026-01-16 10:10:19.702507-04	HT-301	H2_PRESS	38.2	1	2026-01-16 10:10:20.276746-04
+617	2026-01-16 10:10:25.39917-04	CDU-101	TEMP_TOWER	406.84	1	2026-01-16 10:10:25.788487-04
+618	2026-01-16 10:10:25.399227-04	CDU-101	PRESS_TOWER	3.56	1	2026-01-16 10:10:25.788487-04
+619	2026-01-16 10:10:25.399246-04	CDU-101	FLOW_FEED	10291.69	1	2026-01-16 10:10:25.788487-04
+620	2026-01-16 10:10:25.399263-04	FCC-201	TEMP_REACTOR	481.65	1	2026-01-16 10:10:25.788487-04
+621	2026-01-16 10:10:25.399279-04	FCC-201	CATALYST_ACT	77.4	1	2026-01-16 10:10:25.788487-04
+622	2026-01-16 10:10:25.399296-04	HT-301	TEMP_HYDRO	314.25	1	2026-01-16 10:10:25.788487-04
+623	2026-01-16 10:10:25.399312-04	HT-301	H2_PRESS	37.23	1	2026-01-16 10:10:25.788487-04
+624	2026-01-16 10:10:30.898369-04	CDU-101	TEMP_TOWER	410.52	1	2026-01-16 10:10:31.546032-04
+625	2026-01-16 10:10:30.898444-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:10:31.546032-04
+626	2026-01-16 10:10:30.898465-04	CDU-101	FLOW_FEED	11087.77	1	2026-01-16 10:10:31.546032-04
+627	2026-01-16 10:10:30.898484-04	FCC-201	TEMP_REACTOR	487.2	1	2026-01-16 10:10:31.546032-04
+628	2026-01-16 10:10:30.898502-04	FCC-201	CATALYST_ACT	82.46	1	2026-01-16 10:10:31.546032-04
+629	2026-01-16 10:10:30.898519-04	HT-301	TEMP_HYDRO	345.89	1	2026-01-16 10:10:31.546032-04
+630	2026-01-16 10:10:30.898536-04	HT-301	H2_PRESS	37.99	1	2026-01-16 10:10:31.546032-04
+631	2026-01-16 10:10:36.626385-04	CDU-101	TEMP_TOWER	365.5	1	2026-01-16 10:10:36.904497-04
+632	2026-01-16 10:10:36.626437-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:10:36.904497-04
+633	2026-01-16 10:10:36.626454-04	CDU-101	FLOW_FEED	9603.14	1	2026-01-16 10:10:36.904497-04
+634	2026-01-16 10:10:36.626472-04	FCC-201	TEMP_REACTOR	515.26	1	2026-01-16 10:10:36.904497-04
+635	2026-01-16 10:10:36.626487-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 10:10:36.904497-04
+636	2026-01-16 10:10:36.626504-04	HT-301	TEMP_HYDRO	306.97	1	2026-01-16 10:10:36.904497-04
+637	2026-01-16 10:10:36.626521-04	HT-301	H2_PRESS	31.17	1	2026-01-16 10:10:36.904497-04
+638	2026-01-16 10:10:41.937432-04	CDU-101	TEMP_TOWER	438.93	1	2026-01-16 10:10:42.485514-04
+639	2026-01-16 10:10:41.937493-04	CDU-101	PRESS_TOWER	4.63	1	2026-01-16 10:10:42.485514-04
+640	2026-01-16 10:10:41.937513-04	CDU-101	FLOW_FEED	8685.25	1	2026-01-16 10:10:42.485514-04
+641	2026-01-16 10:10:41.93753-04	FCC-201	TEMP_REACTOR	543.37	1	2026-01-16 10:10:42.485514-04
+642	2026-01-16 10:10:41.937548-04	FCC-201	CATALYST_ACT	79.91	1	2026-01-16 10:10:42.485514-04
+643	2026-01-16 10:10:41.937566-04	HT-301	TEMP_HYDRO	354.33	1	2026-01-16 10:10:42.485514-04
+644	2026-01-16 10:10:41.937584-04	HT-301	H2_PRESS	30.19	1	2026-01-16 10:10:42.485514-04
+645	2026-01-16 10:10:47.548803-04	CDU-101	TEMP_TOWER	354.38	1	2026-01-16 10:10:48.188065-04
+646	2026-01-16 10:10:47.548871-04	CDU-101	PRESS_TOWER	4.55	1	2026-01-16 10:10:48.188065-04
+647	2026-01-16 10:10:47.548889-04	CDU-101	FLOW_FEED	8589.09	1	2026-01-16 10:10:48.188065-04
+648	2026-01-16 10:10:47.548907-04	FCC-201	TEMP_REACTOR	534.62	1	2026-01-16 10:10:48.188065-04
+649	2026-01-16 10:10:47.548923-04	FCC-201	CATALYST_ACT	84.66	1	2026-01-16 10:10:48.188065-04
+650	2026-01-16 10:10:47.54894-04	HT-301	TEMP_HYDRO	359.7	1	2026-01-16 10:10:48.188065-04
+651	2026-01-16 10:10:47.548957-04	HT-301	H2_PRESS	42.57	1	2026-01-16 10:10:48.188065-04
+652	2026-01-16 10:10:53.249152-04	CDU-101	TEMP_TOWER	364.57	1	2026-01-16 10:10:54.766173-04
+653	2026-01-16 10:10:53.249217-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:10:54.766173-04
+654	2026-01-16 10:10:53.249237-04	CDU-101	FLOW_FEED	8482.94	1	2026-01-16 10:10:54.766173-04
+655	2026-01-16 10:10:53.249256-04	FCC-201	TEMP_REACTOR	505.02	1	2026-01-16 10:10:54.766173-04
+656	2026-01-16 10:10:53.249273-04	FCC-201	CATALYST_ACT	88.07	1	2026-01-16 10:10:54.766173-04
+657	2026-01-16 10:10:53.249292-04	HT-301	TEMP_HYDRO	358.76	1	2026-01-16 10:10:54.766173-04
+658	2026-01-16 10:10:53.249309-04	HT-301	H2_PRESS	36.92	1	2026-01-16 10:10:54.766173-04
+659	2026-01-16 10:11:00.012543-04	CDU-101	TEMP_TOWER	352.79	1	2026-01-16 10:11:00.345359-04
+660	2026-01-16 10:11:00.012603-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:11:00.345359-04
+661	2026-01-16 10:11:00.012624-04	CDU-101	FLOW_FEED	8288.23	1	2026-01-16 10:11:00.345359-04
+662	2026-01-16 10:11:00.012642-04	FCC-201	TEMP_REACTOR	527.23	1	2026-01-16 10:11:00.345359-04
+663	2026-01-16 10:11:00.012658-04	FCC-201	CATALYST_ACT	70.65	1	2026-01-16 10:11:00.345359-04
+664	2026-01-16 10:11:00.012675-04	HT-301	TEMP_HYDRO	308.32	1	2026-01-16 10:11:00.345359-04
+665	2026-01-16 10:11:00.012692-04	HT-301	H2_PRESS	34.55	1	2026-01-16 10:11:00.345359-04
+666	2026-01-16 10:11:05.426656-04	CDU-101	TEMP_TOWER	359.96	1	2026-01-16 10:11:05.959417-04
+667	2026-01-16 10:11:05.426709-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:11:05.959417-04
+668	2026-01-16 10:11:05.426726-04	CDU-101	FLOW_FEED	11029.8	1	2026-01-16 10:11:05.959417-04
+669	2026-01-16 10:11:05.426742-04	FCC-201	TEMP_REACTOR	488.54	1	2026-01-16 10:11:05.959417-04
+670	2026-01-16 10:11:05.426758-04	FCC-201	CATALYST_ACT	83.4	1	2026-01-16 10:11:05.959417-04
+671	2026-01-16 10:11:05.426774-04	HT-301	TEMP_HYDRO	342.4	1	2026-01-16 10:11:05.959417-04
+672	2026-01-16 10:11:05.42679-04	HT-301	H2_PRESS	47.82	1	2026-01-16 10:11:05.959417-04
+673	2026-01-16 10:11:11.007003-04	CDU-101	TEMP_TOWER	434.59	1	2026-01-16 10:11:11.258225-04
+674	2026-01-16 10:11:11.007067-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:11:11.258225-04
+675	2026-01-16 10:11:11.007088-04	CDU-101	FLOW_FEED	10612.94	1	2026-01-16 10:11:11.258225-04
+676	2026-01-16 10:11:11.007107-04	FCC-201	TEMP_REACTOR	545.96	1	2026-01-16 10:11:11.258225-04
+677	2026-01-16 10:11:11.007125-04	FCC-201	CATALYST_ACT	77.1	1	2026-01-16 10:11:11.258225-04
+678	2026-01-16 10:11:11.007143-04	HT-301	TEMP_HYDRO	327.44	1	2026-01-16 10:11:11.258225-04
+679	2026-01-16 10:11:11.007161-04	HT-301	H2_PRESS	41.21	1	2026-01-16 10:11:11.258225-04
+680	2026-01-16 10:22:31.026173-04	CDU-101	TEMP_TOWER	358.98	1	2026-01-16 10:22:33.358948-04
+681	2026-01-16 10:22:31.026253-04	CDU-101	PRESS_TOWER	3.08	1	2026-01-16 10:22:33.358948-04
+682	2026-01-16 10:22:31.026279-04	CDU-101	FLOW_FEED	10326.75	1	2026-01-16 10:22:33.358948-04
+683	2026-01-16 10:22:31.026301-04	FCC-201	TEMP_REACTOR	531.72	1	2026-01-16 10:22:33.358948-04
+684	2026-01-16 10:22:31.02632-04	FCC-201	CATALYST_ACT	85.4	1	2026-01-16 10:22:33.358948-04
+685	2026-01-16 10:22:31.026339-04	HT-301	TEMP_HYDRO	340.9	1	2026-01-16 10:22:33.358948-04
+686	2026-01-16 10:22:31.026357-04	HT-301	H2_PRESS	49.04	1	2026-01-16 10:22:33.358948-04
+687	2026-01-16 10:22:39.426801-04	CDU-101	TEMP_TOWER	440.3	1	2026-01-16 10:22:39.634186-04
+688	2026-01-16 10:22:39.42685-04	CDU-101	PRESS_TOWER	3.16	1	2026-01-16 10:22:39.634186-04
+689	2026-01-16 10:22:39.426867-04	CDU-101	FLOW_FEED	10129	1	2026-01-16 10:22:39.634186-04
+690	2026-01-16 10:22:39.426883-04	FCC-201	TEMP_REACTOR	519.24	1	2026-01-16 10:22:39.634186-04
+691	2026-01-16 10:22:39.426899-04	FCC-201	CATALYST_ACT	90.96	1	2026-01-16 10:22:39.634186-04
+692	2026-01-16 10:22:39.426915-04	HT-301	TEMP_HYDRO	320.38	1	2026-01-16 10:22:39.634186-04
+693	2026-01-16 10:22:39.42693-04	HT-301	H2_PRESS	36.82	1	2026-01-16 10:22:39.634186-04
+694	2026-01-16 10:22:44.762972-04	CDU-101	TEMP_TOWER	416.18	1	2026-01-16 10:22:45.213068-04
+695	2026-01-16 10:22:44.763025-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:22:45.213068-04
+696	2026-01-16 10:22:44.763042-04	CDU-101	FLOW_FEED	11696.57	1	2026-01-16 10:22:45.213068-04
+697	2026-01-16 10:22:44.76306-04	FCC-201	TEMP_REACTOR	486.74	1	2026-01-16 10:22:45.213068-04
+698	2026-01-16 10:22:44.763076-04	FCC-201	CATALYST_ACT	93.27	1	2026-01-16 10:22:45.213068-04
+699	2026-01-16 10:22:44.763093-04	HT-301	TEMP_HYDRO	308.53	1	2026-01-16 10:22:45.213068-04
+700	2026-01-16 10:22:44.763109-04	HT-301	H2_PRESS	42.9	1	2026-01-16 10:22:45.213068-04
+701	2026-01-16 10:22:50.273965-04	CDU-101	TEMP_TOWER	420.77	1	2026-01-16 10:22:52.507711-04
+702	2026-01-16 10:22:50.274021-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:22:52.507711-04
+703	2026-01-16 10:22:50.274039-04	CDU-101	FLOW_FEED	8544.89	1	2026-01-16 10:22:52.507711-04
+704	2026-01-16 10:22:50.274056-04	FCC-201	TEMP_REACTOR	518.24	1	2026-01-16 10:22:52.507711-04
+705	2026-01-16 10:22:50.274073-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:22:52.507711-04
+706	2026-01-16 10:22:50.274092-04	HT-301	TEMP_HYDRO	352.22	1	2026-01-16 10:22:52.507711-04
+707	2026-01-16 10:22:50.27411-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:22:52.507711-04
+708	2026-01-16 10:22:57.55014-04	CDU-101	TEMP_TOWER	444.5	1	2026-01-16 10:23:00.071391-04
+709	2026-01-16 10:22:57.550193-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:23:00.071391-04
+710	2026-01-16 10:22:57.550211-04	CDU-101	FLOW_FEED	8955.9	1	2026-01-16 10:23:00.071391-04
+711	2026-01-16 10:22:57.550228-04	FCC-201	TEMP_REACTOR	482.05	1	2026-01-16 10:23:00.071391-04
+712	2026-01-16 10:22:57.550244-04	FCC-201	CATALYST_ACT	94.06	1	2026-01-16 10:23:00.071391-04
+713	2026-01-16 10:22:57.550261-04	HT-301	TEMP_HYDRO	352.7	1	2026-01-16 10:23:00.071391-04
+714	2026-01-16 10:22:57.550277-04	HT-301	H2_PRESS	38.07	1	2026-01-16 10:23:00.071391-04
+715	2026-01-16 10:23:09.820166-04	CDU-101	TEMP_TOWER	381.8	1	2026-01-16 10:23:12.875869-04
+716	2026-01-16 10:23:09.82023-04	CDU-101	PRESS_TOWER	4.69	1	2026-01-16 10:23:12.875869-04
+717	2026-01-16 10:23:09.820249-04	CDU-101	FLOW_FEED	11129.83	1	2026-01-16 10:23:12.875869-04
+718	2026-01-16 10:23:09.820268-04	FCC-201	TEMP_REACTOR	544.36	1	2026-01-16 10:23:12.875869-04
+719	2026-01-16 10:23:09.820285-04	FCC-201	CATALYST_ACT	78.46	1	2026-01-16 10:23:12.875869-04
+720	2026-01-16 10:23:09.820303-04	HT-301	TEMP_HYDRO	305.24	1	2026-01-16 10:23:12.875869-04
+721	2026-01-16 10:23:09.820319-04	HT-301	H2_PRESS	43.74	1	2026-01-16 10:23:12.875869-04
+722	2026-01-16 10:23:17.917636-04	CDU-101	TEMP_TOWER	371.72	1	2026-01-16 10:23:20.163172-04
+723	2026-01-16 10:23:17.917705-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:23:20.163172-04
+724	2026-01-16 10:23:17.917722-04	CDU-101	FLOW_FEED	11924.52	1	2026-01-16 10:23:20.163172-04
+725	2026-01-16 10:23:17.917741-04	FCC-201	TEMP_REACTOR	505.61	1	2026-01-16 10:23:20.163172-04
+726	2026-01-16 10:23:17.917759-04	FCC-201	CATALYST_ACT	89.61	1	2026-01-16 10:23:20.163172-04
+727	2026-01-16 10:23:17.917778-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:23:20.163172-04
+728	2026-01-16 10:23:17.917795-04	HT-301	H2_PRESS	35.92	1	2026-01-16 10:23:20.163172-04
+729	2026-01-16 10:23:25.213596-04	CDU-101	TEMP_TOWER	371.21	1	2026-01-16 10:23:27.858328-04
+730	2026-01-16 10:23:25.213661-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:23:27.858328-04
+731	2026-01-16 10:23:25.213681-04	CDU-101	FLOW_FEED	11264.42	1	2026-01-16 10:23:27.858328-04
+732	2026-01-16 10:23:25.213702-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:23:27.858328-04
+733	2026-01-16 10:23:25.213719-04	FCC-201	CATALYST_ACT	73.28	1	2026-01-16 10:23:27.858328-04
+734	2026-01-16 10:23:25.213736-04	HT-301	TEMP_HYDRO	304.66	1	2026-01-16 10:23:27.858328-04
+735	2026-01-16 10:23:25.213752-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:23:27.858328-04
+736	2026-01-16 10:23:32.904164-04	CDU-101	TEMP_TOWER	445.75	1	2026-01-16 10:23:33.246675-04
+737	2026-01-16 10:23:32.904218-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:23:33.246675-04
+738	2026-01-16 10:23:32.904235-04	CDU-101	FLOW_FEED	10727.24	1	2026-01-16 10:23:33.246675-04
+739	2026-01-16 10:23:32.904252-04	FCC-201	TEMP_REACTOR	547.9	1	2026-01-16 10:23:33.246675-04
+740	2026-01-16 10:23:32.904268-04	FCC-201	CATALYST_ACT	80.09	1	2026-01-16 10:23:33.246675-04
+741	2026-01-16 10:23:32.904284-04	HT-301	TEMP_HYDRO	327.38	1	2026-01-16 10:23:33.246675-04
+742	2026-01-16 10:23:32.904299-04	HT-301	H2_PRESS	48.61	1	2026-01-16 10:23:33.246675-04
+743	2026-01-16 10:23:38.275745-04	CDU-101	TEMP_TOWER	409.25	1	2026-01-16 10:23:40.867905-04
+744	2026-01-16 10:23:38.275807-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:23:40.867905-04
+745	2026-01-16 10:23:38.275826-04	CDU-101	FLOW_FEED	8468.85	1	2026-01-16 10:23:40.867905-04
+746	2026-01-16 10:23:38.275845-04	FCC-201	TEMP_REACTOR	539.57	1	2026-01-16 10:23:40.867905-04
+747	2026-01-16 10:23:38.27586-04	FCC-201	CATALYST_ACT	87.58	1	2026-01-16 10:23:40.867905-04
+748	2026-01-16 10:23:38.275877-04	HT-301	TEMP_HYDRO	338.61	1	2026-01-16 10:23:40.867905-04
+749	2026-01-16 10:23:38.275892-04	HT-301	H2_PRESS	41.75	1	2026-01-16 10:23:40.867905-04
+750	2026-01-16 10:23:45.946101-04	CDU-101	TEMP_TOWER	383.69	1	2026-01-16 10:23:46.231207-04
+751	2026-01-16 10:23:45.946159-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:23:46.231207-04
+752	2026-01-16 10:23:45.946177-04	CDU-101	FLOW_FEED	9468	1	2026-01-16 10:23:46.231207-04
+753	2026-01-16 10:23:45.946195-04	FCC-201	TEMP_REACTOR	491.29	1	2026-01-16 10:23:46.231207-04
+754	2026-01-16 10:23:45.946211-04	FCC-201	CATALYST_ACT	74.68	1	2026-01-16 10:23:46.231207-04
+755	2026-01-16 10:23:45.946227-04	HT-301	TEMP_HYDRO	338.66	1	2026-01-16 10:23:46.231207-04
+756	2026-01-16 10:23:45.946244-04	HT-301	H2_PRESS	39.52	1	2026-01-16 10:23:46.231207-04
+757	2026-01-16 10:23:51.263802-04	CDU-101	TEMP_TOWER	423.45	1	2026-01-16 10:23:51.80562-04
+758	2026-01-16 10:23:51.265008-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:23:51.80562-04
+759	2026-01-16 10:23:51.265086-04	CDU-101	FLOW_FEED	9566.36	1	2026-01-16 10:23:51.80562-04
+760	2026-01-16 10:23:51.265108-04	FCC-201	TEMP_REACTOR	492.29	1	2026-01-16 10:23:51.80562-04
+761	2026-01-16 10:23:51.265127-04	FCC-201	CATALYST_ACT	77.5	1	2026-01-16 10:23:51.80562-04
+762	2026-01-16 10:23:51.265145-04	HT-301	TEMP_HYDRO	300.93	1	2026-01-16 10:23:51.80562-04
+763	2026-01-16 10:23:51.265163-04	HT-301	H2_PRESS	48.18	1	2026-01-16 10:23:51.80562-04
+764	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:07.10153-04
+765	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:07.10153-04
+766	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:07.10153-04
+767	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:07.10153-04
+768	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:07.10153-04
+769	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:07.10153-04
+770	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:07.10153-04
+771	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:09.662083-04
+772	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:09.662083-04
+773	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:09.662083-04
+774	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:09.662083-04
+775	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:09.662083-04
+776	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:09.662083-04
+777	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:09.662083-04
+778	2026-01-16 10:24:14.922041-04	CDU-101	TEMP_TOWER	410.66	1	2026-01-16 10:24:15.125166-04
+779	2026-01-16 10:24:14.922107-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:24:15.125166-04
+780	2026-01-16 10:24:14.922168-04	CDU-101	FLOW_FEED	10547.47	1	2026-01-16 10:24:15.125166-04
+781	2026-01-16 10:24:14.922189-04	FCC-201	TEMP_REACTOR	526.99	1	2026-01-16 10:24:15.125166-04
+782	2026-01-16 10:24:14.922205-04	FCC-201	CATALYST_ACT	78.75	1	2026-01-16 10:24:15.125166-04
+783	2026-01-16 10:24:14.922225-04	HT-301	TEMP_HYDRO	325.18	1	2026-01-16 10:24:15.125166-04
+784	2026-01-16 10:24:14.922241-04	HT-301	H2_PRESS	47.97	1	2026-01-16 10:24:15.125166-04
+785	2026-01-16 10:24:20.192866-04	CDU-101	TEMP_TOWER	353.73	1	2026-01-16 10:24:20.683471-04
+786	2026-01-16 10:24:20.192923-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:24:20.683471-04
+787	2026-01-16 10:24:20.19294-04	CDU-101	FLOW_FEED	8834.56	1	2026-01-16 10:24:20.683471-04
+788	2026-01-16 10:24:20.192957-04	FCC-201	TEMP_REACTOR	495.19	1	2026-01-16 10:24:20.683471-04
+789	2026-01-16 10:24:20.192972-04	FCC-201	CATALYST_ACT	86.04	1	2026-01-16 10:24:20.683471-04
+790	2026-01-16 10:24:20.192987-04	HT-301	TEMP_HYDRO	368.94	1	2026-01-16 10:24:20.683471-04
+791	2026-01-16 10:24:20.193001-04	HT-301	H2_PRESS	39.98	1	2026-01-16 10:24:20.683471-04
+792	2026-01-16 10:24:25.723755-04	CDU-101	TEMP_TOWER	408.59	1	2026-01-16 10:24:25.921512-04
+793	2026-01-16 10:24:25.723802-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:24:25.921512-04
+794	2026-01-16 10:24:25.723819-04	CDU-101	FLOW_FEED	10353.57	1	2026-01-16 10:24:25.921512-04
+795	2026-01-16 10:24:25.723836-04	FCC-201	TEMP_REACTOR	536.57	1	2026-01-16 10:24:25.921512-04
+796	2026-01-16 10:24:25.72385-04	FCC-201	CATALYST_ACT	70.85	1	2026-01-16 10:24:25.921512-04
+797	2026-01-16 10:24:25.723866-04	HT-301	TEMP_HYDRO	335.36	1	2026-01-16 10:24:25.921512-04
+798	2026-01-16 10:24:25.72388-04	HT-301	H2_PRESS	46.27	1	2026-01-16 10:24:25.921512-04
+799	2026-01-16 10:24:30.972691-04	CDU-101	TEMP_TOWER	418.73	1	2026-01-16 10:24:33.439834-04
+800	2026-01-16 10:24:30.972748-04	CDU-101	PRESS_TOWER	4.26	1	2026-01-16 10:24:33.439834-04
+801	2026-01-16 10:24:30.972767-04	CDU-101	FLOW_FEED	8943.52	1	2026-01-16 10:24:33.439834-04
+802	2026-01-16 10:24:30.972785-04	FCC-201	TEMP_REACTOR	490.15	1	2026-01-16 10:24:33.439834-04
+803	2026-01-16 10:24:30.972802-04	FCC-201	CATALYST_ACT	88.79	1	2026-01-16 10:24:33.439834-04
+804	2026-01-16 10:24:30.972818-04	HT-301	TEMP_HYDRO	372.1	1	2026-01-16 10:24:33.439834-04
+805	2026-01-16 10:24:30.972834-04	HT-301	H2_PRESS	34.99	1	2026-01-16 10:24:33.439834-04
+806	2026-01-16 10:24:38.48167-04	CDU-101	TEMP_TOWER	436.15	1	2026-01-16 10:24:38.679329-04
+807	2026-01-16 10:24:38.481719-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:24:38.679329-04
+808	2026-01-16 10:24:38.481735-04	CDU-101	FLOW_FEED	10006.84	1	2026-01-16 10:24:38.679329-04
+809	2026-01-16 10:24:38.481752-04	FCC-201	TEMP_REACTOR	482.7	1	2026-01-16 10:24:38.679329-04
+810	2026-01-16 10:24:38.481767-04	FCC-201	CATALYST_ACT	85.82	1	2026-01-16 10:24:38.679329-04
+811	2026-01-16 10:24:38.481782-04	HT-301	TEMP_HYDRO	360.97	1	2026-01-16 10:24:38.679329-04
+812	2026-01-16 10:24:38.481797-04	HT-301	H2_PRESS	43.11	1	2026-01-16 10:24:38.679329-04
+813	2026-01-16 10:24:43.705794-04	CDU-101	TEMP_TOWER	401.51	1	2026-01-16 10:24:44.171045-04
+814	2026-01-16 10:24:43.705842-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:24:44.171045-04
+815	2026-01-16 10:24:43.705858-04	CDU-101	FLOW_FEED	9772.79	1	2026-01-16 10:24:44.171045-04
+816	2026-01-16 10:24:43.705874-04	FCC-201	TEMP_REACTOR	493.79	1	2026-01-16 10:24:44.171045-04
+817	2026-01-16 10:24:43.705889-04	FCC-201	CATALYST_ACT	70.86	1	2026-01-16 10:24:44.171045-04
+818	2026-01-16 10:24:43.705904-04	HT-301	TEMP_HYDRO	300.42	1	2026-01-16 10:24:44.171045-04
+819	2026-01-16 10:24:43.705919-04	HT-301	H2_PRESS	33.5	1	2026-01-16 10:24:44.171045-04
+820	2026-01-16 10:24:49.207696-04	CDU-101	TEMP_TOWER	438.37	1	2026-01-16 10:24:49.404001-04
+821	2026-01-16 10:24:49.207741-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:24:49.404001-04
+822	2026-01-16 10:24:49.207758-04	CDU-101	FLOW_FEED	9095.93	1	2026-01-16 10:24:49.404001-04
+823	2026-01-16 10:24:49.207774-04	FCC-201	TEMP_REACTOR	508.84	1	2026-01-16 10:24:49.404001-04
+824	2026-01-16 10:24:49.207789-04	FCC-201	CATALYST_ACT	71.28	1	2026-01-16 10:24:49.404001-04
+825	2026-01-16 10:24:49.207804-04	HT-301	TEMP_HYDRO	312.47	1	2026-01-16 10:24:49.404001-04
+826	2026-01-16 10:24:49.207819-04	HT-301	H2_PRESS	40.83	1	2026-01-16 10:24:49.404001-04
+827	2026-01-16 10:24:54.441585-04	CDU-101	TEMP_TOWER	365.77	1	2026-01-16 10:24:56.924932-04
+828	2026-01-16 10:24:54.441641-04	CDU-101	PRESS_TOWER	3.74	1	2026-01-16 10:24:56.924932-04
+829	2026-01-16 10:24:54.441727-04	CDU-101	FLOW_FEED	11448.45	1	2026-01-16 10:24:56.924932-04
+830	2026-01-16 10:24:54.441759-04	FCC-201	TEMP_REACTOR	519.71	1	2026-01-16 10:24:56.924932-04
+831	2026-01-16 10:24:54.441778-04	FCC-201	CATALYST_ACT	73.81	1	2026-01-16 10:24:56.924932-04
+832	2026-01-16 10:24:54.441822-04	HT-301	TEMP_HYDRO	312.68	1	2026-01-16 10:24:56.924932-04
+833	2026-01-16 10:24:54.441848-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:24:56.924932-04
+834	2026-01-16 10:25:01.958688-04	CDU-101	TEMP_TOWER	436.54	1	2026-01-16 10:25:02.153953-04
+835	2026-01-16 10:25:01.958734-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:25:02.153953-04
+836	2026-01-16 10:25:01.958751-04	CDU-101	FLOW_FEED	8121.98	1	2026-01-16 10:25:02.153953-04
+837	2026-01-16 10:25:01.958767-04	FCC-201	TEMP_REACTOR	519.88	1	2026-01-16 10:25:02.153953-04
+838	2026-01-16 10:25:01.958782-04	FCC-201	CATALYST_ACT	87.38	1	2026-01-16 10:25:02.153953-04
+839	2026-01-16 10:25:01.958797-04	HT-301	TEMP_HYDRO	331.13	1	2026-01-16 10:25:02.153953-04
+840	2026-01-16 10:25:01.958812-04	HT-301	H2_PRESS	35.16	1	2026-01-16 10:25:02.153953-04
+841	2026-01-16 10:25:07.1926-04	CDU-101	TEMP_TOWER	386.03	1	2026-01-16 10:25:07.651512-04
+842	2026-01-16 10:25:07.192666-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:25:07.651512-04
+843	2026-01-16 10:25:07.192684-04	CDU-101	FLOW_FEED	10693.3	1	2026-01-16 10:25:07.651512-04
+844	2026-01-16 10:25:07.192703-04	FCC-201	TEMP_REACTOR	548.94	1	2026-01-16 10:25:07.651512-04
+845	2026-01-16 10:25:07.192721-04	FCC-201	CATALYST_ACT	89.09	1	2026-01-16 10:25:07.651512-04
+846	2026-01-16 10:25:07.192738-04	HT-301	TEMP_HYDRO	368.74	1	2026-01-16 10:25:07.651512-04
+847	2026-01-16 10:25:07.192754-04	HT-301	H2_PRESS	30.92	1	2026-01-16 10:25:07.651512-04
+848	2026-01-16 10:25:12.685617-04	CDU-101	TEMP_TOWER	413.64	1	2026-01-16 10:25:14.89209-04
+849	2026-01-16 10:25:12.685675-04	CDU-101	PRESS_TOWER	2.66	1	2026-01-16 10:25:14.89209-04
+850	2026-01-16 10:25:12.685694-04	CDU-101	FLOW_FEED	9565.77	1	2026-01-16 10:25:14.89209-04
+851	2026-01-16 10:25:12.685713-04	FCC-201	TEMP_REACTOR	520.31	1	2026-01-16 10:25:14.89209-04
+852	2026-01-16 10:25:12.685729-04	FCC-201	CATALYST_ACT	78.36	1	2026-01-16 10:25:14.89209-04
+853	2026-01-16 10:25:12.685746-04	HT-301	TEMP_HYDRO	370.73	1	2026-01-16 10:25:14.89209-04
+854	2026-01-16 10:25:12.685763-04	HT-301	H2_PRESS	43.42	1	2026-01-16 10:25:14.89209-04
+855	2026-01-16 10:25:19.918858-04	CDU-101	TEMP_TOWER	405.66	1	2026-01-16 10:25:20.394652-04
+856	2026-01-16 10:25:19.918906-04	CDU-101	PRESS_TOWER	3.02	1	2026-01-16 10:25:20.394652-04
+857	2026-01-16 10:25:19.918923-04	CDU-101	FLOW_FEED	10081.2	1	2026-01-16 10:25:20.394652-04
+858	2026-01-16 10:25:19.918939-04	FCC-201	TEMP_REACTOR	507.95	1	2026-01-16 10:25:20.394652-04
+859	2026-01-16 10:25:19.918954-04	FCC-201	CATALYST_ACT	85.14	1	2026-01-16 10:25:20.394652-04
+860	2026-01-16 10:25:19.91897-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:25:20.394652-04
+861	2026-01-16 10:25:19.918984-04	HT-301	H2_PRESS	49.57	1	2026-01-16 10:25:20.394652-04
+862	2026-01-16 10:25:25.428324-04	CDU-101	TEMP_TOWER	389.09	1	2026-01-16 10:25:25.62286-04
+863	2026-01-16 10:25:25.428375-04	CDU-101	PRESS_TOWER	3.17	1	2026-01-16 10:25:25.62286-04
+864	2026-01-16 10:25:25.428392-04	CDU-101	FLOW_FEED	8504.42	1	2026-01-16 10:25:25.62286-04
+865	2026-01-16 10:25:25.428407-04	FCC-201	TEMP_REACTOR	503.79	1	2026-01-16 10:25:25.62286-04
+866	2026-01-16 10:25:25.428422-04	FCC-201	CATALYST_ACT	76.98	1	2026-01-16 10:25:25.62286-04
+867	2026-01-16 10:25:25.428437-04	HT-301	TEMP_HYDRO	372.74	1	2026-01-16 10:25:25.62286-04
+868	2026-01-16 10:25:25.428452-04	HT-301	H2_PRESS	44.53	1	2026-01-16 10:25:25.62286-04
+869	2026-01-16 10:25:30.66533-04	CDU-101	TEMP_TOWER	371.07	1	2026-01-16 10:25:33.134725-04
+870	2026-01-16 10:25:30.66539-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:25:33.134725-04
+871	2026-01-16 10:25:30.665408-04	CDU-101	FLOW_FEED	8786.6	1	2026-01-16 10:25:33.134725-04
+872	2026-01-16 10:25:30.665425-04	FCC-201	TEMP_REACTOR	488.73	1	2026-01-16 10:25:33.134725-04
+873	2026-01-16 10:25:30.66544-04	FCC-201	CATALYST_ACT	88.69	1	2026-01-16 10:25:33.134725-04
+874	2026-01-16 10:25:30.665455-04	HT-301	TEMP_HYDRO	312.62	1	2026-01-16 10:25:33.134725-04
+875	2026-01-16 10:25:30.66547-04	HT-301	H2_PRESS	40.08	1	2026-01-16 10:25:33.134725-04
+876	2026-01-16 10:25:38.175427-04	CDU-101	TEMP_TOWER	361.94	1	2026-01-16 10:25:38.391081-04
+877	2026-01-16 10:25:38.175484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:25:38.391081-04
+878	2026-01-16 10:25:38.175503-04	CDU-101	FLOW_FEED	10299.44	1	2026-01-16 10:25:38.391081-04
+879	2026-01-16 10:25:38.17552-04	FCC-201	TEMP_REACTOR	490.94	1	2026-01-16 10:25:38.391081-04
+880	2026-01-16 10:25:38.175536-04	FCC-201	CATALYST_ACT	78.35	1	2026-01-16 10:25:38.391081-04
+881	2026-01-16 10:25:38.175552-04	HT-301	TEMP_HYDRO	339.51	1	2026-01-16 10:25:38.391081-04
+882	2026-01-16 10:25:38.175653-04	HT-301	H2_PRESS	38.35	1	2026-01-16 10:25:38.391081-04
+883	2026-01-16 10:25:43.44182-04	CDU-101	TEMP_TOWER	374.02	1	2026-01-16 10:25:43.929966-04
+884	2026-01-16 10:25:43.441884-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:43.929966-04
+885	2026-01-16 10:25:43.441903-04	CDU-101	FLOW_FEED	8917.93	1	2026-01-16 10:25:43.929966-04
+886	2026-01-16 10:25:43.441921-04	FCC-201	TEMP_REACTOR	547.99	1	2026-01-16 10:25:43.929966-04
+887	2026-01-16 10:25:43.441937-04	FCC-201	CATALYST_ACT	70.51	1	2026-01-16 10:25:43.929966-04
+888	2026-01-16 10:25:43.441955-04	HT-301	TEMP_HYDRO	304.49	1	2026-01-16 10:25:43.929966-04
+889	2026-01-16 10:25:43.441971-04	HT-301	H2_PRESS	34.82	1	2026-01-16 10:25:43.929966-04
+890	2026-01-16 10:25:48.962178-04	CDU-101	TEMP_TOWER	390.39	1	2026-01-16 10:25:51.181699-04
+891	2026-01-16 10:25:48.962237-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:51.181699-04
+892	2026-01-16 10:25:48.962257-04	CDU-101	FLOW_FEED	10329.41	1	2026-01-16 10:25:51.181699-04
+893	2026-01-16 10:25:48.962275-04	FCC-201	TEMP_REACTOR	548.1	1	2026-01-16 10:25:51.181699-04
+894	2026-01-16 10:25:48.962292-04	FCC-201	CATALYST_ACT	70.31	1	2026-01-16 10:25:51.181699-04
+895	2026-01-16 10:25:48.962308-04	HT-301	TEMP_HYDRO	372.19	1	2026-01-16 10:25:51.181699-04
+896	2026-01-16 10:25:48.962325-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:25:51.181699-04
+897	2026-01-16 10:25:56.385547-04	CDU-101	TEMP_TOWER	383.17	1	2026-01-16 10:25:56.877935-04
+898	2026-01-16 10:25:56.385608-04	CDU-101	PRESS_TOWER	3.2	1	2026-01-16 10:25:56.877935-04
+899	2026-01-16 10:25:56.385627-04	CDU-101	FLOW_FEED	11151.18	1	2026-01-16 10:25:56.877935-04
+900	2026-01-16 10:25:56.385648-04	FCC-201	TEMP_REACTOR	542.42	1	2026-01-16 10:25:56.877935-04
+901	2026-01-16 10:25:56.385664-04	FCC-201	CATALYST_ACT	87.15	1	2026-01-16 10:25:56.877935-04
+902	2026-01-16 10:25:56.385682-04	HT-301	TEMP_HYDRO	366.51	1	2026-01-16 10:25:56.877935-04
+903	2026-01-16 10:25:56.385698-04	HT-301	H2_PRESS	30.91	1	2026-01-16 10:25:56.877935-04
+904	2026-01-16 10:26:01.984273-04	CDU-101	TEMP_TOWER	411.67	1	2026-01-16 10:26:02.188-04
+905	2026-01-16 10:26:01.984322-04	CDU-101	PRESS_TOWER	3.27	1	2026-01-16 10:26:02.188-04
+906	2026-01-16 10:26:01.98434-04	CDU-101	FLOW_FEED	11397.47	1	2026-01-16 10:26:02.188-04
+907	2026-01-16 10:26:01.984357-04	FCC-201	TEMP_REACTOR	486.69	1	2026-01-16 10:26:02.188-04
+908	2026-01-16 10:26:01.984373-04	FCC-201	CATALYST_ACT	85.41	1	2026-01-16 10:26:02.188-04
+909	2026-01-16 10:26:01.984389-04	HT-301	TEMP_HYDRO	325.36	1	2026-01-16 10:26:02.188-04
+910	2026-01-16 10:26:01.984404-04	HT-301	H2_PRESS	37.81	1	2026-01-16 10:26:02.188-04
+911	2026-01-16 10:26:07.220643-04	CDU-101	TEMP_TOWER	363.33	1	2026-01-16 10:26:07.692443-04
+912	2026-01-16 10:26:07.220699-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:26:07.692443-04
+913	2026-01-16 10:26:07.220717-04	CDU-101	FLOW_FEED	10561.95	1	2026-01-16 10:26:07.692443-04
+914	2026-01-16 10:26:07.220735-04	FCC-201	TEMP_REACTOR	497.22	1	2026-01-16 10:26:07.692443-04
+915	2026-01-16 10:26:07.22075-04	FCC-201	CATALYST_ACT	94.2	1	2026-01-16 10:26:07.692443-04
+916	2026-01-16 10:26:07.220766-04	HT-301	TEMP_HYDRO	301.43	1	2026-01-16 10:26:07.692443-04
+917	2026-01-16 10:26:07.220781-04	HT-301	H2_PRESS	49.74	1	2026-01-16 10:26:07.692443-04
+918	2026-01-16 10:26:12.722608-04	CDU-101	TEMP_TOWER	357.97	1	2026-01-16 10:26:12.924255-04
+919	2026-01-16 10:26:12.722664-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:26:12.924255-04
+920	2026-01-16 10:26:12.722683-04	CDU-101	FLOW_FEED	11633.39	1	2026-01-16 10:26:12.924255-04
+921	2026-01-16 10:26:12.722701-04	FCC-201	TEMP_REACTOR	508.41	1	2026-01-16 10:26:12.924255-04
+922	2026-01-16 10:26:12.722718-04	FCC-201	CATALYST_ACT	82.49	1	2026-01-16 10:26:12.924255-04
+923	2026-01-16 10:26:12.722735-04	HT-301	TEMP_HYDRO	365.45	1	2026-01-16 10:26:12.924255-04
+924	2026-01-16 10:26:12.722751-04	HT-301	H2_PRESS	44.39	1	2026-01-16 10:26:12.924255-04
+925	2026-01-16 10:26:17.951141-04	CDU-101	TEMP_TOWER	352.65	1	2026-01-16 10:26:18.41653-04
+926	2026-01-16 10:26:17.951189-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:26:18.41653-04
+927	2026-01-16 10:26:17.951206-04	CDU-101	FLOW_FEED	9716.79	1	2026-01-16 10:26:18.41653-04
+928	2026-01-16 10:26:17.951222-04	FCC-201	TEMP_REACTOR	495.37	1	2026-01-16 10:26:18.41653-04
+929	2026-01-16 10:26:17.951237-04	FCC-201	CATALYST_ACT	89.93	1	2026-01-16 10:26:18.41653-04
+930	2026-01-16 10:26:17.951253-04	HT-301	TEMP_HYDRO	376.63	1	2026-01-16 10:26:18.41653-04
+931	2026-01-16 10:26:17.951268-04	HT-301	H2_PRESS	44.37	1	2026-01-16 10:26:18.41653-04
+932	2026-01-16 10:26:23.449916-04	CDU-101	TEMP_TOWER	408.89	1	2026-01-16 10:26:23.654996-04
+933	2026-01-16 10:26:23.449966-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:26:23.654996-04
+934	2026-01-16 10:26:23.449984-04	CDU-101	FLOW_FEED	8275.24	1	2026-01-16 10:26:23.654996-04
+935	2026-01-16 10:26:23.450001-04	FCC-201	TEMP_REACTOR	547.87	1	2026-01-16 10:26:23.654996-04
+936	2026-01-16 10:26:23.450017-04	FCC-201	CATALYST_ACT	89.24	1	2026-01-16 10:26:23.654996-04
+937	2026-01-16 10:26:23.450032-04	HT-301	TEMP_HYDRO	366.4	1	2026-01-16 10:26:23.654996-04
+938	2026-01-16 10:26:23.450047-04	HT-301	H2_PRESS	45.25	1	2026-01-16 10:26:23.654996-04
+939	2026-01-16 10:26:28.907667-04	CDU-101	TEMP_TOWER	354.69	1	2026-01-16 10:26:29.411128-04
+940	2026-01-16 10:26:28.907732-04	CDU-101	PRESS_TOWER	4.35	1	2026-01-16 10:26:29.411128-04
+941	2026-01-16 10:26:28.90775-04	CDU-101	FLOW_FEED	8499.95	1	2026-01-16 10:26:29.411128-04
+942	2026-01-16 10:26:28.907767-04	FCC-201	TEMP_REACTOR	528.69	1	2026-01-16 10:26:29.411128-04
+943	2026-01-16 10:26:28.907783-04	FCC-201	CATALYST_ACT	80.39	1	2026-01-16 10:26:29.411128-04
+944	2026-01-16 10:26:28.907798-04	HT-301	TEMP_HYDRO	339.05	1	2026-01-16 10:26:29.411128-04
+945	2026-01-16 10:26:28.907813-04	HT-301	H2_PRESS	36.94	1	2026-01-16 10:26:29.411128-04
+946	2026-01-16 10:26:34.441743-04	CDU-101	TEMP_TOWER	429.69	1	2026-01-16 10:26:36.676509-04
+947	2026-01-16 10:26:34.441803-04	CDU-101	PRESS_TOWER	4.89	1	2026-01-16 10:26:36.676509-04
+948	2026-01-16 10:26:34.441824-04	CDU-101	FLOW_FEED	10249.63	1	2026-01-16 10:26:36.676509-04
+949	2026-01-16 10:26:34.441842-04	FCC-201	TEMP_REACTOR	520.53	1	2026-01-16 10:26:36.676509-04
+950	2026-01-16 10:26:34.441859-04	FCC-201	CATALYST_ACT	88.99	1	2026-01-16 10:26:36.676509-04
+951	2026-01-16 10:26:34.441875-04	HT-301	TEMP_HYDRO	326.87	1	2026-01-16 10:26:36.676509-04
+952	2026-01-16 10:26:34.441891-04	HT-301	H2_PRESS	32.16	1	2026-01-16 10:26:36.676509-04
+953	2026-01-16 10:26:41.704094-04	CDU-101	TEMP_TOWER	410.01	1	2026-01-16 10:26:44.193435-04
+954	2026-01-16 10:26:41.704161-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 10:26:44.193435-04
+955	2026-01-16 10:26:41.704179-04	CDU-101	FLOW_FEED	10806.24	1	2026-01-16 10:26:44.193435-04
+956	2026-01-16 10:26:41.704196-04	FCC-201	TEMP_REACTOR	509.04	1	2026-01-16 10:26:44.193435-04
+957	2026-01-16 10:26:41.704212-04	FCC-201	CATALYST_ACT	86.77	1	2026-01-16 10:26:44.193435-04
+958	2026-01-16 10:26:41.704228-04	HT-301	TEMP_HYDRO	309.14	1	2026-01-16 10:26:44.193435-04
+959	2026-01-16 10:26:41.704243-04	HT-301	H2_PRESS	41.23	1	2026-01-16 10:26:44.193435-04
+960	2026-01-16 10:26:49.236814-04	CDU-101	TEMP_TOWER	368.52	1	2026-01-16 10:26:49.435897-04
+961	2026-01-16 10:26:49.236863-04	CDU-101	PRESS_TOWER	4.83	1	2026-01-16 10:26:49.435897-04
+962	2026-01-16 10:26:49.23688-04	CDU-101	FLOW_FEED	11256.66	1	2026-01-16 10:26:49.435897-04
+963	2026-01-16 10:26:49.236896-04	FCC-201	TEMP_REACTOR	536.85	1	2026-01-16 10:26:49.435897-04
+964	2026-01-16 10:26:49.236911-04	FCC-201	CATALYST_ACT	79.42	1	2026-01-16 10:26:49.435897-04
+965	2026-01-16 10:26:49.236926-04	HT-301	TEMP_HYDRO	325.8	1	2026-01-16 10:26:49.435897-04
+966	2026-01-16 10:26:49.236941-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:26:49.435897-04
+967	2026-01-16 10:26:54.487623-04	CDU-101	TEMP_TOWER	392.86	1	2026-01-16 10:26:56.986218-04
+968	2026-01-16 10:26:54.487681-04	CDU-101	PRESS_TOWER	4.09	1	2026-01-16 10:26:56.986218-04
+969	2026-01-16 10:26:54.487699-04	CDU-101	FLOW_FEED	9070.59	1	2026-01-16 10:26:56.986218-04
+970	2026-01-16 10:26:54.487718-04	FCC-201	TEMP_REACTOR	485.72	1	2026-01-16 10:26:56.986218-04
+971	2026-01-16 10:26:54.487733-04	FCC-201	CATALYST_ACT	86.35	1	2026-01-16 10:26:56.986218-04
+972	2026-01-16 10:26:54.48775-04	HT-301	TEMP_HYDRO	314.18	1	2026-01-16 10:26:56.986218-04
+973	2026-01-16 10:26:54.487766-04	HT-301	H2_PRESS	30.72	1	2026-01-16 10:26:56.986218-04
+974	2026-01-16 10:27:02.037656-04	CDU-101	TEMP_TOWER	410.73	1	2026-01-16 10:27:02.240397-04
+975	2026-01-16 10:27:02.037722-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:27:02.240397-04
+976	2026-01-16 10:27:02.037761-04	CDU-101	FLOW_FEED	11284.66	1	2026-01-16 10:27:02.240397-04
+977	2026-01-16 10:27:02.037783-04	FCC-201	TEMP_REACTOR	486.05	1	2026-01-16 10:27:02.240397-04
+978	2026-01-16 10:27:02.037799-04	FCC-201	CATALYST_ACT	93.69	1	2026-01-16 10:27:02.240397-04
+979	2026-01-16 10:27:02.037815-04	HT-301	TEMP_HYDRO	345.25	1	2026-01-16 10:27:02.240397-04
+980	2026-01-16 10:27:02.03783-04	HT-301	H2_PRESS	40.89	1	2026-01-16 10:27:02.240397-04
+981	2026-01-16 10:27:07.328399-04	CDU-101	TEMP_TOWER	405.11	1	2026-01-16 10:27:07.78589-04
+982	2026-01-16 10:27:07.328448-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:27:07.78589-04
+983	2026-01-16 10:27:07.328465-04	CDU-101	FLOW_FEED	10000.77	1	2026-01-16 10:27:07.78589-04
+984	2026-01-16 10:27:07.328481-04	FCC-201	TEMP_REACTOR	544.72	1	2026-01-16 10:27:07.78589-04
+985	2026-01-16 10:27:07.328496-04	FCC-201	CATALYST_ACT	81.75	1	2026-01-16 10:27:07.78589-04
+986	2026-01-16 10:27:07.328511-04	HT-301	TEMP_HYDRO	323.08	1	2026-01-16 10:27:07.78589-04
+987	2026-01-16 10:27:07.328525-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:27:07.78589-04
+988	2026-01-16 10:27:12.832719-04	CDU-101	TEMP_TOWER	355.54	1	2026-01-16 10:27:13.03091-04
+989	2026-01-16 10:27:12.832778-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 10:27:13.03091-04
+990	2026-01-16 10:27:12.832798-04	CDU-101	FLOW_FEED	9969.96	1	2026-01-16 10:27:13.03091-04
+991	2026-01-16 10:27:12.832817-04	FCC-201	TEMP_REACTOR	521.73	1	2026-01-16 10:27:13.03091-04
+992	2026-01-16 10:27:12.832833-04	FCC-201	CATALYST_ACT	71.43	1	2026-01-16 10:27:13.03091-04
+993	2026-01-16 10:27:12.83285-04	HT-301	TEMP_HYDRO	329.63	1	2026-01-16 10:27:13.03091-04
+994	2026-01-16 10:27:12.832869-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:27:13.03091-04
+995	2026-01-16 10:27:18.084868-04	CDU-101	TEMP_TOWER	407.33	1	2026-01-16 10:27:18.563452-04
+996	2026-01-16 10:27:18.084935-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:27:18.563452-04
+997	2026-01-16 10:27:18.084954-04	CDU-101	FLOW_FEED	10807.02	1	2026-01-16 10:27:18.563452-04
+998	2026-01-16 10:27:18.084972-04	FCC-201	TEMP_REACTOR	481.66	1	2026-01-16 10:27:18.563452-04
+999	2026-01-16 10:27:18.084991-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 10:27:18.563452-04
+1000	2026-01-16 10:27:18.085008-04	HT-301	TEMP_HYDRO	335.97	1	2026-01-16 10:27:18.563452-04
+1001	2026-01-16 10:27:18.085024-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:27:18.563452-04
+1002	2026-01-16 10:27:23.602675-04	CDU-101	TEMP_TOWER	428.04	1	2026-01-16 10:27:23.801929-04
+1003	2026-01-16 10:27:23.602735-04	CDU-101	PRESS_TOWER	4.5	1	2026-01-16 10:27:23.801929-04
+1004	2026-01-16 10:27:23.602753-04	CDU-101	FLOW_FEED	11577.31	1	2026-01-16 10:27:23.801929-04
+1005	2026-01-16 10:27:23.602771-04	FCC-201	TEMP_REACTOR	514.85	1	2026-01-16 10:27:23.801929-04
+1006	2026-01-16 10:27:23.602786-04	FCC-201	CATALYST_ACT	85.3	1	2026-01-16 10:27:23.801929-04
+1007	2026-01-16 10:27:23.602802-04	HT-301	TEMP_HYDRO	371.88	1	2026-01-16 10:27:23.801929-04
+1008	2026-01-16 10:27:23.602818-04	HT-301	H2_PRESS	44.57	1	2026-01-16 10:27:23.801929-04
+1009	2026-01-16 10:27:28.833674-04	CDU-101	TEMP_TOWER	408.01	1	2026-01-16 10:27:29.297608-04
+1010	2026-01-16 10:27:28.833724-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:27:29.297608-04
+1011	2026-01-16 10:27:28.833741-04	CDU-101	FLOW_FEED	9583.36	1	2026-01-16 10:27:29.297608-04
+1012	2026-01-16 10:27:28.833757-04	FCC-201	TEMP_REACTOR	488.69	1	2026-01-16 10:27:29.297608-04
+1013	2026-01-16 10:27:28.833772-04	FCC-201	CATALYST_ACT	74.74	1	2026-01-16 10:27:29.297608-04
+1014	2026-01-16 10:27:28.833787-04	HT-301	TEMP_HYDRO	358.5	1	2026-01-16 10:27:29.297608-04
+1015	2026-01-16 10:27:28.833801-04	HT-301	H2_PRESS	38.9	1	2026-01-16 10:27:29.297608-04
+1016	2026-01-16 10:27:34.325241-04	CDU-101	TEMP_TOWER	441.23	1	2026-01-16 10:27:34.525996-04
+1017	2026-01-16 10:27:34.325296-04	CDU-101	PRESS_TOWER	4.76	1	2026-01-16 10:27:34.525996-04
+1018	2026-01-16 10:27:34.325313-04	CDU-101	FLOW_FEED	10076.64	1	2026-01-16 10:27:34.525996-04
+1019	2026-01-16 10:27:34.32533-04	FCC-201	TEMP_REACTOR	526.87	1	2026-01-16 10:27:34.525996-04
+1020	2026-01-16 10:27:34.325346-04	FCC-201	CATALYST_ACT	72.68	1	2026-01-16 10:27:34.525996-04
+1021	2026-01-16 10:27:34.325363-04	HT-301	TEMP_HYDRO	341.3	1	2026-01-16 10:27:34.525996-04
+1022	2026-01-16 10:27:34.325379-04	HT-301	H2_PRESS	41.57	1	2026-01-16 10:27:34.525996-04
+1023	2026-01-16 10:27:39.567608-04	CDU-101	TEMP_TOWER	371.79	1	2026-01-16 10:27:40.029484-04
+1024	2026-01-16 10:27:39.567673-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 10:27:40.029484-04
+1025	2026-01-16 10:27:39.567693-04	CDU-101	FLOW_FEED	9698.52	1	2026-01-16 10:27:40.029484-04
+1026	2026-01-16 10:27:39.567713-04	FCC-201	TEMP_REACTOR	544.38	1	2026-01-16 10:27:40.029484-04
+1027	2026-01-16 10:27:39.56773-04	FCC-201	CATALYST_ACT	77.14	1	2026-01-16 10:27:40.029484-04
+1028	2026-01-16 10:27:39.567746-04	HT-301	TEMP_HYDRO	323.05	1	2026-01-16 10:27:40.029484-04
+1029	2026-01-16 10:27:39.567764-04	HT-301	H2_PRESS	41.54	1	2026-01-16 10:27:40.029484-04
+1030	2026-01-16 10:27:45.080497-04	CDU-101	TEMP_TOWER	385.72	1	2026-01-16 10:27:45.339448-04
+1031	2026-01-16 10:27:45.080565-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:27:45.339448-04
+1032	2026-01-16 10:27:45.080583-04	CDU-101	FLOW_FEED	11079.8	1	2026-01-16 10:27:45.339448-04
+1033	2026-01-16 10:27:45.080602-04	FCC-201	TEMP_REACTOR	500.62	1	2026-01-16 10:27:45.339448-04
+1034	2026-01-16 10:27:45.080618-04	FCC-201	CATALYST_ACT	82.34	1	2026-01-16 10:27:45.339448-04
+1035	2026-01-16 10:27:45.080636-04	HT-301	TEMP_HYDRO	341.42	1	2026-01-16 10:27:45.339448-04
+1036	2026-01-16 10:27:45.080653-04	HT-301	H2_PRESS	39	1	2026-01-16 10:27:45.339448-04
+1037	2026-01-16 10:27:50.403439-04	CDU-101	TEMP_TOWER	413.22	1	2026-01-16 10:27:50.982057-04
+1038	2026-01-16 10:27:50.4035-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:27:50.982057-04
+1039	2026-01-16 10:27:50.403519-04	CDU-101	FLOW_FEED	10932.95	1	2026-01-16 10:27:50.982057-04
+1040	2026-01-16 10:27:50.403538-04	FCC-201	TEMP_REACTOR	540.44	1	2026-01-16 10:27:50.982057-04
+1041	2026-01-16 10:27:50.403555-04	FCC-201	CATALYST_ACT	73.09	1	2026-01-16 10:27:50.982057-04
+1042	2026-01-16 10:27:50.403572-04	HT-301	TEMP_HYDRO	324.46	1	2026-01-16 10:27:50.982057-04
+1043	2026-01-16 10:27:50.40359-04	HT-301	H2_PRESS	35.75	1	2026-01-16 10:27:50.982057-04
+1044	2026-01-16 10:27:56.024708-04	CDU-101	TEMP_TOWER	426.96	1	2026-01-16 10:27:56.229611-04
+1045	2026-01-16 10:27:56.024757-04	CDU-101	PRESS_TOWER	3.52	1	2026-01-16 10:27:56.229611-04
+1046	2026-01-16 10:27:56.024773-04	CDU-101	FLOW_FEED	8090.48	1	2026-01-16 10:27:56.229611-04
+1047	2026-01-16 10:27:56.024789-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:27:56.229611-04
+1048	2026-01-16 10:27:56.024804-04	FCC-201	CATALYST_ACT	77.24	1	2026-01-16 10:27:56.229611-04
+1049	2026-01-16 10:27:56.024819-04	HT-301	TEMP_HYDRO	359.65	1	2026-01-16 10:27:56.229611-04
+1050	2026-01-16 10:27:56.024834-04	HT-301	H2_PRESS	38.22	1	2026-01-16 10:27:56.229611-04
+1051	2026-01-16 10:28:01.279124-04	CDU-101	TEMP_TOWER	428.12	1	2026-01-16 10:28:03.773878-04
+1052	2026-01-16 10:28:01.279184-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:28:03.773878-04
+1053	2026-01-16 10:28:01.279204-04	CDU-101	FLOW_FEED	9945.52	1	2026-01-16 10:28:03.773878-04
+1054	2026-01-16 10:28:01.279221-04	FCC-201	TEMP_REACTOR	485.04	1	2026-01-16 10:28:03.773878-04
+1055	2026-01-16 10:28:01.279239-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 10:28:03.773878-04
+1056	2026-01-16 10:28:01.279256-04	HT-301	TEMP_HYDRO	360.02	1	2026-01-16 10:28:03.773878-04
+1057	2026-01-16 10:28:01.279274-04	HT-301	H2_PRESS	41.79	1	2026-01-16 10:28:03.773878-04
+1058	2026-01-16 10:28:08.83085-04	CDU-101	TEMP_TOWER	399.42	1	2026-01-16 10:28:09.041362-04
+1059	2026-01-16 10:28:08.830898-04	CDU-101	PRESS_TOWER	3.54	1	2026-01-16 10:28:09.041362-04
+1060	2026-01-16 10:28:08.830914-04	CDU-101	FLOW_FEED	8906.48	1	2026-01-16 10:28:09.041362-04
+1061	2026-01-16 10:28:08.830931-04	FCC-201	TEMP_REACTOR	525.86	1	2026-01-16 10:28:09.041362-04
+1062	2026-01-16 10:28:08.830946-04	FCC-201	CATALYST_ACT	90.39	1	2026-01-16 10:28:09.041362-04
+1063	2026-01-16 10:28:08.830961-04	HT-301	TEMP_HYDRO	379.73	1	2026-01-16 10:28:09.041362-04
+1064	2026-01-16 10:28:08.830976-04	HT-301	H2_PRESS	38.89	1	2026-01-16 10:28:09.041362-04
+1065	2026-01-16 10:28:14.119088-04	CDU-101	TEMP_TOWER	431.49	1	2026-01-16 10:28:14.585242-04
+1066	2026-01-16 10:28:14.119134-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:28:14.585242-04
+1067	2026-01-16 10:28:14.119151-04	CDU-101	FLOW_FEED	9598.56	1	2026-01-16 10:28:14.585242-04
+1068	2026-01-16 10:28:14.119167-04	FCC-201	TEMP_REACTOR	483.55	1	2026-01-16 10:28:14.585242-04
+1069	2026-01-16 10:28:14.119182-04	FCC-201	CATALYST_ACT	90.23	1	2026-01-16 10:28:14.585242-04
+1070	2026-01-16 10:28:14.119197-04	HT-301	TEMP_HYDRO	361.71	1	2026-01-16 10:28:14.585242-04
+1071	2026-01-16 10:28:14.119231-04	HT-301	H2_PRESS	45.95	1	2026-01-16 10:28:14.585242-04
+1072	2026-01-16 10:28:19.633631-04	CDU-101	TEMP_TOWER	390.77	1	2026-01-16 10:28:19.834349-04
+1073	2026-01-16 10:28:19.633689-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:28:19.834349-04
+1074	2026-01-16 10:28:19.633706-04	CDU-101	FLOW_FEED	11130.18	1	2026-01-16 10:28:19.834349-04
+1075	2026-01-16 10:28:19.633723-04	FCC-201	TEMP_REACTOR	546.82	1	2026-01-16 10:28:19.834349-04
+1076	2026-01-16 10:28:19.633738-04	FCC-201	CATALYST_ACT	79.09	1	2026-01-16 10:28:19.834349-04
+1077	2026-01-16 10:28:19.633753-04	HT-301	TEMP_HYDRO	318.43	1	2026-01-16 10:28:19.834349-04
+1078	2026-01-16 10:28:19.633767-04	HT-301	H2_PRESS	45.07	1	2026-01-16 10:28:19.834349-04
+1079	2026-01-16 10:28:24.871588-04	CDU-101	TEMP_TOWER	379.06	1	2026-01-16 10:28:25.381005-04
+1080	2026-01-16 10:28:24.871647-04	CDU-101	PRESS_TOWER	2.61	1	2026-01-16 10:28:25.381005-04
+1081	2026-01-16 10:28:24.871665-04	CDU-101	FLOW_FEED	10650.56	1	2026-01-16 10:28:25.381005-04
+1082	2026-01-16 10:28:24.871682-04	FCC-201	TEMP_REACTOR	526.08	1	2026-01-16 10:28:25.381005-04
+1083	2026-01-16 10:28:24.871698-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:28:25.381005-04
+1084	2026-01-16 10:28:24.871714-04	HT-301	TEMP_HYDRO	322.58	1	2026-01-16 10:28:25.381005-04
+1085	2026-01-16 10:28:24.87173-04	HT-301	H2_PRESS	43.55	1	2026-01-16 10:28:25.381005-04
+1086	2026-01-16 10:28:30.432187-04	CDU-101	TEMP_TOWER	390.08	1	2026-01-16 10:28:31.375496-04
+1087	2026-01-16 10:28:30.432254-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:28:31.375496-04
+1088	2026-01-16 10:28:30.432274-04	CDU-101	FLOW_FEED	10013.36	1	2026-01-16 10:28:31.375496-04
+1089	2026-01-16 10:28:30.432292-04	FCC-201	TEMP_REACTOR	511.73	1	2026-01-16 10:28:31.375496-04
+1090	2026-01-16 10:28:30.432307-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:28:31.375496-04
+1091	2026-01-16 10:28:30.432322-04	HT-301	TEMP_HYDRO	306.26	1	2026-01-16 10:28:31.375496-04
+1092	2026-01-16 10:28:30.432341-04	HT-301	H2_PRESS	31.34	1	2026-01-16 10:28:31.375496-04
+1093	2026-01-16 10:28:36.434876-04	CDU-101	TEMP_TOWER	420.32	1	2026-01-16 10:28:39.282138-04
+1094	2026-01-16 10:28:36.434936-04	CDU-101	PRESS_TOWER	4.74	1	2026-01-16 10:28:39.282138-04
+1095	2026-01-16 10:28:36.434956-04	CDU-101	FLOW_FEED	11317.28	1	2026-01-16 10:28:39.282138-04
+1096	2026-01-16 10:28:36.434974-04	FCC-201	TEMP_REACTOR	531.71	1	2026-01-16 10:28:39.282138-04
+1097	2026-01-16 10:28:36.43499-04	FCC-201	CATALYST_ACT	77.18	1	2026-01-16 10:28:39.282138-04
+1098	2026-01-16 10:28:36.435006-04	HT-301	TEMP_HYDRO	373.04	1	2026-01-16 10:28:39.282138-04
+1099	2026-01-16 10:28:36.435023-04	HT-301	H2_PRESS	44.55	1	2026-01-16 10:28:39.282138-04
+1100	2026-01-16 10:28:46.585833-04	CDU-101	TEMP_TOWER	397.18	1	2026-01-16 10:28:52.286659-04
+1101	2026-01-16 10:28:46.58591-04	CDU-101	PRESS_TOWER	4.71	1	2026-01-16 10:28:52.286659-04
+1102	2026-01-16 10:28:46.585927-04	CDU-101	FLOW_FEED	10179.37	1	2026-01-16 10:28:52.286659-04
+1103	2026-01-16 10:28:46.585945-04	FCC-201	TEMP_REACTOR	542.86	1	2026-01-16 10:28:52.286659-04
+1104	2026-01-16 10:28:46.585963-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:28:52.286659-04
+1105	2026-01-16 10:28:46.58598-04	HT-301	TEMP_HYDRO	326.83	1	2026-01-16 10:28:52.286659-04
+1106	2026-01-16 10:28:46.585995-04	HT-301	H2_PRESS	32.6	1	2026-01-16 10:28:52.286659-04
+1107	2026-01-16 10:28:57.387675-04	CDU-101	TEMP_TOWER	405.19	1	2026-01-16 10:28:57.766465-04
+1108	2026-01-16 10:28:57.387734-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:28:57.766465-04
+1109	2026-01-16 10:28:57.387751-04	CDU-101	FLOW_FEED	9510.35	1	2026-01-16 10:28:57.766465-04
+1110	2026-01-16 10:28:57.387768-04	FCC-201	TEMP_REACTOR	480.95	1	2026-01-16 10:28:57.766465-04
+1111	2026-01-16 10:28:57.387785-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:28:57.766465-04
+1112	2026-01-16 10:28:57.387802-04	HT-301	TEMP_HYDRO	325.25	1	2026-01-16 10:28:57.766465-04
+1113	2026-01-16 10:28:57.387818-04	HT-301	H2_PRESS	39.83	1	2026-01-16 10:28:57.766465-04
+1114	2026-01-16 10:29:02.833763-04	CDU-101	TEMP_TOWER	394.06	1	2026-01-16 10:29:03.346602-04
+1115	2026-01-16 10:29:02.833818-04	CDU-101	PRESS_TOWER	4.78	1	2026-01-16 10:29:03.346602-04
+1116	2026-01-16 10:29:02.833838-04	CDU-101	FLOW_FEED	10883.96	1	2026-01-16 10:29:03.346602-04
+1117	2026-01-16 10:29:02.833854-04	FCC-201	TEMP_REACTOR	537.98	1	2026-01-16 10:29:03.346602-04
+1118	2026-01-16 10:29:02.83387-04	FCC-201	CATALYST_ACT	74.42	1	2026-01-16 10:29:03.346602-04
+1119	2026-01-16 10:29:02.833885-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:29:03.346602-04
+1120	2026-01-16 10:29:02.8339-04	HT-301	H2_PRESS	49.53	1	2026-01-16 10:29:03.346602-04
+1121	2026-01-16 10:29:08.377875-04	CDU-101	TEMP_TOWER	410.05	1	2026-01-16 10:29:10.577338-04
+1122	2026-01-16 10:29:08.377935-04	CDU-101	PRESS_TOWER	4.97	1	2026-01-16 10:29:10.577338-04
+1123	2026-01-16 10:29:08.377955-04	CDU-101	FLOW_FEED	11330.81	1	2026-01-16 10:29:10.577338-04
+1124	2026-01-16 10:29:08.377972-04	FCC-201	TEMP_REACTOR	503.53	1	2026-01-16 10:29:10.577338-04
+1125	2026-01-16 10:29:08.377989-04	FCC-201	CATALYST_ACT	84.9	1	2026-01-16 10:29:10.577338-04
+1126	2026-01-16 10:29:08.378006-04	HT-301	TEMP_HYDRO	358.81	1	2026-01-16 10:29:10.577338-04
+1127	2026-01-16 10:29:08.378022-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:29:10.577338-04
+1128	2026-01-16 10:29:15.624626-04	CDU-101	TEMP_TOWER	422.5	1	2026-01-16 10:29:18.212705-04
+1129	2026-01-16 10:29:15.624686-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:18.212705-04
+1130	2026-01-16 10:29:15.624705-04	CDU-101	FLOW_FEED	9802.32	1	2026-01-16 10:29:18.212705-04
+1131	2026-01-16 10:29:15.624724-04	FCC-201	TEMP_REACTOR	487.49	1	2026-01-16 10:29:18.212705-04
+1132	2026-01-16 10:29:15.624741-04	FCC-201	CATALYST_ACT	94.62	1	2026-01-16 10:29:18.212705-04
+1133	2026-01-16 10:29:15.624758-04	HT-301	TEMP_HYDRO	334.33	1	2026-01-16 10:29:18.212705-04
+1134	2026-01-16 10:29:15.624775-04	HT-301	H2_PRESS	31.95	1	2026-01-16 10:29:18.212705-04
+1135	2026-01-16 10:29:23.296516-04	CDU-101	TEMP_TOWER	356.92	1	2026-01-16 10:29:23.562659-04
+1136	2026-01-16 10:29:23.296578-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:29:23.562659-04
+1137	2026-01-16 10:29:23.296595-04	CDU-101	FLOW_FEED	11852.17	1	2026-01-16 10:29:23.562659-04
+1138	2026-01-16 10:29:23.296611-04	FCC-201	TEMP_REACTOR	517.64	1	2026-01-16 10:29:23.562659-04
+1139	2026-01-16 10:29:23.296626-04	FCC-201	CATALYST_ACT	90.05	1	2026-01-16 10:29:23.562659-04
+1140	2026-01-16 10:29:23.296642-04	HT-301	TEMP_HYDRO	351.82	1	2026-01-16 10:29:23.562659-04
+1141	2026-01-16 10:29:23.296657-04	HT-301	H2_PRESS	45.04	1	2026-01-16 10:29:23.562659-04
+1142	2026-01-16 10:29:28.703804-04	CDU-101	TEMP_TOWER	386.52	1	2026-01-16 10:29:29.195216-04
+1143	2026-01-16 10:29:28.703862-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:29.195216-04
+1144	2026-01-16 10:29:28.70388-04	CDU-101	FLOW_FEED	8608.47	1	2026-01-16 10:29:29.195216-04
+1145	2026-01-16 10:29:28.703897-04	FCC-201	TEMP_REACTOR	501.03	1	2026-01-16 10:29:29.195216-04
+1146	2026-01-16 10:29:28.703913-04	FCC-201	CATALYST_ACT	85.46	1	2026-01-16 10:29:29.195216-04
+1147	2026-01-16 10:29:28.70393-04	HT-301	TEMP_HYDRO	371.69	1	2026-01-16 10:29:29.195216-04
+1148	2026-01-16 10:29:28.703947-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:29:29.195216-04
+1149	2026-01-16 10:29:34.22273-04	CDU-101	TEMP_TOWER	355.56	1	2026-01-16 10:29:34.438862-04
+1150	2026-01-16 10:29:34.222777-04	CDU-101	PRESS_TOWER	3.3	1	2026-01-16 10:29:34.438862-04
+1151	2026-01-16 10:29:34.222793-04	CDU-101	FLOW_FEED	11455.22	1	2026-01-16 10:29:34.438862-04
+1152	2026-01-16 10:29:34.222809-04	FCC-201	TEMP_REACTOR	542.09	1	2026-01-16 10:29:34.438862-04
+1153	2026-01-16 10:29:34.222824-04	FCC-201	CATALYST_ACT	79.77	1	2026-01-16 10:29:34.438862-04
+1154	2026-01-16 10:29:34.222839-04	HT-301	TEMP_HYDRO	338.86	1	2026-01-16 10:29:34.438862-04
+1155	2026-01-16 10:29:34.222854-04	HT-301	H2_PRESS	49.16	1	2026-01-16 10:29:34.438862-04
+1156	2026-01-16 10:29:39.473288-04	CDU-101	TEMP_TOWER	378.7	1	2026-01-16 10:29:39.944023-04
+1157	2026-01-16 10:29:39.473354-04	CDU-101	PRESS_TOWER	2.81	1	2026-01-16 10:29:39.944023-04
+1158	2026-01-16 10:29:39.473372-04	CDU-101	FLOW_FEED	10990.54	1	2026-01-16 10:29:39.944023-04
+1159	2026-01-16 10:29:39.473392-04	FCC-201	TEMP_REACTOR	541.95	1	2026-01-16 10:29:39.944023-04
+1160	2026-01-16 10:29:39.473408-04	FCC-201	CATALYST_ACT	84.65	1	2026-01-16 10:29:39.944023-04
+1161	2026-01-16 10:29:39.473425-04	HT-301	TEMP_HYDRO	348.03	1	2026-01-16 10:29:39.944023-04
+1162	2026-01-16 10:29:39.473441-04	HT-301	H2_PRESS	46.22	1	2026-01-16 10:29:39.944023-04
+1163	2026-01-16 10:29:44.970842-04	CDU-101	TEMP_TOWER	434.33	1	2026-01-16 10:29:45.171287-04
+1164	2026-01-16 10:29:44.970904-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:29:45.171287-04
+1165	2026-01-16 10:29:44.970924-04	CDU-101	FLOW_FEED	9846.45	1	2026-01-16 10:29:45.171287-04
+1166	2026-01-16 10:29:44.97094-04	FCC-201	TEMP_REACTOR	499.19	1	2026-01-16 10:29:45.171287-04
+1167	2026-01-16 10:29:44.970955-04	FCC-201	CATALYST_ACT	74.13	1	2026-01-16 10:29:45.171287-04
+1168	2026-01-16 10:29:44.970971-04	HT-301	TEMP_HYDRO	377.38	1	2026-01-16 10:29:45.171287-04
+1169	2026-01-16 10:29:44.970986-04	HT-301	H2_PRESS	37.27	1	2026-01-16 10:29:45.171287-04
+1170	2026-01-16 10:29:50.21744-04	CDU-101	TEMP_TOWER	423.31	1	2026-01-16 10:29:50.710103-04
+1171	2026-01-16 10:29:50.217495-04	CDU-101	PRESS_TOWER	2.65	1	2026-01-16 10:29:50.710103-04
+1172	2026-01-16 10:29:50.217512-04	CDU-101	FLOW_FEED	11312.31	1	2026-01-16 10:29:50.710103-04
+1173	2026-01-16 10:29:50.217529-04	FCC-201	TEMP_REACTOR	539.19	1	2026-01-16 10:29:50.710103-04
+1174	2026-01-16 10:29:50.217545-04	FCC-201	CATALYST_ACT	72.65	1	2026-01-16 10:29:50.710103-04
+1175	2026-01-16 10:29:50.217561-04	HT-301	TEMP_HYDRO	346.56	1	2026-01-16 10:29:50.710103-04
+1176	2026-01-16 10:29:50.217577-04	HT-301	H2_PRESS	38.16	1	2026-01-16 10:29:50.710103-04
+1177	2026-01-16 10:29:55.762175-04	CDU-101	TEMP_TOWER	397.87	1	2026-01-16 10:29:55.998134-04
+1178	2026-01-16 10:29:55.762233-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:29:55.998134-04
+1179	2026-01-16 10:29:55.762253-04	CDU-101	FLOW_FEED	11751.32	1	2026-01-16 10:29:55.998134-04
+1180	2026-01-16 10:29:55.762271-04	FCC-201	TEMP_REACTOR	548.44	1	2026-01-16 10:29:55.998134-04
+1181	2026-01-16 10:29:55.762288-04	FCC-201	CATALYST_ACT	71.03	1	2026-01-16 10:29:55.998134-04
+1182	2026-01-16 10:29:55.762305-04	HT-301	TEMP_HYDRO	347.62	1	2026-01-16 10:29:55.998134-04
+1183	2026-01-16 10:29:55.762324-04	HT-301	H2_PRESS	35.93	1	2026-01-16 10:29:55.998134-04
+1184	2026-01-16 10:30:01.041043-04	CDU-101	TEMP_TOWER	402.09	1	2026-01-16 10:30:01.532518-04
+1185	2026-01-16 10:30:01.041091-04	CDU-101	PRESS_TOWER	4.75	1	2026-01-16 10:30:01.532518-04
+1186	2026-01-16 10:30:01.041108-04	CDU-101	FLOW_FEED	11624.26	1	2026-01-16 10:30:01.532518-04
+1187	2026-01-16 10:30:01.041124-04	FCC-201	TEMP_REACTOR	506.18	1	2026-01-16 10:30:01.532518-04
+1188	2026-01-16 10:30:01.041139-04	FCC-201	CATALYST_ACT	75.98	1	2026-01-16 10:30:01.532518-04
+1189	2026-01-16 10:30:01.041157-04	HT-301	TEMP_HYDRO	366.47	1	2026-01-16 10:30:01.532518-04
+1190	2026-01-16 10:30:01.041173-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:30:01.532518-04
+1191	2026-01-16 10:30:06.571181-04	CDU-101	TEMP_TOWER	440.17	1	2026-01-16 10:30:12.745873-04
+1192	2026-01-16 10:30:06.571239-04	CDU-101	PRESS_TOWER	3.55	1	2026-01-16 10:30:12.745873-04
+1193	2026-01-16 10:30:06.571259-04	CDU-101	FLOW_FEED	11972.92	1	2026-01-16 10:30:12.745873-04
+1194	2026-01-16 10:30:06.571278-04	FCC-201	TEMP_REACTOR	517.11	1	2026-01-16 10:30:12.745873-04
+1195	2026-01-16 10:30:06.571293-04	FCC-201	CATALYST_ACT	72.51	1	2026-01-16 10:30:12.745873-04
+1196	2026-01-16 10:30:06.57131-04	HT-301	TEMP_HYDRO	371.91	1	2026-01-16 10:30:12.745873-04
+1197	2026-01-16 10:30:06.571326-04	HT-301	H2_PRESS	48.21	1	2026-01-16 10:30:12.745873-04
+1198	2026-01-16 10:30:17.778307-04	CDU-101	TEMP_TOWER	353.74	1	2026-01-16 10:30:18.439965-04
+1199	2026-01-16 10:30:17.77837-04	CDU-101	PRESS_TOWER	4.47	1	2026-01-16 10:30:18.439965-04
+1200	2026-01-16 10:30:17.778389-04	CDU-101	FLOW_FEED	9174.31	1	2026-01-16 10:30:18.439965-04
+1201	2026-01-16 10:30:17.778407-04	FCC-201	TEMP_REACTOR	481.95	1	2026-01-16 10:30:18.439965-04
+1202	2026-01-16 10:30:17.778423-04	FCC-201	CATALYST_ACT	84.19	1	2026-01-16 10:30:18.439965-04
+1203	2026-01-16 10:30:17.778442-04	HT-301	TEMP_HYDRO	352.91	1	2026-01-16 10:30:18.439965-04
+1204	2026-01-16 10:30:17.778458-04	HT-301	H2_PRESS	34.78	1	2026-01-16 10:30:18.439965-04
+1205	2026-01-16 10:30:23.497972-04	CDU-101	TEMP_TOWER	414.89	1	2026-01-16 10:30:23.823558-04
+1206	2026-01-16 10:30:23.498019-04	CDU-101	PRESS_TOWER	4.43	1	2026-01-16 10:30:23.823558-04
+1207	2026-01-16 10:30:23.498036-04	CDU-101	FLOW_FEED	11808.42	1	2026-01-16 10:30:23.823558-04
+1208	2026-01-16 10:30:23.498052-04	FCC-201	TEMP_REACTOR	536.89	1	2026-01-16 10:30:23.823558-04
+1209	2026-01-16 10:30:23.498067-04	FCC-201	CATALYST_ACT	91.54	1	2026-01-16 10:30:23.823558-04
+1210	2026-01-16 10:30:23.498081-04	HT-301	TEMP_HYDRO	376.32	1	2026-01-16 10:30:23.823558-04
+1211	2026-01-16 10:30:23.498096-04	HT-301	H2_PRESS	33.8	1	2026-01-16 10:30:23.823558-04
+1212	2026-01-16 10:30:28.895949-04	CDU-101	TEMP_TOWER	408.34	1	2026-01-16 10:30:29.357518-04
+1213	2026-01-16 10:30:28.895997-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:30:29.357518-04
+1214	2026-01-16 10:30:28.896014-04	CDU-101	FLOW_FEED	9884.94	1	2026-01-16 10:30:29.357518-04
+1215	2026-01-16 10:30:28.89603-04	FCC-201	TEMP_REACTOR	506.77	1	2026-01-16 10:30:29.357518-04
+1216	2026-01-16 10:30:28.896045-04	FCC-201	CATALYST_ACT	93.46	1	2026-01-16 10:30:29.357518-04
+1217	2026-01-16 10:30:28.89606-04	HT-301	TEMP_HYDRO	310.88	1	2026-01-16 10:30:29.357518-04
+1218	2026-01-16 10:30:28.896075-04	HT-301	H2_PRESS	34.23	1	2026-01-16 10:30:29.357518-04
+1219	2026-01-16 10:30:34.516517-04	CDU-101	TEMP_TOWER	411.95	1	2026-01-16 10:30:38.218901-04
+1220	2026-01-16 10:30:34.517033-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:38.218901-04
+1221	2026-01-16 10:30:34.517096-04	CDU-101	FLOW_FEED	10174.93	1	2026-01-16 10:30:38.218901-04
+1222	2026-01-16 10:30:34.51712-04	FCC-201	TEMP_REACTOR	493.46	1	2026-01-16 10:30:38.218901-04
+1223	2026-01-16 10:30:34.517138-04	FCC-201	CATALYST_ACT	87.59	1	2026-01-16 10:30:38.218901-04
+1224	2026-01-16 10:30:34.517154-04	HT-301	TEMP_HYDRO	361.29	1	2026-01-16 10:30:38.218901-04
+1225	2026-01-16 10:30:34.517171-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:30:38.218901-04
+1226	2026-01-16 10:30:43.265957-04	CDU-101	TEMP_TOWER	379.2	1	2026-01-16 10:30:43.782537-04
+1227	2026-01-16 10:30:43.266007-04	CDU-101	PRESS_TOWER	3.59	1	2026-01-16 10:30:43.782537-04
+1228	2026-01-16 10:30:43.266025-04	CDU-101	FLOW_FEED	11635.26	1	2026-01-16 10:30:43.782537-04
+1229	2026-01-16 10:30:43.266042-04	FCC-201	TEMP_REACTOR	495.85	1	2026-01-16 10:30:43.782537-04
+1230	2026-01-16 10:30:43.266057-04	FCC-201	CATALYST_ACT	73.83	1	2026-01-16 10:30:43.782537-04
+1231	2026-01-16 10:30:43.266072-04	HT-301	TEMP_HYDRO	335.67	1	2026-01-16 10:30:43.782537-04
+1232	2026-01-16 10:30:43.266088-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:30:43.782537-04
+1233	2026-01-16 10:30:48.83423-04	CDU-101	TEMP_TOWER	377.54	1	2026-01-16 10:30:51.190296-04
+1234	2026-01-16 10:30:48.834458-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:51.190296-04
+1235	2026-01-16 10:30:48.834485-04	CDU-101	FLOW_FEED	8851.93	1	2026-01-16 10:30:51.190296-04
+1236	2026-01-16 10:30:48.834503-04	FCC-201	TEMP_REACTOR	518.66	1	2026-01-16 10:30:51.190296-04
+1237	2026-01-16 10:30:48.834522-04	FCC-201	CATALYST_ACT	71.54	1	2026-01-16 10:30:51.190296-04
+1238	2026-01-16 10:30:48.834542-04	HT-301	TEMP_HYDRO	373.84	1	2026-01-16 10:30:51.190296-04
+1239	2026-01-16 10:30:48.83456-04	HT-301	H2_PRESS	48.79	1	2026-01-16 10:30:51.190296-04
+1240	2026-01-16 10:30:56.255287-04	CDU-101	TEMP_TOWER	404.37	1	2026-01-16 10:30:56.729258-04
+1241	2026-01-16 10:30:56.255348-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:30:56.729258-04
+1242	2026-01-16 10:30:56.255366-04	CDU-101	FLOW_FEED	9682.12	1	2026-01-16 10:30:56.729258-04
+1243	2026-01-16 10:30:56.255383-04	FCC-201	TEMP_REACTOR	547.67	1	2026-01-16 10:30:56.729258-04
+1244	2026-01-16 10:30:56.255398-04	FCC-201	CATALYST_ACT	94.66	1	2026-01-16 10:30:56.729258-04
+1245	2026-01-16 10:30:56.255413-04	HT-301	TEMP_HYDRO	349.46	1	2026-01-16 10:30:56.729258-04
+1246	2026-01-16 10:30:56.255428-04	HT-301	H2_PRESS	36.31	1	2026-01-16 10:30:56.729258-04
+1247	2026-01-16 10:31:01.770982-04	CDU-101	TEMP_TOWER	394.97	1	2026-01-16 10:31:02.607016-04
+1248	2026-01-16 10:31:01.771081-04	CDU-101	PRESS_TOWER	2.64	1	2026-01-16 10:31:02.607016-04
+1249	2026-01-16 10:31:01.771107-04	CDU-101	FLOW_FEED	10800.69	1	2026-01-16 10:31:02.607016-04
+1250	2026-01-16 10:31:01.771126-04	FCC-201	TEMP_REACTOR	548.12	1	2026-01-16 10:31:02.607016-04
+1251	2026-01-16 10:31:01.771143-04	FCC-201	CATALYST_ACT	82.85	1	2026-01-16 10:31:02.607016-04
+1252	2026-01-16 10:31:01.771201-04	HT-301	TEMP_HYDRO	377.28	1	2026-01-16 10:31:02.607016-04
+1253	2026-01-16 10:31:01.771219-04	HT-301	H2_PRESS	44.48	1	2026-01-16 10:31:02.607016-04
+1254	2026-01-16 10:31:07.64956-04	CDU-101	TEMP_TOWER	400.73	1	2026-01-16 10:31:14.284358-04
+1255	2026-01-16 10:31:07.649685-04	CDU-101	PRESS_TOWER	4.27	1	2026-01-16 10:31:14.284358-04
+1256	2026-01-16 10:31:07.649705-04	CDU-101	FLOW_FEED	9229.64	1	2026-01-16 10:31:14.284358-04
+1257	2026-01-16 10:31:07.649723-04	FCC-201	TEMP_REACTOR	519.64	1	2026-01-16 10:31:14.284358-04
+1258	2026-01-16 10:31:07.64974-04	FCC-201	CATALYST_ACT	77.66	1	2026-01-16 10:31:14.284358-04
+1259	2026-01-16 10:31:07.649756-04	HT-301	TEMP_HYDRO	308.24	1	2026-01-16 10:31:14.284358-04
+1260	2026-01-16 10:31:07.649774-04	HT-301	H2_PRESS	30.08	1	2026-01-16 10:31:14.284358-04
+1261	2026-01-16 10:31:19.317384-04	CDU-101	TEMP_TOWER	357.18	1	2026-01-16 10:31:20.117792-04
+1262	2026-01-16 10:31:19.317434-04	CDU-101	PRESS_TOWER	4.84	1	2026-01-16 10:31:20.117792-04
+1263	2026-01-16 10:31:19.31745-04	CDU-101	FLOW_FEED	10250.33	1	2026-01-16 10:31:20.117792-04
+1264	2026-01-16 10:31:19.317466-04	FCC-201	TEMP_REACTOR	491.17	1	2026-01-16 10:31:20.117792-04
+1265	2026-01-16 10:31:19.317481-04	FCC-201	CATALYST_ACT	74.91	1	2026-01-16 10:31:20.117792-04
+1266	2026-01-16 10:31:19.317497-04	HT-301	TEMP_HYDRO	346.28	1	2026-01-16 10:31:20.117792-04
+1267	2026-01-16 10:31:19.317511-04	HT-301	H2_PRESS	45.98	1	2026-01-16 10:31:20.117792-04
+1268	2026-01-16 10:31:25.23139-04	CDU-101	TEMP_TOWER	424.02	1	2026-01-16 10:31:25.851161-04
+1269	2026-01-16 10:31:25.231471-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:31:25.851161-04
+1270	2026-01-16 10:31:25.231489-04	CDU-101	FLOW_FEED	8703.81	1	2026-01-16 10:31:25.851161-04
+1271	2026-01-16 10:31:25.231508-04	FCC-201	TEMP_REACTOR	515.76	1	2026-01-16 10:31:25.851161-04
+1272	2026-01-16 10:31:25.231525-04	FCC-201	CATALYST_ACT	71.45	1	2026-01-16 10:31:25.851161-04
+1273	2026-01-16 10:31:25.231541-04	HT-301	TEMP_HYDRO	356.49	1	2026-01-16 10:31:25.851161-04
+1274	2026-01-16 10:31:25.231559-04	HT-301	H2_PRESS	47.33	1	2026-01-16 10:31:25.851161-04
+1275	2026-01-16 10:31:30.939591-04	CDU-101	TEMP_TOWER	360.94	1	2026-01-16 10:31:34.171122-04
+1276	2026-01-16 10:31:30.939652-04	CDU-101	PRESS_TOWER	2.54	1	2026-01-16 10:31:34.171122-04
+1277	2026-01-16 10:31:30.939673-04	CDU-101	FLOW_FEED	8136.45	1	2026-01-16 10:31:34.171122-04
+1278	2026-01-16 10:31:30.93969-04	FCC-201	TEMP_REACTOR	518.25	1	2026-01-16 10:31:34.171122-04
+1279	2026-01-16 10:31:30.939707-04	FCC-201	CATALYST_ACT	78.95	1	2026-01-16 10:31:34.171122-04
+1280	2026-01-16 10:31:30.939723-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:31:34.171122-04
+1281	2026-01-16 10:31:30.939741-04	HT-301	H2_PRESS	35.76	1	2026-01-16 10:31:34.171122-04
+1282	2026-01-16 10:31:39.407564-04	CDU-101	TEMP_TOWER	363.29	1	2026-01-16 10:31:40.538398-04
+1283	2026-01-16 10:31:39.40765-04	CDU-101	PRESS_TOWER	3.97	1	2026-01-16 10:31:40.538398-04
+1284	2026-01-16 10:31:39.407668-04	CDU-101	FLOW_FEED	10670.08	1	2026-01-16 10:31:40.538398-04
+1285	2026-01-16 10:31:39.407685-04	FCC-201	TEMP_REACTOR	524.02	1	2026-01-16 10:31:40.538398-04
+1286	2026-01-16 10:31:39.4077-04	FCC-201	CATALYST_ACT	71.26	1	2026-01-16 10:31:40.538398-04
+1287	2026-01-16 10:31:39.407716-04	HT-301	TEMP_HYDRO	301.55	1	2026-01-16 10:31:40.538398-04
+1288	2026-01-16 10:31:39.407731-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:31:40.538398-04
+1289	2026-01-16 10:31:45.867603-04	CDU-101	TEMP_TOWER	419.42	1	2026-01-16 10:31:46.555631-04
+1290	2026-01-16 10:31:45.86772-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:31:46.555631-04
+1291	2026-01-16 10:31:45.867741-04	CDU-101	FLOW_FEED	11225.31	1	2026-01-16 10:31:46.555631-04
+1292	2026-01-16 10:31:45.867761-04	FCC-201	TEMP_REACTOR	544.47	1	2026-01-16 10:31:46.555631-04
+1293	2026-01-16 10:31:45.867778-04	FCC-201	CATALYST_ACT	85.69	1	2026-01-16 10:31:46.555631-04
+1294	2026-01-16 10:31:45.867795-04	HT-301	TEMP_HYDRO	304.73	1	2026-01-16 10:31:46.555631-04
+1295	2026-01-16 10:31:45.867815-04	HT-301	H2_PRESS	38.71	1	2026-01-16 10:31:46.555631-04
+1296	2026-01-16 10:31:51.664903-04	CDU-101	TEMP_TOWER	406.4	1	2026-01-16 10:31:54.476581-04
+1297	2026-01-16 10:31:51.664971-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:31:54.476581-04
+1298	2026-01-16 10:31:51.66499-04	CDU-101	FLOW_FEED	8392.11	1	2026-01-16 10:31:54.476581-04
+1299	2026-01-16 10:31:51.66501-04	FCC-201	TEMP_REACTOR	526.16	1	2026-01-16 10:31:54.476581-04
+1300	2026-01-16 10:31:51.665027-04	FCC-201	CATALYST_ACT	71.94	1	2026-01-16 10:31:54.476581-04
+1301	2026-01-16 10:31:51.665044-04	HT-301	TEMP_HYDRO	343.15	1	2026-01-16 10:31:54.476581-04
+1302	2026-01-16 10:31:51.66506-04	HT-301	H2_PRESS	31.83	1	2026-01-16 10:31:54.476581-04
+1303	2026-01-16 10:32:00.615406-04	CDU-101	TEMP_TOWER	443.45	1	2026-01-16 10:32:01.599685-04
+1304	2026-01-16 10:32:00.615503-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:32:01.599685-04
+1305	2026-01-16 10:32:00.615523-04	CDU-101	FLOW_FEED	9016.95	1	2026-01-16 10:32:01.599685-04
+1306	2026-01-16 10:32:00.615589-04	FCC-201	TEMP_REACTOR	530.01	1	2026-01-16 10:32:01.599685-04
+1307	2026-01-16 10:32:00.615609-04	FCC-201	CATALYST_ACT	91.76	1	2026-01-16 10:32:01.599685-04
+1308	2026-01-16 10:32:00.615625-04	HT-301	TEMP_HYDRO	353.24	1	2026-01-16 10:32:01.599685-04
+1309	2026-01-16 10:32:00.615645-04	HT-301	H2_PRESS	49.49	1	2026-01-16 10:32:01.599685-04
+1310	2026-01-16 10:32:09.326671-04	CDU-101	TEMP_TOWER	388.31	1	2026-01-16 10:32:12.204717-04
+1311	2026-01-16 10:32:09.326737-04	CDU-101	PRESS_TOWER	4.23	1	2026-01-16 10:32:12.204717-04
+1312	2026-01-16 10:32:09.326759-04	CDU-101	FLOW_FEED	8401.27	1	2026-01-16 10:32:12.204717-04
+1313	2026-01-16 10:32:09.326778-04	FCC-201	TEMP_REACTOR	494.36	1	2026-01-16 10:32:12.204717-04
+1314	2026-01-16 10:32:09.326796-04	FCC-201	CATALYST_ACT	91	1	2026-01-16 10:32:12.204717-04
+1315	2026-01-16 10:32:09.326814-04	HT-301	TEMP_HYDRO	359.89	1	2026-01-16 10:32:12.204717-04
+1316	2026-01-16 10:32:09.326829-04	HT-301	H2_PRESS	40.67	1	2026-01-16 10:32:12.204717-04
+1317	2026-01-16 10:32:17.396486-04	CDU-101	TEMP_TOWER	358.4	1	2026-01-16 10:32:17.738737-04
+1318	2026-01-16 10:32:17.396559-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:32:17.738737-04
+1319	2026-01-16 10:32:17.396579-04	CDU-101	FLOW_FEED	9768.87	1	2026-01-16 10:32:17.738737-04
+1320	2026-01-16 10:32:17.3966-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:32:17.738737-04
+1321	2026-01-16 10:32:17.396617-04	FCC-201	CATALYST_ACT	85.1	1	2026-01-16 10:32:17.738737-04
+1322	2026-01-16 10:32:17.396634-04	HT-301	TEMP_HYDRO	369.4	1	2026-01-16 10:32:17.738737-04
+1323	2026-01-16 10:32:17.396651-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:32:17.738737-04
+1324	2026-01-16 10:32:22.872986-04	CDU-101	TEMP_TOWER	419.35	1	2026-01-16 10:32:24.235468-04
+1325	2026-01-16 10:32:22.873065-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:32:24.235468-04
+1326	2026-01-16 10:32:22.873085-04	CDU-101	FLOW_FEED	8581.79	1	2026-01-16 10:32:24.235468-04
+1327	2026-01-16 10:32:22.873104-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:32:24.235468-04
+1328	2026-01-16 10:32:22.873122-04	FCC-201	CATALYST_ACT	75.79	1	2026-01-16 10:32:24.235468-04
+1329	2026-01-16 10:32:22.873138-04	HT-301	TEMP_HYDRO	368.58	1	2026-01-16 10:32:24.235468-04
+1330	2026-01-16 10:32:22.873155-04	HT-301	H2_PRESS	35.54	1	2026-01-16 10:32:24.235468-04
+1331	2026-01-16 10:32:29.896867-04	CDU-101	TEMP_TOWER	362.48	1	2026-01-16 10:32:30.281874-04
+1332	2026-01-16 10:32:29.896927-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:32:30.281874-04
+1333	2026-01-16 10:32:29.896949-04	CDU-101	FLOW_FEED	9186.29	1	2026-01-16 10:32:30.281874-04
+1334	2026-01-16 10:32:29.896967-04	FCC-201	TEMP_REACTOR	495.6	1	2026-01-16 10:32:30.281874-04
+1335	2026-01-16 10:32:29.896983-04	FCC-201	CATALYST_ACT	84.52	1	2026-01-16 10:32:30.281874-04
+1336	2026-01-16 10:32:29.897001-04	HT-301	TEMP_HYDRO	349.92	1	2026-01-16 10:32:30.281874-04
+1337	2026-01-16 10:32:29.89702-04	HT-301	H2_PRESS	47.73	1	2026-01-16 10:32:30.281874-04
+1338	2026-01-16 10:32:35.393358-04	CDU-101	TEMP_TOWER	381.03	1	2026-01-16 10:32:36.064363-04
+1339	2026-01-16 10:32:35.39342-04	CDU-101	PRESS_TOWER	2.95	1	2026-01-16 10:32:36.064363-04
+1340	2026-01-16 10:32:35.393438-04	CDU-101	FLOW_FEED	8166.6	1	2026-01-16 10:32:36.064363-04
+1341	2026-01-16 10:32:35.393456-04	FCC-201	TEMP_REACTOR	531.02	1	2026-01-16 10:32:36.064363-04
+1342	2026-01-16 10:32:35.393472-04	FCC-201	CATALYST_ACT	80.94	1	2026-01-16 10:32:36.064363-04
+1343	2026-01-16 10:32:35.393489-04	HT-301	TEMP_HYDRO	301.58	1	2026-01-16 10:32:36.064363-04
+1344	2026-01-16 10:32:35.393507-04	HT-301	H2_PRESS	44.78	1	2026-01-16 10:32:36.064363-04
+1345	2026-01-16 10:32:41.211862-04	CDU-101	TEMP_TOWER	423.36	1	2026-01-16 10:32:41.521975-04
+1346	2026-01-16 10:32:41.21192-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:32:41.521975-04
+1347	2026-01-16 10:32:41.211938-04	CDU-101	FLOW_FEED	9548.44	1	2026-01-16 10:32:41.521975-04
+1348	2026-01-16 10:32:41.211957-04	FCC-201	TEMP_REACTOR	532.23	1	2026-01-16 10:32:41.521975-04
+1349	2026-01-16 10:32:41.211973-04	FCC-201	CATALYST_ACT	77.48	1	2026-01-16 10:32:41.521975-04
+1350	2026-01-16 10:32:41.211989-04	HT-301	TEMP_HYDRO	372.69	1	2026-01-16 10:32:41.521975-04
+1351	2026-01-16 10:32:41.212005-04	HT-301	H2_PRESS	30.38	1	2026-01-16 10:32:41.521975-04
+1352	2026-01-16 10:32:46.552203-04	CDU-101	TEMP_TOWER	397.47	1	2026-01-16 10:32:49.218202-04
+1353	2026-01-16 10:32:46.552262-04	CDU-101	PRESS_TOWER	4.01	1	2026-01-16 10:32:49.218202-04
+1354	2026-01-16 10:32:46.552283-04	CDU-101	FLOW_FEED	11476.17	1	2026-01-16 10:32:49.218202-04
+1355	2026-01-16 10:32:46.552302-04	FCC-201	TEMP_REACTOR	515.12	1	2026-01-16 10:32:49.218202-04
+1356	2026-01-16 10:32:46.552321-04	FCC-201	CATALYST_ACT	92.45	1	2026-01-16 10:32:49.218202-04
+1357	2026-01-16 10:32:46.552339-04	HT-301	TEMP_HYDRO	342.45	1	2026-01-16 10:32:49.218202-04
+1358	2026-01-16 10:32:46.552356-04	HT-301	H2_PRESS	31.27	1	2026-01-16 10:32:49.218202-04
+1359	2026-01-16 10:32:54.296948-04	CDU-101	TEMP_TOWER	385.75	1	2026-01-16 10:32:54.493525-04
+1360	2026-01-16 10:32:54.296998-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:32:54.493525-04
+1361	2026-01-16 10:32:54.297015-04	CDU-101	FLOW_FEED	8096.41	1	2026-01-16 10:32:54.493525-04
+1362	2026-01-16 10:32:54.297032-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:32:54.493525-04
+1363	2026-01-16 10:32:54.297046-04	FCC-201	CATALYST_ACT	80.43	1	2026-01-16 10:32:54.493525-04
+1364	2026-01-16 10:32:54.297063-04	HT-301	TEMP_HYDRO	359.25	1	2026-01-16 10:32:54.493525-04
+1365	2026-01-16 10:32:54.297078-04	HT-301	H2_PRESS	41.7	1	2026-01-16 10:32:54.493525-04
+1366	2026-01-16 10:32:59.555964-04	CDU-101	TEMP_TOWER	377.09	1	2026-01-16 10:33:02.164792-04
+1367	2026-01-16 10:32:59.556023-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:33:02.164792-04
+1368	2026-01-16 10:32:59.556042-04	CDU-101	FLOW_FEED	8561.83	1	2026-01-16 10:33:02.164792-04
+1369	2026-01-16 10:32:59.55606-04	FCC-201	TEMP_REACTOR	523.35	1	2026-01-16 10:33:02.164792-04
+1370	2026-01-16 10:32:59.556076-04	FCC-201	CATALYST_ACT	85.72	1	2026-01-16 10:33:02.164792-04
+1371	2026-01-16 10:32:59.556093-04	HT-301	TEMP_HYDRO	358.33	1	2026-01-16 10:33:02.164792-04
+1372	2026-01-16 10:32:59.55611-04	HT-301	H2_PRESS	35.36	1	2026-01-16 10:33:02.164792-04
+1373	2026-01-16 10:33:07.273094-04	CDU-101	TEMP_TOWER	406.61	1	2026-01-16 10:33:07.497101-04
+1374	2026-01-16 10:33:07.273143-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 10:33:07.497101-04
+1375	2026-01-16 10:33:07.273161-04	CDU-101	FLOW_FEED	8137.3	1	2026-01-16 10:33:07.497101-04
+1376	2026-01-16 10:33:07.273178-04	FCC-201	TEMP_REACTOR	517.25	1	2026-01-16 10:33:07.497101-04
+1377	2026-01-16 10:33:07.273193-04	FCC-201	CATALYST_ACT	92.65	1	2026-01-16 10:33:07.497101-04
+1378	2026-01-16 10:33:07.273208-04	HT-301	TEMP_HYDRO	318.42	1	2026-01-16 10:33:07.497101-04
+1379	2026-01-16 10:33:07.273223-04	HT-301	H2_PRESS	40.73	1	2026-01-16 10:33:07.497101-04
+1380	2026-01-16 10:33:12.529268-04	CDU-101	TEMP_TOWER	385.52	1	2026-01-16 10:33:13.00047-04
+1381	2026-01-16 10:33:12.529329-04	CDU-101	PRESS_TOWER	3.63	1	2026-01-16 10:33:13.00047-04
+1382	2026-01-16 10:33:12.529347-04	CDU-101	FLOW_FEED	10373.21	1	2026-01-16 10:33:13.00047-04
+1383	2026-01-16 10:33:12.529364-04	FCC-201	TEMP_REACTOR	524.69	1	2026-01-16 10:33:13.00047-04
+1384	2026-01-16 10:33:12.52938-04	FCC-201	CATALYST_ACT	92.35	1	2026-01-16 10:33:13.00047-04
+1385	2026-01-16 10:33:12.529395-04	HT-301	TEMP_HYDRO	320.21	1	2026-01-16 10:33:13.00047-04
+1386	2026-01-16 10:33:12.52941-04	HT-301	H2_PRESS	46.63	1	2026-01-16 10:33:13.00047-04
+1387	2026-01-16 10:33:21.248244-04	CDU-101	TEMP_TOWER	399.47	1	2026-01-16 10:33:21.640509-04
+1388	2026-01-16 10:33:21.24832-04	CDU-101	PRESS_TOWER	4.9	1	2026-01-16 10:33:21.640509-04
+1389	2026-01-16 10:33:21.248339-04	CDU-101	FLOW_FEED	10195.7	1	2026-01-16 10:33:21.640509-04
+1390	2026-01-16 10:33:21.248356-04	FCC-201	TEMP_REACTOR	549.71	1	2026-01-16 10:33:21.640509-04
+1391	2026-01-16 10:33:21.248373-04	FCC-201	CATALYST_ACT	74.43	1	2026-01-16 10:33:21.640509-04
+1392	2026-01-16 10:33:21.248389-04	HT-301	TEMP_HYDRO	377.12	1	2026-01-16 10:33:21.640509-04
+1393	2026-01-16 10:33:21.248406-04	HT-301	H2_PRESS	36.56	1	2026-01-16 10:33:21.640509-04
+1394	2026-01-16 10:33:26.694202-04	CDU-101	TEMP_TOWER	433.79	1	2026-01-16 10:33:27.157112-04
+1395	2026-01-16 10:33:26.694261-04	CDU-101	PRESS_TOWER	3.39	1	2026-01-16 10:33:27.157112-04
+1396	2026-01-16 10:33:26.69428-04	CDU-101	FLOW_FEED	9751.95	1	2026-01-16 10:33:27.157112-04
+1397	2026-01-16 10:33:26.694297-04	FCC-201	TEMP_REACTOR	505.57	1	2026-01-16 10:33:27.157112-04
+1398	2026-01-16 10:33:26.694314-04	FCC-201	CATALYST_ACT	80.74	1	2026-01-16 10:33:27.157112-04
+1399	2026-01-16 10:33:26.69433-04	HT-301	TEMP_HYDRO	333.75	1	2026-01-16 10:33:27.157112-04
+1400	2026-01-16 10:33:26.694346-04	HT-301	H2_PRESS	39.23	1	2026-01-16 10:33:27.157112-04
+1401	2026-01-16 10:33:32.202708-04	CDU-101	TEMP_TOWER	429.51	1	2026-01-16 10:33:32.4361-04
+1402	2026-01-16 10:33:32.202768-04	CDU-101	PRESS_TOWER	2.87	1	2026-01-16 10:33:32.4361-04
+1403	2026-01-16 10:33:32.202789-04	CDU-101	FLOW_FEED	8275.45	1	2026-01-16 10:33:32.4361-04
+1404	2026-01-16 10:33:32.202806-04	FCC-201	TEMP_REACTOR	548.04	1	2026-01-16 10:33:32.4361-04
+1405	2026-01-16 10:33:32.202823-04	FCC-201	CATALYST_ACT	76.81	1	2026-01-16 10:33:32.4361-04
+1406	2026-01-16 10:33:32.202839-04	HT-301	TEMP_HYDRO	368.22	1	2026-01-16 10:33:32.4361-04
+1407	2026-01-16 10:33:32.202855-04	HT-301	H2_PRESS	42.27	1	2026-01-16 10:33:32.4361-04
+1408	2026-01-16 10:33:37.477779-04	CDU-101	TEMP_TOWER	386.89	1	2026-01-16 10:33:39.983945-04
+1409	2026-01-16 10:33:37.477837-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 10:33:39.983945-04
+1410	2026-01-16 10:33:37.477854-04	CDU-101	FLOW_FEED	9034.87	1	2026-01-16 10:33:39.983945-04
+1411	2026-01-16 10:33:37.477872-04	FCC-201	TEMP_REACTOR	488.96	1	2026-01-16 10:33:39.983945-04
+1412	2026-01-16 10:33:37.477886-04	FCC-201	CATALYST_ACT	80.46	1	2026-01-16 10:33:39.983945-04
+1413	2026-01-16 10:33:37.477902-04	HT-301	TEMP_HYDRO	332.33	1	2026-01-16 10:33:39.983945-04
+1414	2026-01-16 10:33:37.477917-04	HT-301	H2_PRESS	34.54	1	2026-01-16 10:33:39.983945-04
+1415	2026-01-16 10:33:45.036201-04	CDU-101	TEMP_TOWER	424.83	1	2026-01-16 10:33:45.262717-04
+1416	2026-01-16 10:33:45.036255-04	CDU-101	PRESS_TOWER	4.48	1	2026-01-16 10:33:45.262717-04
+1417	2026-01-16 10:33:45.036273-04	CDU-101	FLOW_FEED	10095.67	1	2026-01-16 10:33:45.262717-04
+1418	2026-01-16 10:33:45.036289-04	FCC-201	TEMP_REACTOR	523.18	1	2026-01-16 10:33:45.262717-04
+1419	2026-01-16 10:33:45.036304-04	FCC-201	CATALYST_ACT	71.74	1	2026-01-16 10:33:45.262717-04
+1420	2026-01-16 10:33:45.036319-04	HT-301	TEMP_HYDRO	330.83	1	2026-01-16 10:33:45.262717-04
+1421	2026-01-16 10:33:45.036334-04	HT-301	H2_PRESS	32.19	1	2026-01-16 10:33:45.262717-04
+1422	2026-01-16 10:33:50.326776-04	CDU-101	TEMP_TOWER	403.86	1	2026-01-16 10:33:58.55448-04
+1423	2026-01-16 10:33:50.32684-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:33:58.55448-04
+1424	2026-01-16 10:33:50.326858-04	CDU-101	FLOW_FEED	8652.82	1	2026-01-16 10:33:58.55448-04
+1425	2026-01-16 10:33:50.326877-04	FCC-201	TEMP_REACTOR	532.66	1	2026-01-16 10:33:58.55448-04
+1426	2026-01-16 10:33:50.326894-04	FCC-201	CATALYST_ACT	78.32	1	2026-01-16 10:33:58.55448-04
+1427	2026-01-16 10:33:50.32691-04	HT-301	TEMP_HYDRO	362.01	1	2026-01-16 10:33:58.55448-04
+1428	2026-01-16 10:33:50.326926-04	HT-301	H2_PRESS	42.52	1	2026-01-16 10:33:58.55448-04
+1429	2026-01-16 10:34:03.622918-04	CDU-101	TEMP_TOWER	386.46	1	2026-01-16 10:34:04.164338-04
+1430	2026-01-16 10:34:03.622984-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:34:04.164338-04
+1431	2026-01-16 10:34:03.623005-04	CDU-101	FLOW_FEED	11742.54	1	2026-01-16 10:34:04.164338-04
+1432	2026-01-16 10:34:03.623024-04	FCC-201	TEMP_REACTOR	501.34	1	2026-01-16 10:34:04.164338-04
+1433	2026-01-16 10:34:03.623041-04	FCC-201	CATALYST_ACT	72.8	1	2026-01-16 10:34:04.164338-04
+1434	2026-01-16 10:34:03.623058-04	HT-301	TEMP_HYDRO	335.7	1	2026-01-16 10:34:04.164338-04
+1435	2026-01-16 10:34:03.623075-04	HT-301	H2_PRESS	43.57	1	2026-01-16 10:34:04.164338-04
+1436	2026-01-16 10:34:09.206976-04	CDU-101	TEMP_TOWER	350.46	1	2026-01-16 10:34:09.450243-04
+1437	2026-01-16 10:34:09.207045-04	CDU-101	PRESS_TOWER	2.82	1	2026-01-16 10:34:09.450243-04
+1438	2026-01-16 10:34:09.207064-04	CDU-101	FLOW_FEED	10611.57	1	2026-01-16 10:34:09.450243-04
+1439	2026-01-16 10:34:09.207081-04	FCC-201	TEMP_REACTOR	510.62	1	2026-01-16 10:34:09.450243-04
+1440	2026-01-16 10:34:09.207099-04	FCC-201	CATALYST_ACT	81.4	1	2026-01-16 10:34:09.450243-04
+1441	2026-01-16 10:34:09.207117-04	HT-301	TEMP_HYDRO	328.49	1	2026-01-16 10:34:09.450243-04
+1442	2026-01-16 10:34:09.207134-04	HT-301	H2_PRESS	34.87	1	2026-01-16 10:34:09.450243-04
+1443	2026-01-16 10:34:14.48283-04	CDU-101	TEMP_TOWER	414.51	1	2026-01-16 10:34:17.00368-04
+1444	2026-01-16 10:34:14.482891-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:34:17.00368-04
+1445	2026-01-16 10:34:14.482909-04	CDU-101	FLOW_FEED	9838.7	1	2026-01-16 10:34:17.00368-04
+1446	2026-01-16 10:34:14.482927-04	FCC-201	TEMP_REACTOR	542.14	1	2026-01-16 10:34:17.00368-04
+1447	2026-01-16 10:34:14.482943-04	FCC-201	CATALYST_ACT	77.34	1	2026-01-16 10:34:17.00368-04
+1448	2026-01-16 10:34:14.482958-04	HT-301	TEMP_HYDRO	378.14	1	2026-01-16 10:34:17.00368-04
+1449	2026-01-16 10:34:14.482974-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:34:17.00368-04
+1450	2026-01-16 10:34:22.038612-04	CDU-101	TEMP_TOWER	365.68	1	2026-01-16 10:34:22.30655-04
+1451	2026-01-16 10:34:22.038673-04	CDU-101	PRESS_TOWER	4.95	1	2026-01-16 10:34:22.30655-04
+1452	2026-01-16 10:34:22.038693-04	CDU-101	FLOW_FEED	8800.62	1	2026-01-16 10:34:22.30655-04
+1453	2026-01-16 10:34:22.038712-04	FCC-201	TEMP_REACTOR	480.01	1	2026-01-16 10:34:22.30655-04
+1454	2026-01-16 10:34:22.038727-04	FCC-201	CATALYST_ACT	77.11	1	2026-01-16 10:34:22.30655-04
+1455	2026-01-16 10:34:22.038743-04	HT-301	TEMP_HYDRO	337.39	1	2026-01-16 10:34:22.30655-04
+1456	2026-01-16 10:34:22.03876-04	HT-301	H2_PRESS	36.09	1	2026-01-16 10:34:22.30655-04
+1457	2026-01-16 10:34:27.339392-04	CDU-101	TEMP_TOWER	395.05	1	2026-01-16 10:34:27.883442-04
+1458	2026-01-16 10:34:27.339473-04	CDU-101	PRESS_TOWER	3.81	1	2026-01-16 10:34:27.883442-04
+1459	2026-01-16 10:34:27.339492-04	CDU-101	FLOW_FEED	8415.83	1	2026-01-16 10:34:27.883442-04
+1460	2026-01-16 10:34:27.339513-04	FCC-201	TEMP_REACTOR	546.22	1	2026-01-16 10:34:27.883442-04
+1461	2026-01-16 10:34:27.339531-04	FCC-201	CATALYST_ACT	79.24	1	2026-01-16 10:34:27.883442-04
+1462	2026-01-16 10:34:27.339547-04	HT-301	TEMP_HYDRO	365.73	1	2026-01-16 10:34:27.883442-04
+1463	2026-01-16 10:34:27.339563-04	HT-301	H2_PRESS	49.99	1	2026-01-16 10:34:27.883442-04
+1464	2026-01-16 10:34:32.918522-04	CDU-101	TEMP_TOWER	422.03	1	2026-01-16 10:34:33.110994-04
+1465	2026-01-16 10:34:32.918573-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:34:33.110994-04
+1466	2026-01-16 10:34:32.918589-04	CDU-101	FLOW_FEED	8067.06	1	2026-01-16 10:34:33.110994-04
+1467	2026-01-16 10:34:32.918605-04	FCC-201	TEMP_REACTOR	508.55	1	2026-01-16 10:34:33.110994-04
+1468	2026-01-16 10:34:32.91862-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:34:33.110994-04
+1469	2026-01-16 10:34:32.918635-04	HT-301	TEMP_HYDRO	371.39	1	2026-01-16 10:34:33.110994-04
+1470	2026-01-16 10:34:32.91865-04	HT-301	H2_PRESS	47.63	1	2026-01-16 10:34:33.110994-04
+1471	2026-01-16 10:34:38.186718-04	CDU-101	TEMP_TOWER	375.55	1	2026-01-16 10:34:38.654647-04
+1472	2026-01-16 10:34:38.186775-04	CDU-101	PRESS_TOWER	3.78	1	2026-01-16 10:34:38.654647-04
+1473	2026-01-16 10:34:38.186793-04	CDU-101	FLOW_FEED	11036.33	1	2026-01-16 10:34:38.654647-04
+1474	2026-01-16 10:34:38.186813-04	FCC-201	TEMP_REACTOR	491.23	1	2026-01-16 10:34:38.654647-04
+1475	2026-01-16 10:34:38.18683-04	FCC-201	CATALYST_ACT	93.71	1	2026-01-16 10:34:38.654647-04
+1476	2026-01-16 10:34:38.186846-04	HT-301	TEMP_HYDRO	323.31	1	2026-01-16 10:34:38.654647-04
+1477	2026-01-16 10:34:38.186862-04	HT-301	H2_PRESS	44.74	1	2026-01-16 10:34:38.654647-04
+1478	2026-01-16 10:34:43.718707-04	CDU-101	TEMP_TOWER	430.54	1	2026-01-16 10:34:45.919293-04
+1479	2026-01-16 10:34:43.718766-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:34:45.919293-04
+1480	2026-01-16 10:34:43.718785-04	CDU-101	FLOW_FEED	9808.91	1	2026-01-16 10:34:45.919293-04
+1481	2026-01-16 10:34:43.718802-04	FCC-201	TEMP_REACTOR	547.88	1	2026-01-16 10:34:45.919293-04
+1482	2026-01-16 10:34:43.718819-04	FCC-201	CATALYST_ACT	75.57	1	2026-01-16 10:34:45.919293-04
+1483	2026-01-16 10:34:43.718836-04	HT-301	TEMP_HYDRO	303.23	1	2026-01-16 10:34:45.919293-04
+1484	2026-01-16 10:34:43.718852-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:34:45.919293-04
+1485	2026-01-16 10:34:50.978722-04	CDU-101	TEMP_TOWER	431.68	1	2026-01-16 10:34:51.429352-04
+1486	2026-01-16 10:34:50.978785-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:34:51.429352-04
+1487	2026-01-16 10:34:50.978803-04	CDU-101	FLOW_FEED	10576.43	1	2026-01-16 10:34:51.429352-04
+1488	2026-01-16 10:34:50.978824-04	FCC-201	TEMP_REACTOR	545.01	1	2026-01-16 10:34:51.429352-04
+1489	2026-01-16 10:34:50.978841-04	FCC-201	CATALYST_ACT	87.55	1	2026-01-16 10:34:51.429352-04
+1490	2026-01-16 10:34:50.978858-04	HT-301	TEMP_HYDRO	328.18	1	2026-01-16 10:34:51.429352-04
+1491	2026-01-16 10:34:50.978876-04	HT-301	H2_PRESS	40.99	1	2026-01-16 10:34:51.429352-04
+1492	2026-01-16 10:34:56.457603-04	CDU-101	TEMP_TOWER	415.03	1	2026-01-16 10:34:56.648045-04
+1493	2026-01-16 10:34:56.457657-04	CDU-101	PRESS_TOWER	2.77	1	2026-01-16 10:34:56.648045-04
+1494	2026-01-16 10:34:56.457674-04	CDU-101	FLOW_FEED	10877.67	1	2026-01-16 10:34:56.648045-04
+1495	2026-01-16 10:34:56.45769-04	FCC-201	TEMP_REACTOR	528.05	1	2026-01-16 10:34:56.648045-04
+1496	2026-01-16 10:34:56.457705-04	FCC-201	CATALYST_ACT	92.2	1	2026-01-16 10:34:56.648045-04
+1497	2026-01-16 10:34:56.45772-04	HT-301	TEMP_HYDRO	337.08	1	2026-01-16 10:34:56.648045-04
+1498	2026-01-16 10:34:56.457735-04	HT-301	H2_PRESS	49.6	1	2026-01-16 10:34:56.648045-04
+1499	2026-01-16 10:35:01.681978-04	CDU-101	TEMP_TOWER	433.68	1	2026-01-16 10:35:04.144458-04
+1500	2026-01-16 10:35:01.682036-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:35:04.144458-04
+1501	2026-01-16 10:35:01.682055-04	CDU-101	FLOW_FEED	10855.79	1	2026-01-16 10:35:04.144458-04
+1502	2026-01-16 10:35:01.682073-04	FCC-201	TEMP_REACTOR	533.64	1	2026-01-16 10:35:04.144458-04
+1503	2026-01-16 10:35:01.682091-04	FCC-201	CATALYST_ACT	87.92	1	2026-01-16 10:35:04.144458-04
+1504	2026-01-16 10:35:01.682108-04	HT-301	TEMP_HYDRO	345.07	1	2026-01-16 10:35:04.144458-04
+1505	2026-01-16 10:35:01.682127-04	HT-301	H2_PRESS	35.05	1	2026-01-16 10:35:04.144458-04
+1506	2026-01-16 10:35:09.173089-04	CDU-101	TEMP_TOWER	425.75	1	2026-01-16 10:35:09.371006-04
+1507	2026-01-16 10:35:09.173137-04	CDU-101	PRESS_TOWER	3.4	1	2026-01-16 10:35:09.371006-04
+1508	2026-01-16 10:35:09.173154-04	CDU-101	FLOW_FEED	11542.61	1	2026-01-16 10:35:09.371006-04
+1509	2026-01-16 10:35:09.173171-04	FCC-201	TEMP_REACTOR	490.07	1	2026-01-16 10:35:09.371006-04
+1510	2026-01-16 10:35:09.173187-04	FCC-201	CATALYST_ACT	86.67	1	2026-01-16 10:35:09.371006-04
+1511	2026-01-16 10:35:09.173202-04	HT-301	TEMP_HYDRO	311.71	1	2026-01-16 10:35:09.371006-04
+1512	2026-01-16 10:35:09.173218-04	HT-301	H2_PRESS	34.38	1	2026-01-16 10:35:09.371006-04
+1513	2026-01-16 10:35:14.406287-04	CDU-101	TEMP_TOWER	404.17	1	2026-01-16 10:35:16.883747-04
+1514	2026-01-16 10:35:14.406345-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:35:16.883747-04
+1515	2026-01-16 10:35:14.406364-04	CDU-101	FLOW_FEED	8004.3	1	2026-01-16 10:35:16.883747-04
+1516	2026-01-16 10:35:14.406382-04	FCC-201	TEMP_REACTOR	495.28	1	2026-01-16 10:35:16.883747-04
+1517	2026-01-16 10:35:14.406398-04	FCC-201	CATALYST_ACT	83.84	1	2026-01-16 10:35:16.883747-04
+1518	2026-01-16 10:35:14.406417-04	HT-301	TEMP_HYDRO	306.17	1	2026-01-16 10:35:16.883747-04
+1519	2026-01-16 10:35:14.406434-04	HT-301	H2_PRESS	44.61	1	2026-01-16 10:35:16.883747-04
+1520	2026-01-16 10:35:21.917377-04	CDU-101	TEMP_TOWER	377.52	1	2026-01-16 10:35:22.110085-04
+1521	2026-01-16 10:35:21.917439-04	CDU-101	PRESS_TOWER	3.29	1	2026-01-16 10:35:22.110085-04
+1522	2026-01-16 10:35:21.917458-04	CDU-101	FLOW_FEED	9448.95	1	2026-01-16 10:35:22.110085-04
+1523	2026-01-16 10:35:21.917476-04	FCC-201	TEMP_REACTOR	510.59	1	2026-01-16 10:35:22.110085-04
+1524	2026-01-16 10:35:21.917492-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:35:22.110085-04
+1525	2026-01-16 10:35:21.917507-04	HT-301	TEMP_HYDRO	311.21	1	2026-01-16 10:35:22.110085-04
+1526	2026-01-16 10:35:21.917522-04	HT-301	H2_PRESS	35.49	1	2026-01-16 10:35:22.110085-04
+1527	2026-01-16 10:35:27.143586-04	CDU-101	TEMP_TOWER	372.86	1	2026-01-16 10:35:29.60218-04
+1528	2026-01-16 10:35:27.143649-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:35:29.60218-04
+1529	2026-01-16 10:35:27.143667-04	CDU-101	FLOW_FEED	9155.05	1	2026-01-16 10:35:29.60218-04
+1530	2026-01-16 10:35:27.143685-04	FCC-201	TEMP_REACTOR	528.54	1	2026-01-16 10:35:29.60218-04
+1531	2026-01-16 10:35:27.143702-04	FCC-201	CATALYST_ACT	78.71	1	2026-01-16 10:35:29.60218-04
+1532	2026-01-16 10:35:27.143719-04	HT-301	TEMP_HYDRO	328.6	1	2026-01-16 10:35:29.60218-04
+1533	2026-01-16 10:35:27.143738-04	HT-301	H2_PRESS	43.26	1	2026-01-16 10:35:29.60218-04
+1534	2026-01-16 10:35:34.626863-04	CDU-101	TEMP_TOWER	382.32	1	2026-01-16 10:35:36.852263-04
+1535	2026-01-16 10:35:34.626922-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:35:36.852263-04
+1536	2026-01-16 10:35:34.626941-04	CDU-101	FLOW_FEED	8097.34	1	2026-01-16 10:35:36.852263-04
+1537	2026-01-16 10:35:34.626959-04	FCC-201	TEMP_REACTOR	545.07	1	2026-01-16 10:35:36.852263-04
+1538	2026-01-16 10:35:34.626976-04	FCC-201	CATALYST_ACT	78.24	1	2026-01-16 10:35:36.852263-04
+1539	2026-01-16 10:35:34.626992-04	HT-301	TEMP_HYDRO	369.02	1	2026-01-16 10:35:36.852263-04
+1540	2026-01-16 10:35:34.627009-04	HT-301	H2_PRESS	32.85	1	2026-01-16 10:35:36.852263-04
+1541	2026-01-16 10:35:41.884529-04	CDU-101	TEMP_TOWER	442.24	1	2026-01-16 10:35:44.434377-04
+1542	2026-01-16 10:35:41.884585-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:35:44.434377-04
+1543	2026-01-16 10:35:41.884604-04	CDU-101	FLOW_FEED	9108.04	1	2026-01-16 10:35:44.434377-04
+1544	2026-01-16 10:35:41.884622-04	FCC-201	TEMP_REACTOR	486.84	1	2026-01-16 10:35:44.434377-04
+1545	2026-01-16 10:35:41.884638-04	FCC-201	CATALYST_ACT	71.27	1	2026-01-16 10:35:44.434377-04
+1546	2026-01-16 10:35:41.884655-04	HT-301	TEMP_HYDRO	318.02	1	2026-01-16 10:35:44.434377-04
+1547	2026-01-16 10:35:41.884672-04	HT-301	H2_PRESS	40.13	1	2026-01-16 10:35:44.434377-04
+1548	2026-01-16 10:35:49.464505-04	CDU-101	TEMP_TOWER	408.92	1	2026-01-16 10:35:49.786845-04
+1549	2026-01-16 10:35:49.464568-04	CDU-101	PRESS_TOWER	2.59	1	2026-01-16 10:35:49.786845-04
+1550	2026-01-16 10:35:49.464587-04	CDU-101	FLOW_FEED	8892.7	1	2026-01-16 10:35:49.786845-04
+1551	2026-01-16 10:35:49.464606-04	FCC-201	TEMP_REACTOR	537.83	1	2026-01-16 10:35:49.786845-04
+1552	2026-01-16 10:35:49.464622-04	FCC-201	CATALYST_ACT	90.59	1	2026-01-16 10:35:49.786845-04
+1553	2026-01-16 10:35:49.464639-04	HT-301	TEMP_HYDRO	335.13	1	2026-01-16 10:35:49.786845-04
+1554	2026-01-16 10:35:49.464656-04	HT-301	H2_PRESS	42.21	1	2026-01-16 10:35:49.786845-04
+1555	2026-01-16 10:35:54.968581-04	CDU-101	TEMP_TOWER	420.68	1	2026-01-16 10:35:55.432417-04
+1556	2026-01-16 10:35:54.968629-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:35:55.432417-04
+1557	2026-01-16 10:35:54.968646-04	CDU-101	FLOW_FEED	8307.64	1	2026-01-16 10:35:55.432417-04
+1558	2026-01-16 10:35:54.968662-04	FCC-201	TEMP_REACTOR	532.44	1	2026-01-16 10:35:55.432417-04
+1559	2026-01-16 10:35:54.968677-04	FCC-201	CATALYST_ACT	92.78	1	2026-01-16 10:35:55.432417-04
+1560	2026-01-16 10:35:54.968692-04	HT-301	TEMP_HYDRO	310.02	1	2026-01-16 10:35:55.432417-04
+1561	2026-01-16 10:35:54.968707-04	HT-301	H2_PRESS	33.61	1	2026-01-16 10:35:55.432417-04
+\.
+
+
+--
+-- Data for Name: efficiency_status; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.efficiency_status (status_code, status_name, min_score, max_score, color_hex, icon_name, description) FROM stdin;
+EXCELLENT	Excelente	95	100	#10B981	trending-up	Rendimiento óptimo
+GOOD	Bueno	85	94.9	#34D399	check-circle	Rendimiento satisfactorio
+NEEDS_IMPROVEMENT	Necesita Mejora	70	84.9	#F59E0B	alert-circle	Hay oportunidades de mejora
+POOR	Pobre	0	69.9	#EF4444	alert-triangle	Requiere intervención urgente
+\.
+
+
+--
+-- Data for Name: energy_analysis; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.energy_analysis (id, unit_id, analysis_date, avg_energy_consumption, benchmark, target, efficiency_score, status, inefficiencies, recommendations, estimated_savings, "timestamp") FROM stdin;
+1	FCC-201	2026-01-31	42.06	45	42.75	107	EXCELLENT	[]	[{"action": "Check Insulation", "priority": "HIGH"}, {"action": "Optimize Heater", "priority": "MEDIUM"}]	0	2026-01-31 18:11:39.159984-04
+2	HT-301	2026-01-31	43.04	45	42.75	104.56	EXCELLENT	[]	[{"action": "Check Insulation", "priority": "HIGH"}, {"action": "Optimize Heater", "priority": "MEDIUM"}]	0.29	2026-01-31 18:11:39.209738-04
+3	CDU-101	2026-01-31	44	45	42.75	102.27	EXCELLENT	[]	[{"action": "Check Insulation", "priority": "HIGH"}, {"action": "Optimize Heater", "priority": "MEDIUM"}]	1.25	2026-01-31 18:11:39.211397-04
+\.
+
+
+--
+-- Data for Name: equipment; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.equipment (equipment_id, equipment_name, equipment_type, unit_id, manufacturer, model, serial_number, installation_date, maintenance_interval, last_maintenance_date, operating_hours, status, specifications, created_at, updated_at) FROM stdin;
+PUMP-CDU-101	Bomba CDU-101	PUMP	CDU-101	\N	\N	\N	\N	\N	\N	0	OPERATIONAL	{}	2026-01-22 17:52:26.075143-04	2026-01-22 17:52:26.075143-04
+PUMP-CDU-102	Bomba CDU-102	PUMP	CDU-101	\N	\N	\N	\N	\N	\N	0	OPERATIONAL	{}	2026-01-22 17:52:26.121315-04	2026-01-22 17:52:26.121315-04
+COMP-FCC-201	Compresor FCC-201	COMPRESSOR	FCC-201	\N	\N	\N	\N	\N	\N	0	OPERATIONAL	{}	2026-01-22 17:52:26.123064-04	2026-01-22 17:52:26.123064-04
+VALVE-HT-301	Válvula HT-301	VALVE	HT-301	\N	\N	\N	\N	\N	\N	0	OPERATIONAL	{}	2026-01-22 17:52:26.124666-04	2026-01-22 17:52:26.124666-04
+HEAT-EXCH-001	Intercambiador de Calor	HEAT_EXCHANGER	CDU-101	\N	\N	\N	\N	\N	\N	0	OPERATIONAL	{}	2026-01-22 17:52:26.126214-04	2026-01-22 17:52:26.126214-04
+\.
+
+
+--
+-- Data for Name: inventory; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.inventory (id, item_name, category, quantity, min_level, location) FROM stdin;
+1	Válvula 4"	REPUESTOS	2	5	Almacén A
+2	Sello Mecánico	REPUESTOS	8	3	Almacén B
+3	Catalizador	QUÍMICOS	4500	1000	Silo 1
+\.
+
+
+--
+-- Data for Name: kpis; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.kpis (id, "timestamp", unit_id, energy_efficiency, throughput, quality_score, maintenance_score) FROM stdin;
+7	2026-01-30 19:50:52.275966-04	CDU-101	90.75407720353621	10198.995999346915	95	98
+8	2026-01-30 19:50:52.275966-04	FCC-201	90.75407720353621	10198.995999346915	95	98
+9	2026-01-30 19:50:52.275966-04	HT-301	90.75407720353621	10198.995999346915	95	98
+10	2026-01-30 20:05:52.275966-04	CDU-101	90.18895822264145	10211.35092253693	95	98
+11	2026-01-30 20:05:52.275966-04	FCC-201	90.18895822264145	10211.35092253693	95	98
+12	2026-01-30 20:05:52.275966-04	HT-301	90.18895822264145	10211.35092253693	95	98
+13	2026-01-30 20:20:52.275966-04	CDU-101	90.52933382711379	9966.19393446785	95	98
+14	2026-01-30 20:20:52.275966-04	FCC-201	90.52933382711379	9966.19393446785	95	98
+15	2026-01-30 20:20:52.275966-04	HT-301	90.52933382711379	9966.19393446785	95	98
+16	2026-01-30 20:35:52.275966-04	CDU-101	90.5743197315198	10187.597965950676	95	98
+17	2026-01-30 20:35:52.275966-04	FCC-201	90.5743197315198	10187.597965950676	95	98
+18	2026-01-30 20:35:52.275966-04	HT-301	90.5743197315198	10187.597965950676	95	98
+19	2026-01-30 20:50:52.275966-04	CDU-101	91.85728203117667	10188.790827322275	95	98
+20	2026-01-30 20:50:52.275966-04	FCC-201	91.85728203117667	10188.790827322275	95	98
+21	2026-01-30 20:50:52.275966-04	HT-301	91.85728203117667	10188.790827322275	95	98
+22	2026-01-30 21:05:52.275966-04	CDU-101	91.64242240303373	10177.07108718858	95	98
+23	2026-01-30 21:05:52.275966-04	FCC-201	91.64242240303373	10177.07108718858	95	98
+24	2026-01-30 21:05:52.275966-04	HT-301	91.64242240303373	10177.07108718858	95	98
+25	2026-01-30 21:20:52.275966-04	CDU-101	93.34662468128694	10102.315715632814	95	98
+26	2026-01-30 21:20:52.275966-04	FCC-201	93.34662468128694	10102.315715632814	95	98
+27	2026-01-30 21:20:52.275966-04	HT-301	93.34662468128694	10102.315715632814	95	98
+28	2026-01-30 21:35:52.275966-04	CDU-101	93.66217690419504	10387.0278951398	95	98
+29	2026-01-30 21:35:52.275966-04	FCC-201	93.66217690419504	10387.0278951398	95	98
+30	2026-01-30 21:35:52.275966-04	HT-301	93.66217690419504	10387.0278951398	95	98
+31	2026-01-30 21:50:52.275966-04	CDU-101	92.9831037647269	10307.755282576496	95	98
+32	2026-01-30 21:50:52.275966-04	FCC-201	92.9831037647269	10307.755282576496	95	98
+33	2026-01-30 21:50:52.275966-04	HT-301	92.9831037647269	10307.755282576496	95	98
+34	2026-01-30 22:05:52.275966-04	CDU-101	94.21090266638649	10562.019447934294	95	98
+35	2026-01-30 22:05:52.275966-04	FCC-201	94.21090266638649	10562.019447934294	95	98
+36	2026-01-30 22:05:52.275966-04	HT-301	94.21090266638649	10562.019447934294	95	98
+37	2026-01-30 22:20:52.275966-04	CDU-101	95.01604804915749	10337.927926861483	95	98
+38	2026-01-30 22:20:52.275966-04	FCC-201	95.01604804915749	10337.927926861483	95	98
+39	2026-01-30 22:20:52.275966-04	HT-301	95.01604804915749	10337.927926861483	95	98
+40	2026-01-30 22:35:52.275966-04	CDU-101	95.03062949160041	10552.881130663665	95	98
+41	2026-01-30 22:35:52.275966-04	FCC-201	95.03062949160041	10552.881130663665	95	98
+42	2026-01-30 22:35:52.275966-04	HT-301	95.03062949160041	10552.881130663665	95	98
+43	2026-01-30 22:50:52.275966-04	CDU-101	93.85580545144498	10307.708654952214	95	98
+44	2026-01-30 22:50:52.275966-04	FCC-201	93.85580545144498	10307.708654952214	95	98
+45	2026-01-30 22:50:52.275966-04	HT-301	93.85580545144498	10307.708654952214	95	98
+46	2026-01-30 23:05:52.275966-04	CDU-101	94.60770869153954	10477.535605761395	95	98
+47	2026-01-30 23:05:52.275966-04	FCC-201	94.60770869153954	10477.535605761395	95	98
+48	2026-01-30 23:05:52.275966-04	HT-301	94.60770869153954	10477.535605761395	95	98
+49	2026-01-30 23:20:52.275966-04	CDU-101	95.06357971659861	10684.36231461279	95	98
+50	2026-01-30 23:20:52.275966-04	FCC-201	95.06357971659861	10684.36231461279	95	98
+51	2026-01-30 23:20:52.275966-04	HT-301	95.06357971659861	10684.36231461279	95	98
+52	2026-01-30 23:35:52.275966-04	CDU-101	95.62804466766524	10580.665214594781	95	98
+53	2026-01-30 23:35:52.275966-04	FCC-201	95.62804466766524	10580.665214594781	95	98
+54	2026-01-30 23:35:52.275966-04	HT-301	95.62804466766524	10580.665214594781	95	98
+55	2026-01-30 23:50:52.275966-04	CDU-101	94.66365649806934	10594.724506483819	95	98
+56	2026-01-30 23:50:52.275966-04	FCC-201	94.66365649806934	10594.724506483819	95	98
+57	2026-01-30 23:50:52.275966-04	HT-301	94.66365649806934	10594.724506483819	95	98
+58	2026-01-31 00:05:52.275966-04	CDU-101	94.03188852813378	10606.289070609831	95	98
+59	2026-01-31 00:05:52.275966-04	FCC-201	94.03188852813378	10606.289070609831	95	98
+60	2026-01-31 00:05:52.275966-04	HT-301	94.03188852813378	10606.289070609831	95	98
+61	2026-01-31 00:20:52.275966-04	CDU-101	94.06094375265594	10485.019661239414	95	98
+62	2026-01-31 00:20:52.275966-04	FCC-201	94.06094375265594	10485.019661239414	95	98
+63	2026-01-31 00:20:52.275966-04	HT-301	94.06094375265594	10485.019661239414	95	98
+64	2026-01-31 00:35:52.275966-04	CDU-101	93.92039333735237	10339.487452604368	95	98
+65	2026-01-31 00:35:52.275966-04	FCC-201	93.92039333735237	10339.487452604368	95	98
+66	2026-01-31 00:35:52.275966-04	HT-301	93.92039333735237	10339.487452604368	95	98
+67	2026-01-31 00:50:52.275966-04	CDU-101	93.96511264224057	10599.21663221628	95	98
+68	2026-01-31 00:50:52.275966-04	FCC-201	93.96511264224057	10599.21663221628	95	98
+69	2026-01-31 00:50:52.275966-04	HT-301	93.96511264224057	10599.21663221628	95	98
+70	2026-01-31 01:05:52.275966-04	CDU-101	94.18762648920126	10465.681656231849	95	98
+71	2026-01-31 01:05:52.275966-04	FCC-201	94.18762648920126	10465.681656231849	95	98
+72	2026-01-31 01:05:52.275966-04	HT-301	94.18762648920126	10465.681656231849	95	98
+73	2026-01-31 01:20:52.275966-04	CDU-101	93.89465397937154	10472.530337935063	95	98
+74	2026-01-31 01:20:52.275966-04	FCC-201	93.89465397937154	10472.530337935063	95	98
+75	2026-01-31 01:20:52.275966-04	HT-301	93.89465397937154	10472.530337935063	95	98
+76	2026-01-31 01:35:52.275966-04	CDU-101	93.5482274013638	10565.544989152786	95	98
+77	2026-01-31 01:35:52.275966-04	FCC-201	93.5482274013638	10565.544989152786	95	98
+78	2026-01-31 01:35:52.275966-04	HT-301	93.5482274013638	10565.544989152786	95	98
+79	2026-01-31 01:50:52.275966-04	CDU-101	93.97372203399863	10236.017332387251	95	98
+80	2026-01-31 01:50:52.275966-04	FCC-201	93.97372203399863	10236.017332387251	95	98
+81	2026-01-31 01:50:52.275966-04	HT-301	93.97372203399863	10236.017332387251	95	98
+82	2026-01-31 02:05:52.275966-04	CDU-101	92.18783502913514	10428.253469351292	95	98
+83	2026-01-31 02:05:52.275966-04	FCC-201	92.18783502913514	10428.253469351292	95	98
+84	2026-01-31 02:05:52.275966-04	HT-301	92.18783502913514	10428.253469351292	95	98
+85	2026-01-31 02:20:52.275966-04	CDU-101	92.69754187688439	10393.833669987645	95	98
+86	2026-01-31 02:20:52.275966-04	FCC-201	92.69754187688439	10393.833669987645	95	98
+87	2026-01-31 02:20:52.275966-04	HT-301	92.69754187688439	10393.833669987645	95	98
+88	2026-01-31 02:35:52.275966-04	CDU-101	91.66365108853748	10309.669803292556	95	98
+89	2026-01-31 02:35:52.275966-04	FCC-201	91.66365108853748	10309.669803292556	95	98
+90	2026-01-31 02:35:52.275966-04	HT-301	91.66365108853748	10309.669803292556	95	98
+91	2026-01-31 02:50:52.275966-04	CDU-101	91.2044804322888	10311.674431915373	95	98
+92	2026-01-31 02:50:52.275966-04	FCC-201	91.2044804322888	10311.674431915373	95	98
+93	2026-01-31 02:50:52.275966-04	HT-301	91.2044804322888	10311.674431915373	95	98
+94	2026-01-31 03:05:52.275966-04	CDU-101	91.79513149785203	10281.13773918356	95	98
+95	2026-01-31 03:05:52.275966-04	FCC-201	91.79513149785203	10281.13773918356	95	98
+96	2026-01-31 03:05:52.275966-04	HT-301	91.79513149785203	10281.13773918356	95	98
+97	2026-01-31 03:20:52.275966-04	CDU-101	91.5715541104713	9871.378615975016	95	98
+98	2026-01-31 03:20:52.275966-04	FCC-201	91.5715541104713	9871.378615975016	95	98
+99	2026-01-31 03:20:52.275966-04	HT-301	91.5715541104713	9871.378615975016	95	98
+100	2026-01-31 03:35:52.275966-04	CDU-101	91.08058277960762	9920.0875428709	95	98
+101	2026-01-31 03:35:52.275966-04	FCC-201	91.08058277960762	9920.0875428709	95	98
+102	2026-01-31 03:35:52.275966-04	HT-301	91.08058277960762	9920.0875428709	95	98
+103	2026-01-31 03:50:52.275966-04	CDU-101	89.46316874636153	10096.019572580322	95	98
+104	2026-01-31 03:50:52.275966-04	FCC-201	89.46316874636153	10096.019572580322	95	98
+105	2026-01-31 03:50:52.275966-04	HT-301	89.46316874636153	10096.019572580322	95	98
+106	2026-01-31 04:05:52.275966-04	CDU-101	88.32852915806158	9888.53185628101	95	98
+107	2026-01-31 04:05:52.275966-04	FCC-201	88.32852915806158	9888.53185628101	95	98
+108	2026-01-31 04:05:52.275966-04	HT-301	88.32852915806158	9888.53185628101	95	98
+109	2026-01-31 04:20:52.275966-04	CDU-101	88.99406577070422	10056.701857565402	95	98
+110	2026-01-31 04:20:52.275966-04	FCC-201	88.99406577070422	10056.701857565402	95	98
+111	2026-01-31 04:20:52.275966-04	HT-301	88.99406577070422	10056.701857565402	95	98
+112	2026-01-31 04:35:52.275966-04	CDU-101	88.61079733393997	9980.680471999432	95	98
+113	2026-01-31 04:35:52.275966-04	FCC-201	88.61079733393997	9980.680471999432	95	98
+114	2026-01-31 04:35:52.275966-04	HT-301	88.61079733393997	9980.680471999432	95	98
+115	2026-01-31 04:50:52.275966-04	CDU-101	88.116762293024	9824.909809330717	95	98
+116	2026-01-31 04:50:52.275966-04	FCC-201	88.116762293024	9824.909809330717	95	98
+117	2026-01-31 04:50:52.275966-04	HT-301	88.116762293024	9824.909809330717	95	98
+118	2026-01-31 05:05:52.275966-04	CDU-101	87.09304114768348	9858.017051487759	95	98
+119	2026-01-31 05:05:52.275966-04	FCC-201	87.09304114768348	9858.017051487759	95	98
+120	2026-01-31 05:05:52.275966-04	HT-301	87.09304114768348	9858.017051487759	95	98
+121	2026-01-31 05:20:52.275966-04	CDU-101	86.76083171008821	9532.275869471036	95	98
+122	2026-01-31 05:20:52.275966-04	FCC-201	86.76083171008821	9532.275869471036	95	98
+123	2026-01-31 05:20:52.275966-04	HT-301	86.76083171008821	9532.275869471036	95	98
+124	2026-01-31 05:35:52.275966-04	CDU-101	87.18913946793047	9502.527162125456	95	98
+125	2026-01-31 05:35:52.275966-04	FCC-201	87.18913946793047	9502.527162125456	95	98
+126	2026-01-31 05:35:52.275966-04	HT-301	87.18913946793047	9502.527162125456	95	98
+127	2026-01-31 05:50:52.275966-04	CDU-101	86.69013352983495	9581.073936673813	95	98
+128	2026-01-31 05:50:52.275966-04	FCC-201	86.69013352983495	9581.073936673813	95	98
+129	2026-01-31 05:50:52.275966-04	HT-301	86.69013352983495	9581.073936673813	95	98
+130	2026-01-31 06:05:52.275966-04	CDU-101	86.6723078121142	9711.378033370696	95	98
+131	2026-01-31 06:05:52.275966-04	FCC-201	86.6723078121142	9711.378033370696	95	98
+132	2026-01-31 06:05:52.275966-04	HT-301	86.6723078121142	9711.378033370696	95	98
+133	2026-01-31 06:20:52.275966-04	CDU-101	84.98185723064564	9460.737766575998	95	98
+134	2026-01-31 06:20:52.275966-04	FCC-201	84.98185723064564	9460.737766575998	95	98
+135	2026-01-31 06:20:52.275966-04	HT-301	84.98185723064564	9460.737766575998	95	98
+136	2026-01-31 06:35:52.275966-04	CDU-101	85.19328453729514	9589.469915561385	95	98
+137	2026-01-31 06:35:52.275966-04	FCC-201	85.19328453729514	9589.469915561385	95	98
+138	2026-01-31 06:35:52.275966-04	HT-301	85.19328453729514	9589.469915561385	95	98
+139	2026-01-31 06:50:52.275966-04	CDU-101	84.61726678252907	9688.441964437301	95	98
+140	2026-01-31 06:50:52.275966-04	FCC-201	84.61726678252907	9688.441964437301	95	98
+141	2026-01-31 06:50:52.275966-04	HT-301	84.61726678252907	9688.441964437301	95	98
+142	2026-01-31 07:05:52.275966-04	CDU-101	85.12541486896868	9638.972837262345	95	98
+143	2026-01-31 07:05:52.275966-04	FCC-201	85.12541486896868	9638.972837262345	95	98
+144	2026-01-31 07:05:52.275966-04	HT-301	85.12541486896868	9638.972837262345	95	98
+145	2026-01-31 07:20:52.275966-04	CDU-101	84.30026904890092	9585.088108197884	95	98
+146	2026-01-31 07:20:52.275966-04	FCC-201	84.30026904890092	9585.088108197884	95	98
+147	2026-01-31 07:20:52.275966-04	HT-301	84.30026904890092	9585.088108197884	95	98
+148	2026-01-31 07:35:52.275966-04	CDU-101	84.81203090388583	9331.766415764214	95	98
+149	2026-01-31 07:35:52.275966-04	FCC-201	84.81203090388583	9331.766415764214	95	98
+150	2026-01-31 07:35:52.275966-04	HT-301	84.81203090388583	9331.766415764214	95	98
+151	2026-01-31 07:50:52.275966-04	CDU-101	84.67450022183468	9377.06730197157	95	98
+152	2026-01-31 07:50:52.275966-04	FCC-201	84.67450022183468	9377.06730197157	95	98
+153	2026-01-31 07:50:52.275966-04	HT-301	84.67450022183468	9377.06730197157	95	98
+154	2026-01-31 08:05:52.275966-04	CDU-101	84.8733840918026	9503.41700429702	95	98
+155	2026-01-31 08:05:52.275966-04	FCC-201	84.8733840918026	9503.41700429702	95	98
+156	2026-01-31 08:05:52.275966-04	HT-301	84.8733840918026	9503.41700429702	95	98
+157	2026-01-31 08:20:52.275966-04	CDU-101	84.56864037371521	9536.968698022438	95	98
+158	2026-01-31 08:20:52.275966-04	FCC-201	84.56864037371521	9536.968698022438	95	98
+159	2026-01-31 08:20:52.275966-04	HT-301	84.56864037371521	9536.968698022438	95	98
+160	2026-01-31 08:35:52.275966-04	CDU-101	84.69929880799096	9633.171076979388	95	98
+161	2026-01-31 08:35:52.275966-04	FCC-201	84.69929880799096	9633.171076979388	95	98
+162	2026-01-31 08:35:52.275966-04	HT-301	84.69929880799096	9633.171076979388	95	98
+163	2026-01-31 08:50:52.275966-04	CDU-101	84.90075728226576	9594.679653138739	95	98
+164	2026-01-31 08:50:52.275966-04	FCC-201	84.90075728226576	9594.679653138739	95	98
+165	2026-01-31 08:50:52.275966-04	HT-301	84.90075728226576	9594.679653138739	95	98
+166	2026-01-31 09:05:52.275966-04	CDU-101	86.24336124112416	9583.953176265171	95	98
+167	2026-01-31 09:05:52.275966-04	FCC-201	86.24336124112416	9583.953176265171	95	98
+168	2026-01-31 09:05:52.275966-04	HT-301	86.24336124112416	9583.953176265171	95	98
+169	2026-01-31 09:20:52.275966-04	CDU-101	85.97128834762297	9591.725062666563	95	98
+170	2026-01-31 09:20:52.275966-04	FCC-201	85.97128834762297	9591.725062666563	95	98
+171	2026-01-31 09:20:52.275966-04	HT-301	85.97128834762297	9591.725062666563	95	98
+172	2026-01-31 09:35:52.275966-04	CDU-101	85.8383425215743	9830.486137340225	95	98
+173	2026-01-31 09:35:52.275966-04	FCC-201	85.8383425215743	9830.486137340225	95	98
+174	2026-01-31 09:35:52.275966-04	HT-301	85.8383425215743	9830.486137340225	95	98
+175	2026-01-31 09:50:52.275966-04	CDU-101	85.90933250073851	9629.098506522821	95	98
+176	2026-01-31 09:50:52.275966-04	FCC-201	85.90933250073851	9629.098506522821	95	98
+177	2026-01-31 09:50:52.275966-04	HT-301	85.90933250073851	9629.098506522821	95	98
+178	2026-01-31 10:05:52.275966-04	CDU-101	87.69212287049274	9882.76827786964	95	98
+179	2026-01-31 10:05:52.275966-04	FCC-201	87.69212287049274	9882.76827786964	95	98
+180	2026-01-31 10:05:52.275966-04	HT-301	87.69212287049274	9882.76827786964	95	98
+181	2026-01-31 10:20:52.275966-04	CDU-101	87.71913039390225	9657.088721821568	95	98
+182	2026-01-31 10:20:52.275966-04	FCC-201	87.71913039390225	9657.088721821568	95	98
+183	2026-01-31 10:20:52.275966-04	HT-301	87.71913039390225	9657.088721821568	95	98
+184	2026-01-31 10:35:52.275966-04	CDU-101	87.20685081648442	9733.767944777954	95	98
+185	2026-01-31 10:35:52.275966-04	FCC-201	87.20685081648442	9733.767944777954	95	98
+186	2026-01-31 10:35:52.275966-04	HT-301	87.20685081648442	9733.767944777954	95	98
+187	2026-01-31 10:50:52.275966-04	CDU-101	88.02662099179439	9935.538666246952	95	98
+188	2026-01-31 10:50:52.275966-04	FCC-201	88.02662099179439	9935.538666246952	95	98
+189	2026-01-31 10:50:52.275966-04	HT-301	88.02662099179439	9935.538666246952	95	98
+190	2026-01-31 11:05:52.275966-04	CDU-101	90.08913093839894	10056.201810955843	95	98
+191	2026-01-31 11:05:52.275966-04	FCC-201	90.08913093839894	10056.201810955843	95	98
+192	2026-01-31 11:05:52.275966-04	HT-301	90.08913093839894	10056.201810955843	95	98
+193	2026-01-31 11:20:52.275966-04	CDU-101	89.8217341412802	9951.368360077036	95	98
+194	2026-01-31 11:20:52.275966-04	FCC-201	89.8217341412802	9951.368360077036	95	98
+195	2026-01-31 11:20:52.275966-04	HT-301	89.8217341412802	9951.368360077036	95	98
+196	2026-01-31 11:35:52.275966-04	CDU-101	90.83951042522104	9947.037155410144	95	98
+197	2026-01-31 11:35:52.275966-04	FCC-201	90.83951042522104	9947.037155410144	95	98
+198	2026-01-31 11:35:52.275966-04	HT-301	90.83951042522104	9947.037155410144	95	98
+199	2026-01-31 11:50:52.275966-04	CDU-101	91.21899662537352	10197.510943031575	95	98
+200	2026-01-31 11:50:52.275966-04	FCC-201	91.21899662537352	10197.510943031575	95	98
+201	2026-01-31 11:50:52.275966-04	HT-301	91.21899662537352	10197.510943031575	95	98
+202	2026-01-31 12:05:52.275966-04	CDU-101	90.09730706863036	9929.148513329506	95	98
+203	2026-01-31 12:05:52.275966-04	FCC-201	90.09730706863036	9929.148513329506	95	98
+204	2026-01-31 12:05:52.275966-04	HT-301	90.09730706863036	9929.148513329506	95	98
+205	2026-01-31 12:20:52.275966-04	CDU-101	92.0095146900112	10092.294504128911	95	98
+206	2026-01-31 12:20:52.275966-04	FCC-201	92.0095146900112	10092.294504128911	95	98
+207	2026-01-31 12:20:52.275966-04	HT-301	92.0095146900112	10092.294504128911	95	98
+208	2026-01-31 12:35:52.275966-04	CDU-101	91.58302202136524	10191.97288639308	95	98
+209	2026-01-31 12:35:52.275966-04	FCC-201	91.58302202136524	10191.97288639308	95	98
+210	2026-01-31 12:35:52.275966-04	HT-301	91.58302202136524	10191.97288639308	95	98
+211	2026-01-31 12:50:52.275966-04	CDU-101	93.22539975093848	10373.21386324707	95	98
+212	2026-01-31 12:50:52.275966-04	FCC-201	93.22539975093848	10373.21386324707	95	98
+213	2026-01-31 12:50:52.275966-04	HT-301	93.22539975093848	10373.21386324707	95	98
+214	2026-01-31 13:05:52.275966-04	CDU-101	92.80552918324175	10422.33361723983	95	98
+215	2026-01-31 13:05:52.275966-04	FCC-201	92.80552918324175	10422.33361723983	95	98
+216	2026-01-31 13:05:52.275966-04	HT-301	92.80552918324175	10422.33361723983	95	98
+217	2026-01-31 13:20:52.275966-04	CDU-101	94.04501017361386	10490.775800294854	95	98
+218	2026-01-31 13:20:52.275966-04	FCC-201	94.04501017361386	10490.775800294854	95	98
+219	2026-01-31 13:20:52.275966-04	HT-301	94.04501017361386	10490.775800294854	95	98
+220	2026-01-31 13:35:52.275966-04	CDU-101	94.26794582625065	10202.276858700927	95	98
+221	2026-01-31 13:35:52.275966-04	FCC-201	94.26794582625065	10202.276858700927	95	98
+222	2026-01-31 13:35:52.275966-04	HT-301	94.26794582625065	10202.276858700927	95	98
+223	2026-01-31 13:50:52.275966-04	CDU-101	94.06206683633314	10507.332082345269	95	98
+224	2026-01-31 13:50:52.275966-04	FCC-201	94.06206683633314	10507.332082345269	95	98
+225	2026-01-31 13:50:52.275966-04	HT-301	94.06206683633314	10507.332082345269	95	98
+226	2026-01-31 14:05:52.275966-04	CDU-101	94.8905837725148	10294.431050521298	95	98
+227	2026-01-31 14:05:52.275966-04	FCC-201	94.8905837725148	10294.431050521298	95	98
+228	2026-01-31 14:05:52.275966-04	HT-301	94.8905837725148	10294.431050521298	95	98
+229	2026-01-31 14:20:52.275966-04	CDU-101	93.92212076853852	10540.781007982783	95	98
+230	2026-01-31 14:20:52.275966-04	FCC-201	93.92212076853852	10540.781007982783	95	98
+231	2026-01-31 14:20:52.275966-04	HT-301	93.92212076853852	10540.781007982783	95	98
+232	2026-01-31 14:35:52.275966-04	CDU-101	94.42988440754807	10293.484067577245	95	98
+233	2026-01-31 14:35:52.275966-04	FCC-201	94.42988440754807	10293.484067577245	95	98
+234	2026-01-31 14:35:52.275966-04	HT-301	94.42988440754807	10293.484067577245	95	98
+235	2026-01-31 14:50:52.275966-04	CDU-101	95.24499936167474	10643.988705454909	95	98
+236	2026-01-31 14:50:52.275966-04	FCC-201	95.24499936167474	10643.988705454909	95	98
+237	2026-01-31 14:50:52.275966-04	HT-301	95.24499936167474	10643.988705454909	95	98
+238	2026-01-31 15:05:52.275966-04	CDU-101	94.26876411778204	10428.13203515736	95	98
+239	2026-01-31 15:05:52.275966-04	FCC-201	94.26876411778204	10428.13203515736	95	98
+240	2026-01-31 15:05:52.275966-04	HT-301	94.26876411778204	10428.13203515736	95	98
+241	2026-01-31 15:20:52.275966-04	CDU-101	94.78320329636024	10369.556408007315	95	98
+242	2026-01-31 15:20:52.275966-04	FCC-201	94.78320329636024	10369.556408007315	95	98
+243	2026-01-31 15:20:52.275966-04	HT-301	94.78320329636024	10369.556408007315	95	98
+244	2026-01-31 15:35:52.275966-04	CDU-101	95.21051714035423	10507.889575509687	95	98
+245	2026-01-31 15:35:52.275966-04	FCC-201	95.21051714035423	10507.889575509687	95	98
+246	2026-01-31 15:35:52.275966-04	HT-301	95.21051714035423	10507.889575509687	95	98
+247	2026-01-31 15:50:52.275966-04	CDU-101	95.91846013589176	10640.799129376474	95	98
+248	2026-01-31 15:50:52.275966-04	FCC-201	95.91846013589176	10640.799129376474	95	98
+249	2026-01-31 15:50:52.275966-04	HT-301	95.91846013589176	10640.799129376474	95	98
+250	2026-01-31 16:05:52.275966-04	CDU-101	95.47478680972932	10461.5327814974	95	98
+251	2026-01-31 16:05:52.275966-04	FCC-201	95.47478680972932	10461.5327814974	95	98
+252	2026-01-31 16:05:52.275966-04	HT-301	95.47478680972932	10461.5327814974	95	98
+253	2026-01-31 16:20:52.275966-04	CDU-101	95.5747155006503	10381.289660662775	95	98
+254	2026-01-31 16:20:52.275966-04	FCC-201	95.5747155006503	10381.289660662775	95	98
+255	2026-01-31 16:20:52.275966-04	HT-301	95.5747155006503	10381.289660662775	95	98
+256	2026-01-31 16:35:52.275966-04	CDU-101	95.22454069239382	10549.284159109266	95	98
+257	2026-01-31 16:35:52.275966-04	FCC-201	95.22454069239382	10549.284159109266	95	98
+258	2026-01-31 16:35:52.275966-04	HT-301	95.22454069239382	10549.284159109266	95	98
+259	2026-01-31 16:50:52.275966-04	CDU-101	94.30451830928517	10239.868530201271	95	98
+260	2026-01-31 16:50:52.275966-04	FCC-201	94.30451830928517	10239.868530201271	95	98
+261	2026-01-31 16:50:52.275966-04	HT-301	94.30451830928517	10239.868530201271	95	98
+262	2026-01-31 17:05:52.275966-04	CDU-101	94.9800511406262	10440.108232226003	95	98
+263	2026-01-31 17:05:52.275966-04	FCC-201	94.9800511406262	10440.108232226003	95	98
+264	2026-01-31 17:05:52.275966-04	HT-301	94.9800511406262	10440.108232226003	95	98
+265	2026-01-31 17:20:52.275966-04	CDU-101	93.37120818605567	10208.341639431557	95	98
+266	2026-01-31 17:20:52.275966-04	FCC-201	93.37120818605567	10208.341639431557	95	98
+267	2026-01-31 17:20:52.275966-04	HT-301	93.37120818605567	10208.341639431557	95	98
+268	2026-01-31 17:35:52.275966-04	CDU-101	92.95867138436243	10306.666385182732	95	98
+269	2026-01-31 17:35:52.275966-04	FCC-201	92.95867138436243	10306.666385182732	95	98
+270	2026-01-31 17:35:52.275966-04	HT-301	92.95867138436243	10306.666385182732	95	98
+271	2026-01-31 17:50:52.275966-04	CDU-101	93.65532495721432	10326.612684005864	95	98
+272	2026-01-31 17:50:52.275966-04	FCC-201	93.65532495721432	10326.612684005864	95	98
+273	2026-01-31 17:50:52.275966-04	HT-301	93.65532495721432	10326.612684005864	95	98
+274	2026-01-31 18:05:52.275966-04	CDU-101	92.2042140242651	10401.262141905308	95	98
+275	2026-01-31 18:05:52.275966-04	FCC-201	92.2042140242651	10401.262141905308	95	98
+276	2026-01-31 18:05:52.275966-04	HT-301	92.2042140242651	10401.262141905308	95	98
+277	2026-01-31 18:20:52.275966-04	CDU-101	91.64604374734509	10042.706094749503	95	98
+278	2026-01-31 18:20:52.275966-04	FCC-201	91.64604374734509	10042.706094749503	95	98
+279	2026-01-31 18:20:52.275966-04	HT-301	91.64604374734509	10042.706094749503	95	98
+280	2026-01-31 18:35:52.275966-04	CDU-101	91.64819503320894	10066.065281196517	95	98
+281	2026-01-31 18:35:52.275966-04	FCC-201	91.64819503320894	10066.065281196517	95	98
+282	2026-01-31 18:35:52.275966-04	HT-301	91.64819503320894	10066.065281196517	95	98
+283	2026-01-31 18:50:52.275966-04	CDU-101	90.31548872548987	9976.744562760754	95	98
+284	2026-01-31 18:50:52.275966-04	FCC-201	90.31548872548987	9976.744562760754	95	98
+285	2026-01-31 18:50:52.275966-04	HT-301	90.31548872548987	9976.744562760754	95	98
+286	2026-01-31 19:05:52.275966-04	CDU-101	90.4734552495945	9870.67435726124	95	98
+287	2026-01-31 19:05:52.275966-04	FCC-201	90.4734552495945	9870.67435726124	95	98
+288	2026-01-31 19:05:52.275966-04	HT-301	90.4734552495945	9870.67435726124	95	98
+289	2026-01-31 19:20:52.275966-04	CDU-101	90.30641779666183	9932.484016291837	95	98
+290	2026-01-31 19:20:52.275966-04	FCC-201	90.30641779666183	9932.484016291837	95	98
+291	2026-01-31 19:20:52.275966-04	HT-301	90.30641779666183	9932.484016291837	95	98
+292	2026-01-31 19:35:52.275966-04	CDU-101	89.33181654344614	10108.402773307	95	98
+293	2026-01-31 19:35:52.275966-04	FCC-201	89.33181654344614	10108.402773307	95	98
+294	2026-01-31 19:35:52.275966-04	HT-301	89.33181654344614	10108.402773307	95	98
+\.
+
+
+--
+-- Data for Name: maintenance_predictions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.maintenance_predictions (id, equipment_id, equipment_type, unit_id, failure_probability, prediction, confidence, recommendation, "timestamp", features) FROM stdin;
+1	PUMP-CDU-101	PUMP	CDU-101	17.3	OPERACIÓN NORMAL	89.7	CONTINUAR OPERACIÓN NORMAL	2026-01-31 17:45:21.465407-04	{"flow_rate": 86.8, "vibration": 3.1, "motor_current": 47.6, "seal_condition": "GOOD", "operating_hours": 4837, "bearing_temperature": 81.0}
+2	PUMP-CDU-102	PUMP	CDU-101	28.2	OPERACIÓN NORMAL	80.9	CONTINUAR OPERACIÓN NORMAL	2026-01-31 17:45:21.538745-04	{"flow_rate": 91.3, "vibration": 3.87, "motor_current": 54.7, "seal_condition": "FAIR", "operating_hours": 879, "bearing_temperature": 69.8}
+3	COMP-FCC-201	COMPRESSOR	FCC-201	34.6	OPERACIÓN NORMAL	89	CONTINUAR OPERACIÓN NORMAL	2026-01-31 17:45:21.540413-04	{"vibration_x": 4.08, "vibration_y": 2.43, "oil_temperature": 72.4, "suction_pressure": 2.71, "discharge_pressure": 13.84, "discharge_temperature": 92.0}
+4	VALVE-HT-301	VALVE	HT-301	13	OPERACIÓN NORMAL	81.6	CONTINUAR OPERACIÓN NORMAL	2026-01-31 17:45:21.542077-04	{"cycle_count": 2950, "leakage_rate": 0.339, "response_time": 2.28, "position_error": 0.39, "actuator_pressure": 4.46}
+5	HEAT-EXCH-001	HEAT_EXCHANGER	CDU-101	26.1	OPERACIÓN NORMAL	85.7	CONTINUAR OPERACIÓN NORMAL	2026-01-31 17:45:21.543696-04	{"cycle_count": 6159, "leakage_rate": 0.353, "response_time": 0.87, "position_error": 0.45, "actuator_pressure": 4.97}
+6	PUMP-CDU-101	PUMP	CDU-101	32.2	OPERACIÓN NORMAL	93.4	CONTINUAR OPERACIÓN NORMAL	2026-01-31 18:08:04.897567-04	{"flow_rate": 117.5, "vibration": 3.0, "motor_current": 51.3, "seal_condition": "GOOD", "operating_hours": 4754, "bearing_temperature": 74.8}
+7	PUMP-CDU-102	PUMP	CDU-101	22.8	OPERACIÓN NORMAL	85.3	CONTINUAR OPERACIÓN NORMAL	2026-01-31 18:08:05.340527-04	{"flow_rate": 97.6, "vibration": 2.13, "motor_current": 47.8, "seal_condition": "FAIR", "operating_hours": 4338, "bearing_temperature": 76.8}
+8	COMP-FCC-201	COMPRESSOR	FCC-201	29.1	OPERACIÓN NORMAL	91.4	CONTINUAR OPERACIÓN NORMAL	2026-01-31 18:08:05.380336-04	{"vibration_x": 3.23, "vibration_y": 3.43, "oil_temperature": 60.1, "suction_pressure": 1.54, "discharge_pressure": 11.09, "discharge_temperature": 108.4}
+9	VALVE-HT-301	VALVE	HT-301	15.3	OPERACIÓN NORMAL	93.5	CONTINUAR OPERACIÓN NORMAL	2026-01-31 18:08:05.443753-04	{"cycle_count": 7227, "leakage_rate": 0.054, "response_time": 1.85, "position_error": 0.88, "actuator_pressure": 4.88}
+10	HEAT-EXCH-001	HEAT_EXCHANGER	CDU-101	11.3	OPERACIÓN NORMAL	84.7	CONTINUAR OPERACIÓN NORMAL	2026-01-31 18:08:05.490883-04	{"cycle_count": 9459, "leakage_rate": 0.366, "response_time": 1.01, "position_error": 0.32, "actuator_pressure": 6.0}
+11	PUMP-CDU-101	PUMP	CDU-101	54.3	RIESGO MODERADO	92.5	Aumentar frecuencia de monitoreo de vibración.	2026-01-31 18:11:39.079441-04	{"hours_run": 2904, "vibration": 5.53, "temperature": 85.2}
+12	PUMP-CDU-102	PUMP	CDU-101	12	OPERACIÓN NORMAL	92.5	Continuar plan de mantenimiento preventivo.	2026-01-31 18:11:39.126379-04	{"hours_run": 2330, "vibration": 4.72, "temperature": 79.4}
+13	COMP-FCC-201	COMPRESSOR	FCC-201	39.7	OPERACIÓN NORMAL	92.5	Continuar plan de mantenimiento preventivo.	2026-01-31 18:11:39.129255-04	{"hours_run": 4241, "vibration": 7.27, "temperature": 78.0}
+14	VALVE-HT-301	VALVE	HT-301	10.1	OPERACIÓN NORMAL	92.5	Continuar plan de mantenimiento preventivo.	2026-01-31 18:11:39.132024-04	{"hours_run": 2312, "vibration": 2.19, "temperature": 79.8}
+15	HEAT-EXCH-001	HEAT_EXCHANGER	CDU-101	26.1	OPERACIÓN NORMAL	92.5	Continuar plan de mantenimiento preventivo.	2026-01-31 18:11:39.134295-04	{"hours_run": 3120, "vibration": 3.34, "temperature": 69.0}
+\.
+
+
+--
+-- Data for Name: process_data; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_data (id, "timestamp", unit_id, tag_id, value, quality, created_at) FROM stdin;
+1	2026-01-16 13:03:27.796152-04	CDU-101	TEMP_TOWER	435.48	1	2026-01-16 09:03:31.52595-04
+2	2026-01-16 13:03:27.796232-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 09:03:31.52595-04
+3	2026-01-16 13:03:27.796255-04	CDU-101	FLOW_FEED	9105.04	1	2026-01-16 09:03:31.52595-04
+4	2026-01-16 13:03:27.796279-04	FCC-201	TEMP_REACTOR	345.33	1	2026-01-16 09:03:31.52595-04
+5	2026-01-16 13:03:27.796298-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 09:03:31.52595-04
+6	2026-01-16 13:03:27.796314-04	HT-301	TEMP_HYDRO	368.4	1	2026-01-16 09:03:31.52595-04
+7	2026-01-16 13:03:27.796332-04	HT-301	H2_PRESS	5.21	1	2026-01-16 09:03:31.52595-04
+8	2026-01-16 13:03:37.936045-04	CDU-101	TEMP_TOWER	397.79	1	2026-01-16 09:03:38.321619-04
+9	2026-01-16 13:03:37.936083-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:03:38.321619-04
+10	2026-01-16 13:03:37.936101-04	CDU-101	FLOW_FEED	11275.67	1	2026-01-16 09:03:38.321619-04
+11	2026-01-16 13:03:37.936115-04	FCC-201	TEMP_REACTOR	314.58	1	2026-01-16 09:03:38.321619-04
+12	2026-01-16 13:03:37.936131-04	FCC-201	CATALYST_ACT	94.92	1	2026-01-16 09:03:38.321619-04
+13	2026-01-16 13:03:37.936146-04	HT-301	TEMP_HYDRO	359.23	1	2026-01-16 09:03:38.321619-04
+14	2026-01-16 13:03:37.936159-04	HT-301	H2_PRESS	2.06	1	2026-01-16 09:03:38.321619-04
+15	2026-01-16 13:03:43.388523-04	CDU-101	TEMP_TOWER	453.53	1	2026-01-16 09:03:43.858564-04
+16	2026-01-16 13:03:43.388561-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 09:03:43.858564-04
+17	2026-01-16 13:03:43.388576-04	CDU-101	FLOW_FEED	9838.36	1	2026-01-16 09:03:43.858564-04
+18	2026-01-16 13:03:43.388591-04	FCC-201	TEMP_REACTOR	429.06	1	2026-01-16 09:03:43.858564-04
+19	2026-01-16 13:03:43.388605-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 09:03:43.858564-04
+20	2026-01-16 13:03:43.388619-04	HT-301	TEMP_HYDRO	475.95	1	2026-01-16 09:03:43.858564-04
+21	2026-01-16 13:03:43.388632-04	HT-301	H2_PRESS	4.36	1	2026-01-16 09:03:43.858564-04
+22	2026-01-16 13:03:48.903758-04	CDU-101	TEMP_TOWER	356.4	1	2026-01-16 09:03:49.102551-04
+23	2026-01-16 13:03:48.903801-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 09:03:49.102551-04
+24	2026-01-16 13:03:48.903817-04	CDU-101	FLOW_FEED	10528.7	1	2026-01-16 09:03:49.102551-04
+25	2026-01-16 13:03:48.903832-04	FCC-201	TEMP_REACTOR	475.5	1	2026-01-16 09:03:49.102551-04
+26	2026-01-16 13:03:48.903847-04	FCC-201	CATALYST_ACT	75.08	1	2026-01-16 09:03:49.102551-04
+27	2026-01-16 13:03:48.903862-04	HT-301	TEMP_HYDRO	341.99	1	2026-01-16 09:03:49.102551-04
+28	2026-01-16 13:03:48.903876-04	HT-301	H2_PRESS	4.96	1	2026-01-16 09:03:49.102551-04
+29	2026-01-16 13:04:04.159565-04	CDU-101	TEMP_TOWER	456.83	1	2026-01-16 09:04:04.629963-04
+30	2026-01-16 13:04:04.159602-04	CDU-101	PRESS_TOWER	5.33	1	2026-01-16 09:04:04.629963-04
+31	2026-01-16 13:04:04.159617-04	CDU-101	FLOW_FEED	8429.92	1	2026-01-16 09:04:04.629963-04
+32	2026-01-16 13:04:04.159631-04	FCC-201	TEMP_REACTOR	385.4	1	2026-01-16 09:04:04.629963-04
+33	2026-01-16 13:04:04.159646-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 09:04:04.629963-04
+34	2026-01-16 13:04:04.15966-04	HT-301	TEMP_HYDRO	351.18	1	2026-01-16 09:04:04.629963-04
+35	2026-01-16 13:04:04.159673-04	HT-301	H2_PRESS	5.31	1	2026-01-16 09:04:04.629963-04
+36	2026-01-16 13:04:19.688307-04	CDU-101	TEMP_TOWER	366.68	1	2026-01-16 09:04:20.267735-04
+37	2026-01-16 13:04:19.688343-04	CDU-101	PRESS_TOWER	4.44	1	2026-01-16 09:04:20.267735-04
+38	2026-01-16 13:04:19.688358-04	CDU-101	FLOW_FEED	9195.83	1	2026-01-16 09:04:20.267735-04
+39	2026-01-16 13:04:19.688372-04	FCC-201	TEMP_REACTOR	459.55	1	2026-01-16 09:04:20.267735-04
+40	2026-01-16 13:04:19.688387-04	FCC-201	CATALYST_ACT	90.44	1	2026-01-16 09:04:20.267735-04
+41	2026-01-16 13:04:19.6884-04	HT-301	TEMP_HYDRO	467.3	1	2026-01-16 09:04:20.267735-04
+42	2026-01-16 13:04:19.688413-04	HT-301	H2_PRESS	4.65	1	2026-01-16 09:04:20.267735-04
+43	2026-01-16 13:04:35.320255-04	CDU-101	TEMP_TOWER	479.73	1	2026-01-16 09:04:35.819354-04
+44	2026-01-16 13:04:35.320295-04	CDU-101	PRESS_TOWER	2.99	1	2026-01-16 09:04:35.819354-04
+45	2026-01-16 13:04:35.32031-04	CDU-101	FLOW_FEED	10685.03	1	2026-01-16 09:04:35.819354-04
+46	2026-01-16 13:04:35.320325-04	FCC-201	TEMP_REACTOR	414.4	1	2026-01-16 09:04:35.819354-04
+47	2026-01-16 13:04:35.320339-04	FCC-201	CATALYST_ACT	77.37	1	2026-01-16 09:04:35.819354-04
+48	2026-01-16 13:04:35.320353-04	HT-301	TEMP_HYDRO	477.04	1	2026-01-16 09:04:35.819354-04
+49	2026-01-16 13:04:35.320366-04	HT-301	H2_PRESS	2	1	2026-01-16 09:04:35.819354-04
+50	2026-01-16 13:04:50.868351-04	CDU-101	TEMP_TOWER	303.02	1	2026-01-16 09:04:51.32927-04
+51	2026-01-16 13:04:50.868388-04	CDU-101	PRESS_TOWER	4.58	1	2026-01-16 09:04:51.32927-04
+52	2026-01-16 13:04:50.868404-04	CDU-101	FLOW_FEED	8059.54	1	2026-01-16 09:04:51.32927-04
+53	2026-01-16 13:04:50.868418-04	FCC-201	TEMP_REACTOR	483.08	1	2026-01-16 09:04:51.32927-04
+54	2026-01-16 13:04:50.868432-04	FCC-201	CATALYST_ACT	94.46	1	2026-01-16 09:04:51.32927-04
+55	2026-01-16 13:04:50.868445-04	HT-301	TEMP_HYDRO	311.64	1	2026-01-16 09:04:51.32927-04
+56	2026-01-16 13:04:50.868458-04	HT-301	H2_PRESS	2.33	1	2026-01-16 09:04:51.32927-04
+57	2026-01-16 13:05:06.363567-04	CDU-101	TEMP_TOWER	427.64	1	2026-01-16 09:05:06.8233-04
+58	2026-01-16 13:05:06.363607-04	CDU-101	PRESS_TOWER	4.29	1	2026-01-16 09:05:06.8233-04
+59	2026-01-16 13:05:06.363622-04	CDU-101	FLOW_FEED	10755.15	1	2026-01-16 09:05:06.8233-04
+60	2026-01-16 13:05:06.363637-04	FCC-201	TEMP_REACTOR	408.77	1	2026-01-16 09:05:06.8233-04
+61	2026-01-16 13:05:06.363652-04	FCC-201	CATALYST_ACT	82.69	1	2026-01-16 09:05:06.8233-04
+62	2026-01-16 13:05:06.363665-04	HT-301	TEMP_HYDRO	347.47	1	2026-01-16 09:05:06.8233-04
+63	2026-01-16 13:05:06.363679-04	HT-301	H2_PRESS	5.37	1	2026-01-16 09:05:06.8233-04
+64	2026-01-16 13:05:21.875534-04	CDU-101	TEMP_TOWER	490.62	1	2026-01-16 09:05:22.349777-04
+65	2026-01-16 13:05:21.875572-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:22.349777-04
+66	2026-01-16 13:05:21.875587-04	CDU-101	FLOW_FEED	8355.27	1	2026-01-16 09:05:22.349777-04
+67	2026-01-16 13:05:21.875601-04	FCC-201	TEMP_REACTOR	442.57	1	2026-01-16 09:05:22.349777-04
+68	2026-01-16 13:05:21.875615-04	FCC-201	CATALYST_ACT	85.81	1	2026-01-16 09:05:22.349777-04
+69	2026-01-16 13:05:21.875628-04	HT-301	TEMP_HYDRO	386.37	1	2026-01-16 09:05:22.349777-04
+70	2026-01-16 13:05:21.875641-04	HT-301	H2_PRESS	4.31	1	2026-01-16 09:05:22.349777-04
+71	2026-01-16 13:05:37.37748-04	CDU-101	TEMP_TOWER	333.44	1	2026-01-16 09:05:37.967847-04
+72	2026-01-16 13:05:37.377522-04	CDU-101	PRESS_TOWER	2.45	1	2026-01-16 09:05:37.967847-04
+73	2026-01-16 13:05:37.377536-04	CDU-101	FLOW_FEED	10805.98	1	2026-01-16 09:05:37.967847-04
+74	2026-01-16 13:05:37.37755-04	FCC-201	TEMP_REACTOR	458.05	1	2026-01-16 09:05:37.967847-04
+75	2026-01-16 13:05:37.377564-04	FCC-201	CATALYST_ACT	85.74	1	2026-01-16 09:05:37.967847-04
+76	2026-01-16 13:05:37.377578-04	HT-301	TEMP_HYDRO	391.3	1	2026-01-16 09:05:37.967847-04
+77	2026-01-16 13:05:37.377591-04	HT-301	H2_PRESS	2.36	1	2026-01-16 09:05:37.967847-04
+78	2026-01-16 13:05:43.000343-04	CDU-101	TEMP_TOWER	442.57	1	2026-01-16 09:05:43.248149-04
+79	2026-01-16 13:05:43.000392-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 09:05:43.248149-04
+80	2026-01-16 13:05:43.00041-04	CDU-101	FLOW_FEED	10437.42	1	2026-01-16 09:05:43.248149-04
+81	2026-01-16 13:05:43.000427-04	FCC-201	TEMP_REACTOR	480.26	1	2026-01-16 09:05:43.248149-04
+82	2026-01-16 13:05:43.000442-04	FCC-201	CATALYST_ACT	89.69	1	2026-01-16 09:05:43.248149-04
+83	2026-01-16 13:05:43.000456-04	HT-301	TEMP_HYDRO	408.16	1	2026-01-16 09:05:43.248149-04
+84	2026-01-16 13:05:43.000471-04	HT-301	H2_PRESS	3.27	1	2026-01-16 09:05:43.248149-04
+85	2026-01-16 13:05:48.280753-04	CDU-101	TEMP_TOWER	384	1	2026-01-16 09:05:48.779269-04
+86	2026-01-16 13:05:48.280803-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 09:05:48.779269-04
+87	2026-01-16 13:05:48.280823-04	CDU-101	FLOW_FEED	8976.87	1	2026-01-16 09:05:48.779269-04
+88	2026-01-16 13:05:48.280837-04	FCC-201	TEMP_REACTOR	323.18	1	2026-01-16 09:05:48.779269-04
+89	2026-01-16 13:05:48.280852-04	FCC-201	CATALYST_ACT	90.7	1	2026-01-16 09:05:48.779269-04
+90	2026-01-16 13:05:48.280865-04	HT-301	TEMP_HYDRO	390.97	1	2026-01-16 09:05:48.779269-04
+91	2026-01-16 13:05:48.280879-04	HT-301	H2_PRESS	4.68	1	2026-01-16 09:05:48.779269-04
+92	2026-01-16 13:05:53.87347-04	CDU-101	TEMP_TOWER	309.65	1	2026-01-16 09:05:54.117406-04
+93	2026-01-16 13:05:53.873506-04	CDU-101	PRESS_TOWER	5.29	1	2026-01-16 09:05:54.117406-04
+94	2026-01-16 13:05:53.873521-04	CDU-101	FLOW_FEED	9258.11	1	2026-01-16 09:05:54.117406-04
+95	2026-01-16 13:05:53.873535-04	FCC-201	TEMP_REACTOR	421.63	1	2026-01-16 09:05:54.117406-04
+96	2026-01-16 13:05:53.873549-04	FCC-201	CATALYST_ACT	82.13	1	2026-01-16 09:05:54.117406-04
+97	2026-01-16 13:05:53.873563-04	HT-301	TEMP_HYDRO	354.51	1	2026-01-16 09:05:54.117406-04
+98	2026-01-16 13:05:53.873576-04	HT-301	H2_PRESS	4.04	1	2026-01-16 09:05:54.117406-04
+99	2026-01-16 13:05:59.145385-04	CDU-101	TEMP_TOWER	388.25	1	2026-01-16 09:05:59.607303-04
+100	2026-01-16 13:05:59.14543-04	CDU-101	PRESS_TOWER	4.2	1	2026-01-16 09:05:59.607303-04
+101	2026-01-16 13:05:59.145445-04	CDU-101	FLOW_FEED	8840.85	1	2026-01-16 09:05:59.607303-04
+102	2026-01-16 13:05:59.14546-04	FCC-201	TEMP_REACTOR	492.24	1	2026-01-16 09:05:59.607303-04
+103	2026-01-16 13:05:59.145475-04	FCC-201	CATALYST_ACT	85.85	1	2026-01-16 09:05:59.607303-04
+104	2026-01-16 13:05:59.145489-04	HT-301	TEMP_HYDRO	364.03	1	2026-01-16 09:05:59.607303-04
+105	2026-01-16 13:05:59.145504-04	HT-301	H2_PRESS	2.98	1	2026-01-16 09:05:59.607303-04
+106	2026-01-16 13:06:14.635842-04	CDU-101	TEMP_TOWER	472.18	1	2026-01-16 09:06:15.215849-04
+107	2026-01-16 13:06:14.635883-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 09:06:15.215849-04
+108	2026-01-16 13:06:14.635897-04	CDU-101	FLOW_FEED	8743.92	1	2026-01-16 09:06:15.215849-04
+109	2026-01-16 13:06:14.635912-04	FCC-201	TEMP_REACTOR	348.66	1	2026-01-16 09:06:15.215849-04
+110	2026-01-16 13:06:14.635928-04	FCC-201	CATALYST_ACT	92.68	1	2026-01-16 09:06:15.215849-04
+111	2026-01-16 13:06:14.635942-04	HT-301	TEMP_HYDRO	483.55	1	2026-01-16 09:06:15.215849-04
+112	2026-01-16 13:06:14.635957-04	HT-301	H2_PRESS	5.96	1	2026-01-16 09:06:15.215849-04
+113	2026-01-16 13:06:30.29029-04	CDU-101	TEMP_TOWER	333.59	1	2026-01-16 09:06:30.769451-04
+114	2026-01-16 13:06:30.290339-04	CDU-101	PRESS_TOWER	2.68	1	2026-01-16 09:06:30.769451-04
+115	2026-01-16 13:06:30.290355-04	CDU-101	FLOW_FEED	9582.04	1	2026-01-16 09:06:30.769451-04
+116	2026-01-16 13:06:30.290372-04	FCC-201	TEMP_REACTOR	405.3	1	2026-01-16 09:06:30.769451-04
+117	2026-01-16 13:06:30.290529-04	FCC-201	CATALYST_ACT	80.92	1	2026-01-16 09:06:30.769451-04
+118	2026-01-16 13:06:30.290588-04	HT-301	TEMP_HYDRO	479.09	1	2026-01-16 09:06:30.769451-04
+119	2026-01-16 13:06:30.290606-04	HT-301	H2_PRESS	3.72	1	2026-01-16 09:06:30.769451-04
+120	2026-01-16 13:06:47.61827-04	CDU-101	TEMP_TOWER	378.53	1	2026-01-16 09:06:48.355057-04
+121	2026-01-16 13:06:47.618312-04	CDU-101	PRESS_TOWER	2.05	1	2026-01-16 09:06:48.355057-04
+122	2026-01-16 13:06:47.618327-04	CDU-101	FLOW_FEED	10238.43	1	2026-01-16 09:06:48.355057-04
+123	2026-01-16 13:06:47.618341-04	FCC-201	TEMP_REACTOR	321.98	1	2026-01-16 09:06:48.355057-04
+124	2026-01-16 13:06:47.618355-04	FCC-201	CATALYST_ACT	79.9	1	2026-01-16 09:06:48.355057-04
+125	2026-01-16 13:06:47.618369-04	HT-301	TEMP_HYDRO	417.85	1	2026-01-16 09:06:48.355057-04
+126	2026-01-16 13:06:47.618384-04	HT-301	H2_PRESS	3.82	1	2026-01-16 09:06:48.355057-04
+127	2026-01-16 13:07:03.794913-04	CDU-101	TEMP_TOWER	334.77	1	2026-01-16 09:07:04.49108-04
+128	2026-01-16 13:07:03.794971-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 09:07:04.49108-04
+129	2026-01-16 13:07:03.794987-04	CDU-101	FLOW_FEED	11549.86	1	2026-01-16 09:07:04.49108-04
+130	2026-01-16 13:07:03.795002-04	FCC-201	TEMP_REACTOR	422.26	1	2026-01-16 09:07:04.49108-04
+131	2026-01-16 13:07:03.795017-04	FCC-201	CATALYST_ACT	94.48	1	2026-01-16 09:07:04.49108-04
+132	2026-01-16 13:07:03.795032-04	HT-301	TEMP_HYDRO	478.98	1	2026-01-16 09:07:04.49108-04
+133	2026-01-16 13:07:03.795047-04	HT-301	H2_PRESS	5.57	1	2026-01-16 09:07:04.49108-04
+134	2026-01-16 13:07:09.568115-04	CDU-101	TEMP_TOWER	493.75	1	2026-01-16 09:07:10.346155-04
+135	2026-01-16 13:07:09.568161-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 09:07:10.346155-04
+136	2026-01-16 13:07:09.568178-04	CDU-101	FLOW_FEED	11461.91	1	2026-01-16 09:07:10.346155-04
+137	2026-01-16 13:07:09.568193-04	FCC-201	TEMP_REACTOR	443.98	1	2026-01-16 09:07:10.346155-04
+138	2026-01-16 13:07:09.568207-04	FCC-201	CATALYST_ACT	77.45	1	2026-01-16 09:07:10.346155-04
+139	2026-01-16 13:07:09.568221-04	HT-301	TEMP_HYDRO	371.12	1	2026-01-16 09:07:10.346155-04
+140	2026-01-16 13:07:09.568236-04	HT-301	H2_PRESS	5.92	1	2026-01-16 09:07:10.346155-04
+141	2026-01-16 13:07:15.433081-04	CDU-101	TEMP_TOWER	318.86	1	2026-01-16 09:07:16.950729-04
+142	2026-01-16 13:07:15.433122-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 09:07:16.950729-04
+143	2026-01-16 13:07:15.433138-04	CDU-101	FLOW_FEED	11754.8	1	2026-01-16 09:07:16.950729-04
+144	2026-01-16 13:07:15.433152-04	FCC-201	TEMP_REACTOR	343.47	1	2026-01-16 09:07:16.950729-04
+145	2026-01-16 13:07:15.433166-04	FCC-201	CATALYST_ACT	93.61	1	2026-01-16 09:07:16.950729-04
+146	2026-01-16 13:07:15.43318-04	HT-301	TEMP_HYDRO	363.35	1	2026-01-16 09:07:16.950729-04
+147	2026-01-16 13:07:15.433193-04	HT-301	H2_PRESS	3.32	1	2026-01-16 09:07:16.950729-04
+148	2026-01-16 13:07:22.094229-04	CDU-101	TEMP_TOWER	431.69	1	2026-01-16 09:07:22.480409-04
+149	2026-01-16 13:07:22.094272-04	CDU-101	PRESS_TOWER	5.87	1	2026-01-16 09:07:22.480409-04
+150	2026-01-16 13:07:22.094287-04	CDU-101	FLOW_FEED	8430.56	1	2026-01-16 09:07:22.480409-04
+151	2026-01-16 13:07:22.094301-04	FCC-201	TEMP_REACTOR	358.1	1	2026-01-16 09:07:22.480409-04
+152	2026-01-16 13:07:22.094316-04	FCC-201	CATALYST_ACT	89.99	1	2026-01-16 09:07:22.480409-04
+153	2026-01-16 13:07:22.094331-04	HT-301	TEMP_HYDRO	416.68	1	2026-01-16 09:07:22.480409-04
+154	2026-01-16 13:07:22.094346-04	HT-301	H2_PRESS	2.41	1	2026-01-16 09:07:22.480409-04
+155	2026-01-16 13:07:27.523222-04	CDU-101	TEMP_TOWER	413.8	1	2026-01-16 09:07:28.425936-04
+156	2026-01-16 13:07:27.523273-04	CDU-101	PRESS_TOWER	4.11	1	2026-01-16 09:07:28.425936-04
+157	2026-01-16 13:07:27.52329-04	CDU-101	FLOW_FEED	9971.59	1	2026-01-16 09:07:28.425936-04
+158	2026-01-16 13:07:27.523306-04	FCC-201	TEMP_REACTOR	416.38	1	2026-01-16 09:07:28.425936-04
+159	2026-01-16 13:07:27.523321-04	FCC-201	CATALYST_ACT	79.92	1	2026-01-16 09:07:28.425936-04
+160	2026-01-16 13:07:27.523335-04	HT-301	TEMP_HYDRO	346.31	1	2026-01-16 09:07:28.425936-04
+161	2026-01-16 13:07:27.52335-04	HT-301	H2_PRESS	3.74	1	2026-01-16 09:07:28.425936-04
+162	2026-01-16 13:07:33.475271-04	CDU-101	TEMP_TOWER	444.63	1	2026-01-16 09:07:34.115338-04
+163	2026-01-16 13:07:33.475357-04	CDU-101	PRESS_TOWER	5.83	1	2026-01-16 09:07:34.115338-04
+164	2026-01-16 13:07:33.475375-04	CDU-101	FLOW_FEED	8845.99	1	2026-01-16 09:07:34.115338-04
+165	2026-01-16 13:07:33.475396-04	FCC-201	TEMP_REACTOR	336.78	1	2026-01-16 09:07:34.115338-04
+166	2026-01-16 13:07:33.475413-04	FCC-201	CATALYST_ACT	86.57	1	2026-01-16 09:07:34.115338-04
+167	2026-01-16 13:07:33.475429-04	HT-301	TEMP_HYDRO	467.39	1	2026-01-16 09:07:34.115338-04
+168	2026-01-16 13:07:33.475444-04	HT-301	H2_PRESS	5.77	1	2026-01-16 09:07:34.115338-04
+169	2026-01-16 13:07:39.183374-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 09:07:39.911031-04
+170	2026-01-16 13:07:39.183418-04	CDU-101	PRESS_TOWER	5.81	1	2026-01-16 09:07:39.911031-04
+171	2026-01-16 13:07:39.183437-04	CDU-101	FLOW_FEED	8899.33	1	2026-01-16 09:07:39.911031-04
+172	2026-01-16 13:07:39.183455-04	FCC-201	TEMP_REACTOR	469.41	1	2026-01-16 09:07:39.911031-04
+173	2026-01-16 13:07:39.183472-04	FCC-201	CATALYST_ACT	86.83	1	2026-01-16 09:07:39.911031-04
+174	2026-01-16 13:07:39.183487-04	HT-301	TEMP_HYDRO	323.03	1	2026-01-16 09:07:39.911031-04
+175	2026-01-16 13:07:39.183504-04	HT-301	H2_PRESS	4.62	1	2026-01-16 09:07:39.911031-04
+176	2026-01-16 13:07:44.958668-04	CDU-101	TEMP_TOWER	398.26	1	2026-01-16 09:07:45.348886-04
+177	2026-01-16 13:07:44.958718-04	CDU-101	PRESS_TOWER	3.12	1	2026-01-16 09:07:45.348886-04
+178	2026-01-16 13:07:44.958736-04	CDU-101	FLOW_FEED	11037.5	1	2026-01-16 09:07:45.348886-04
+179	2026-01-16 13:07:44.958751-04	FCC-201	TEMP_REACTOR	430.01	1	2026-01-16 09:07:45.348886-04
+180	2026-01-16 13:07:44.958767-04	FCC-201	CATALYST_ACT	87.51	1	2026-01-16 09:07:45.348886-04
+181	2026-01-16 13:07:44.958782-04	HT-301	TEMP_HYDRO	368.2	1	2026-01-16 09:07:45.348886-04
+182	2026-01-16 13:07:44.958797-04	HT-301	H2_PRESS	3.26	1	2026-01-16 09:07:45.348886-04
+183	2026-01-16 10:03:56.951451-04	CDU-101	TEMP_TOWER	352.4	1	2026-01-16 10:03:57.667213-04
+184	2026-01-16 10:03:56.951774-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:03:57.667213-04
+185	2026-01-16 10:03:56.951827-04	CDU-101	FLOW_FEED	8101.68	1	2026-01-16 10:03:57.667213-04
+186	2026-01-16 10:03:56.95189-04	FCC-201	TEMP_REACTOR	497.97	1	2026-01-16 10:03:57.667213-04
+187	2026-01-16 10:03:56.951911-04	FCC-201	CATALYST_ACT	94.76	1	2026-01-16 10:03:57.667213-04
+188	2026-01-16 10:03:56.951929-04	HT-301	TEMP_HYDRO	356.4	1	2026-01-16 10:03:57.667213-04
+189	2026-01-16 10:03:56.951946-04	HT-301	H2_PRESS	33.98	1	2026-01-16 10:03:57.667213-04
+190	2026-01-16 10:04:02.976793-04	CDU-101	TEMP_TOWER	389.18	1	2026-01-16 10:04:03.183112-04
+191	2026-01-16 10:04:02.976852-04	CDU-101	PRESS_TOWER	4.37	1	2026-01-16 10:04:03.183112-04
+192	2026-01-16 10:04:02.976872-04	CDU-101	FLOW_FEED	8839.96	1	2026-01-16 10:04:03.183112-04
+193	2026-01-16 10:04:02.976891-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:04:03.183112-04
+194	2026-01-16 10:04:02.976908-04	FCC-201	CATALYST_ACT	70.53	1	2026-01-16 10:04:03.183112-04
+195	2026-01-16 10:04:02.976926-04	HT-301	TEMP_HYDRO	332.45	1	2026-01-16 10:04:03.183112-04
+196	2026-01-16 10:04:02.976943-04	HT-301	H2_PRESS	32.84	1	2026-01-16 10:04:03.183112-04
+197	2026-01-16 10:04:08.207836-04	CDU-101	TEMP_TOWER	449.22	1	2026-01-16 10:04:08.66787-04
+198	2026-01-16 10:04:08.207884-04	CDU-101	PRESS_TOWER	3.88	1	2026-01-16 10:04:08.66787-04
+199	2026-01-16 10:04:08.207901-04	CDU-101	FLOW_FEED	9971.64	1	2026-01-16 10:04:08.66787-04
+200	2026-01-16 10:04:08.207917-04	FCC-201	TEMP_REACTOR	537.07	1	2026-01-16 10:04:08.66787-04
+201	2026-01-16 10:04:08.207933-04	FCC-201	CATALYST_ACT	76.2	1	2026-01-16 10:04:08.66787-04
+202	2026-01-16 10:04:08.207949-04	HT-301	TEMP_HYDRO	316.88	1	2026-01-16 10:04:08.66787-04
+203	2026-01-16 10:04:08.207965-04	HT-301	H2_PRESS	31.9	1	2026-01-16 10:04:08.66787-04
+204	2026-01-16 10:04:13.689478-04	CDU-101	TEMP_TOWER	369.09	1	2026-01-16 10:04:13.880748-04
+205	2026-01-16 10:04:13.689536-04	CDU-101	PRESS_TOWER	4.77	1	2026-01-16 10:04:13.880748-04
+206	2026-01-16 10:04:13.689554-04	CDU-101	FLOW_FEED	11499.85	1	2026-01-16 10:04:13.880748-04
+207	2026-01-16 10:04:13.689573-04	FCC-201	TEMP_REACTOR	524.42	1	2026-01-16 10:04:13.880748-04
+208	2026-01-16 10:04:13.689589-04	FCC-201	CATALYST_ACT	83.31	1	2026-01-16 10:04:13.880748-04
+209	2026-01-16 10:04:13.689607-04	HT-301	TEMP_HYDRO	334.86	1	2026-01-16 10:04:13.880748-04
+210	2026-01-16 10:04:13.689623-04	HT-301	H2_PRESS	40.68	1	2026-01-16 10:04:13.880748-04
+211	2026-01-16 10:04:18.930435-04	CDU-101	TEMP_TOWER	405.79	1	2026-01-16 10:04:19.382986-04
+212	2026-01-16 10:04:18.930487-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:04:19.382986-04
+213	2026-01-16 10:04:18.930504-04	CDU-101	FLOW_FEED	9173.64	1	2026-01-16 10:04:19.382986-04
+214	2026-01-16 10:04:18.930521-04	FCC-201	TEMP_REACTOR	492.44	1	2026-01-16 10:04:19.382986-04
+215	2026-01-16 10:04:18.930537-04	FCC-201	CATALYST_ACT	86.29	1	2026-01-16 10:04:19.382986-04
+216	2026-01-16 10:04:18.930553-04	HT-301	TEMP_HYDRO	377.21	1	2026-01-16 10:04:19.382986-04
+217	2026-01-16 10:04:18.930569-04	HT-301	H2_PRESS	33.84	1	2026-01-16 10:04:19.382986-04
+218	2026-01-16 10:04:24.413697-04	CDU-101	TEMP_TOWER	383.77	1	2026-01-16 10:04:24.630658-04
+219	2026-01-16 10:04:24.413758-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:04:24.630658-04
+220	2026-01-16 10:04:24.413779-04	CDU-101	FLOW_FEED	11237.41	1	2026-01-16 10:04:24.630658-04
+221	2026-01-16 10:04:24.413798-04	FCC-201	TEMP_REACTOR	502.57	1	2026-01-16 10:04:24.630658-04
+222	2026-01-16 10:04:24.413816-04	FCC-201	CATALYST_ACT	83.18	1	2026-01-16 10:04:24.630658-04
+223	2026-01-16 10:04:24.413833-04	HT-301	TEMP_HYDRO	334.96	1	2026-01-16 10:04:24.630658-04
+224	2026-01-16 10:04:24.413851-04	HT-301	H2_PRESS	38	1	2026-01-16 10:04:24.630658-04
+225	2026-01-16 10:04:29.659097-04	CDU-101	TEMP_TOWER	354.1	1	2026-01-16 10:04:32.305584-04
+226	2026-01-16 10:04:29.659148-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:04:32.305584-04
+227	2026-01-16 10:04:29.659166-04	CDU-101	FLOW_FEED	10091.16	1	2026-01-16 10:04:32.305584-04
+228	2026-01-16 10:04:29.659183-04	FCC-201	TEMP_REACTOR	516.98	1	2026-01-16 10:04:32.305584-04
+229	2026-01-16 10:04:29.659199-04	FCC-201	CATALYST_ACT	84.63	1	2026-01-16 10:04:32.305584-04
+230	2026-01-16 10:04:29.659215-04	HT-301	TEMP_HYDRO	334.78	1	2026-01-16 10:04:32.305584-04
+231	2026-01-16 10:04:29.659231-04	HT-301	H2_PRESS	44.93	1	2026-01-16 10:04:32.305584-04
+232	2026-01-16 10:04:37.580101-04	CDU-101	TEMP_TOWER	371.11	1	2026-01-16 10:04:39.787697-04
+233	2026-01-16 10:04:37.580162-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:04:39.787697-04
+234	2026-01-16 10:04:37.580184-04	CDU-101	FLOW_FEED	11918.59	1	2026-01-16 10:04:39.787697-04
+235	2026-01-16 10:04:37.580203-04	FCC-201	TEMP_REACTOR	504.79	1	2026-01-16 10:04:39.787697-04
+236	2026-01-16 10:04:37.580221-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:04:39.787697-04
+237	2026-01-16 10:04:37.580241-04	HT-301	TEMP_HYDRO	322.2	1	2026-01-16 10:04:39.787697-04
+238	2026-01-16 10:04:37.580258-04	HT-301	H2_PRESS	40.24	1	2026-01-16 10:04:39.787697-04
+239	2026-01-16 10:04:44.815766-04	CDU-101	TEMP_TOWER	356.47	1	2026-01-16 10:04:45.292572-04
+240	2026-01-16 10:04:44.815818-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:04:45.292572-04
+241	2026-01-16 10:04:44.815835-04	CDU-101	FLOW_FEED	9365.71	1	2026-01-16 10:04:45.292572-04
+242	2026-01-16 10:04:44.815853-04	FCC-201	TEMP_REACTOR	496.02	1	2026-01-16 10:04:45.292572-04
+243	2026-01-16 10:04:44.81587-04	FCC-201	CATALYST_ACT	81.78	1	2026-01-16 10:04:45.292572-04
+244	2026-01-16 10:04:44.815888-04	HT-301	TEMP_HYDRO	312.36	1	2026-01-16 10:04:45.292572-04
+245	2026-01-16 10:04:44.815905-04	HT-301	H2_PRESS	42.39	1	2026-01-16 10:04:45.292572-04
+246	2026-01-16 10:04:50.800003-04	CDU-101	TEMP_TOWER	374.89	1	2026-01-16 10:04:50.997676-04
+247	2026-01-16 10:04:50.800052-04	CDU-101	PRESS_TOWER	4.24	1	2026-01-16 10:04:50.997676-04
+248	2026-01-16 10:04:50.800069-04	CDU-101	FLOW_FEED	9224.41	1	2026-01-16 10:04:50.997676-04
+249	2026-01-16 10:04:50.800085-04	FCC-201	TEMP_REACTOR	522.83	1	2026-01-16 10:04:50.997676-04
+250	2026-01-16 10:04:50.8001-04	FCC-201	CATALYST_ACT	79.22	1	2026-01-16 10:04:50.997676-04
+251	2026-01-16 10:04:50.800116-04	HT-301	TEMP_HYDRO	357.95	1	2026-01-16 10:04:50.997676-04
+252	2026-01-16 10:04:50.800131-04	HT-301	H2_PRESS	43.84	1	2026-01-16 10:04:50.997676-04
+253	2026-01-16 10:04:56.332522-04	CDU-101	TEMP_TOWER	409.43	1	2026-01-16 10:04:56.807144-04
+254	2026-01-16 10:04:56.332571-04	CDU-101	PRESS_TOWER	4.67	1	2026-01-16 10:04:56.807144-04
+255	2026-01-16 10:04:56.332588-04	CDU-101	FLOW_FEED	11449.48	1	2026-01-16 10:04:56.807144-04
+256	2026-01-16 10:04:56.332605-04	FCC-201	TEMP_REACTOR	522.96	1	2026-01-16 10:04:56.807144-04
+257	2026-01-16 10:04:56.33262-04	FCC-201	CATALYST_ACT	92.11	1	2026-01-16 10:04:56.807144-04
+258	2026-01-16 10:04:56.332636-04	HT-301	TEMP_HYDRO	365.18	1	2026-01-16 10:04:56.807144-04
+259	2026-01-16 10:04:56.332651-04	HT-301	H2_PRESS	44.66	1	2026-01-16 10:04:56.807144-04
+260	2026-01-16 10:05:01.856374-04	CDU-101	TEMP_TOWER	380.36	1	2026-01-16 10:05:02.0562-04
+261	2026-01-16 10:05:01.856431-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:05:02.0562-04
+262	2026-01-16 10:05:01.856448-04	CDU-101	FLOW_FEED	10762.63	1	2026-01-16 10:05:02.0562-04
+263	2026-01-16 10:05:01.856465-04	FCC-201	TEMP_REACTOR	543.58	1	2026-01-16 10:05:02.0562-04
+264	2026-01-16 10:05:01.856481-04	FCC-201	CATALYST_ACT	80.5	1	2026-01-16 10:05:02.0562-04
+265	2026-01-16 10:05:01.856496-04	HT-301	TEMP_HYDRO	353.13	1	2026-01-16 10:05:02.0562-04
+266	2026-01-16 10:05:01.856512-04	HT-301	H2_PRESS	48.92	1	2026-01-16 10:05:02.0562-04
+267	2026-01-16 10:05:07.092786-04	CDU-101	TEMP_TOWER	421.19	1	2026-01-16 10:05:07.554772-04
+268	2026-01-16 10:05:07.092852-04	CDU-101	PRESS_TOWER	3.42	1	2026-01-16 10:05:07.554772-04
+269	2026-01-16 10:05:07.092872-04	CDU-101	FLOW_FEED	10480.45	1	2026-01-16 10:05:07.554772-04
+270	2026-01-16 10:05:07.092891-04	FCC-201	TEMP_REACTOR	484.44	1	2026-01-16 10:05:07.554772-04
+271	2026-01-16 10:05:07.09291-04	FCC-201	CATALYST_ACT	93.59	1	2026-01-16 10:05:07.554772-04
+272	2026-01-16 10:05:07.092928-04	HT-301	TEMP_HYDRO	361.22	1	2026-01-16 10:05:07.554772-04
+273	2026-01-16 10:05:07.092945-04	HT-301	H2_PRESS	31.74	1	2026-01-16 10:05:07.554772-04
+274	2026-01-16 10:05:12.597506-04	CDU-101	TEMP_TOWER	361.86	1	2026-01-16 10:05:12.798954-04
+275	2026-01-16 10:05:12.597555-04	CDU-101	PRESS_TOWER	3.24	1	2026-01-16 10:05:12.798954-04
+276	2026-01-16 10:05:12.597572-04	CDU-101	FLOW_FEED	10781.3	1	2026-01-16 10:05:12.798954-04
+277	2026-01-16 10:05:12.597588-04	FCC-201	TEMP_REACTOR	546.37	1	2026-01-16 10:05:12.798954-04
+278	2026-01-16 10:05:12.597604-04	FCC-201	CATALYST_ACT	82.09	1	2026-01-16 10:05:12.798954-04
+279	2026-01-16 10:05:12.597619-04	HT-301	TEMP_HYDRO	308.08	1	2026-01-16 10:05:12.798954-04
+280	2026-01-16 10:05:12.597635-04	HT-301	H2_PRESS	33.77	1	2026-01-16 10:05:12.798954-04
+281	2026-01-16 10:05:17.833446-04	CDU-101	TEMP_TOWER	383.75	1	2026-01-16 10:05:24.183624-04
+282	2026-01-16 10:05:17.833512-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:05:24.183624-04
+283	2026-01-16 10:05:17.833534-04	CDU-101	FLOW_FEED	11317.5	1	2026-01-16 10:05:24.183624-04
+284	2026-01-16 10:05:17.833554-04	FCC-201	TEMP_REACTOR	505.08	1	2026-01-16 10:05:24.183624-04
+285	2026-01-16 10:05:17.83357-04	FCC-201	CATALYST_ACT	85.24	1	2026-01-16 10:05:24.183624-04
+286	2026-01-16 10:05:17.833589-04	HT-301	TEMP_HYDRO	346.26	1	2026-01-16 10:05:24.183624-04
+287	2026-01-16 10:05:17.833604-04	HT-301	H2_PRESS	46.76	1	2026-01-16 10:05:24.183624-04
+289	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:44.636139-04
+288	2026-01-16 10:05:29.270415-04	CDU-101	TEMP_TOWER	372.75	1	2026-01-16 10:05:45.344061-04
+290	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:45.344061-04
+291	2026-01-16 10:05:29.270484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:05:44.636139-04
+292	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:45.344061-04
+293	2026-01-16 10:05:29.270501-04	CDU-101	FLOW_FEED	10042.99	1	2026-01-16 10:05:44.636139-04
+294	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:45.344061-04
+295	2026-01-16 10:05:29.27052-04	FCC-201	TEMP_REACTOR	526.91	1	2026-01-16 10:05:44.636139-04
+296	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:45.344061-04
+297	2026-01-16 10:05:29.270536-04	FCC-201	CATALYST_ACT	73.99	1	2026-01-16 10:05:44.636139-04
+298	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:45.344061-04
+299	2026-01-16 10:05:29.270552-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:05:44.636139-04
+300	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:45.344061-04
+301	2026-01-16 10:05:29.270568-04	HT-301	H2_PRESS	44.99	1	2026-01-16 10:05:44.636139-04
+302	2026-01-16 10:05:52.463743-04	CDU-101	TEMP_TOWER	375.66	1	2026-01-16 10:05:53.012388-04
+303	2026-01-16 10:05:52.463943-04	CDU-101	PRESS_TOWER	4.52	1	2026-01-16 10:05:53.012388-04
+304	2026-01-16 10:05:52.463976-04	CDU-101	FLOW_FEED	9252.66	1	2026-01-16 10:05:53.012388-04
+305	2026-01-16 10:05:52.463996-04	FCC-201	TEMP_REACTOR	542.38	1	2026-01-16 10:05:53.012388-04
+306	2026-01-16 10:05:52.464013-04	FCC-201	CATALYST_ACT	81.93	1	2026-01-16 10:05:53.012388-04
+307	2026-01-16 10:05:52.464032-04	HT-301	TEMP_HYDRO	337.31	1	2026-01-16 10:05:53.012388-04
+308	2026-01-16 10:05:52.464048-04	HT-301	H2_PRESS	43.02	1	2026-01-16 10:05:53.012388-04
+309	2026-01-16 10:05:58.111733-04	CDU-101	TEMP_TOWER	397.95	1	2026-01-16 10:05:58.344071-04
+310	2026-01-16 10:05:58.111783-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:05:58.344071-04
+311	2026-01-16 10:05:58.1118-04	CDU-101	FLOW_FEED	8888.16	1	2026-01-16 10:05:58.344071-04
+312	2026-01-16 10:05:58.111816-04	FCC-201	TEMP_REACTOR	547.7	1	2026-01-16 10:05:58.344071-04
+313	2026-01-16 10:05:58.111832-04	FCC-201	CATALYST_ACT	87.63	1	2026-01-16 10:05:58.344071-04
+314	2026-01-16 10:05:58.111848-04	HT-301	TEMP_HYDRO	300.26	1	2026-01-16 10:05:58.344071-04
+315	2026-01-16 10:05:58.111863-04	HT-301	H2_PRESS	32.03	1	2026-01-16 10:05:58.344071-04
+316	2026-01-16 10:06:03.430558-04	CDU-101	TEMP_TOWER	409.01	1	2026-01-16 10:06:04.000085-04
+317	2026-01-16 10:06:03.430607-04	CDU-101	PRESS_TOWER	4.87	1	2026-01-16 10:06:04.000085-04
+318	2026-01-16 10:06:03.430624-04	CDU-101	FLOW_FEED	9647.13	1	2026-01-16 10:06:04.000085-04
+319	2026-01-16 10:06:03.430641-04	FCC-201	TEMP_REACTOR	516.9	1	2026-01-16 10:06:04.000085-04
+320	2026-01-16 10:06:03.430656-04	FCC-201	CATALYST_ACT	72.41	1	2026-01-16 10:06:04.000085-04
+321	2026-01-16 10:06:03.430672-04	HT-301	TEMP_HYDRO	328.27	1	2026-01-16 10:06:04.000085-04
+322	2026-01-16 10:06:03.430687-04	HT-301	H2_PRESS	35.33	1	2026-01-16 10:06:04.000085-04
+323	2026-01-16 10:06:10.167356-04	CDU-101	TEMP_TOWER	356.97	1	2026-01-16 10:06:12.378024-04
+324	2026-01-16 10:06:10.167418-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:06:12.378024-04
+325	2026-01-16 10:06:10.167437-04	CDU-101	FLOW_FEED	10333.11	1	2026-01-16 10:06:12.378024-04
+326	2026-01-16 10:06:10.167455-04	FCC-201	TEMP_REACTOR	484.88	1	2026-01-16 10:06:12.378024-04
+327	2026-01-16 10:06:10.167471-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:06:12.378024-04
+328	2026-01-16 10:06:10.167488-04	HT-301	TEMP_HYDRO	356.65	1	2026-01-16 10:06:12.378024-04
+329	2026-01-16 10:06:10.167504-04	HT-301	H2_PRESS	46.64	1	2026-01-16 10:06:12.378024-04
+330	2026-01-16 10:06:17.544049-04	CDU-101	TEMP_TOWER	422.8	1	2026-01-16 10:06:18.007316-04
+331	2026-01-16 10:06:17.544113-04	CDU-101	PRESS_TOWER	4.72	1	2026-01-16 10:06:18.007316-04
+332	2026-01-16 10:06:17.544131-04	CDU-101	FLOW_FEED	8988.96	1	2026-01-16 10:06:18.007316-04
+333	2026-01-16 10:06:17.544151-04	FCC-201	TEMP_REACTOR	510.25	1	2026-01-16 10:06:18.007316-04
+334	2026-01-16 10:06:17.544167-04	FCC-201	CATALYST_ACT	79.17	1	2026-01-16 10:06:18.007316-04
+335	2026-01-16 10:06:17.544182-04	HT-301	TEMP_HYDRO	352.5	1	2026-01-16 10:06:18.007316-04
+336	2026-01-16 10:06:17.544197-04	HT-301	H2_PRESS	38.57	1	2026-01-16 10:06:18.007316-04
+337	2026-01-16 10:06:23.066147-04	CDU-101	TEMP_TOWER	397.65	1	2026-01-16 10:06:23.270319-04
+338	2026-01-16 10:06:23.0662-04	CDU-101	PRESS_TOWER	4.14	1	2026-01-16 10:06:23.270319-04
+339	2026-01-16 10:06:23.066218-04	CDU-101	FLOW_FEED	9919.81	1	2026-01-16 10:06:23.270319-04
+340	2026-01-16 10:06:23.066234-04	FCC-201	TEMP_REACTOR	521.78	1	2026-01-16 10:06:23.270319-04
+341	2026-01-16 10:06:23.06625-04	FCC-201	CATALYST_ACT	71.31	1	2026-01-16 10:06:23.270319-04
+342	2026-01-16 10:06:23.066266-04	HT-301	TEMP_HYDRO	352.76	1	2026-01-16 10:06:23.270319-04
+343	2026-01-16 10:06:23.066281-04	HT-301	H2_PRESS	31.37	1	2026-01-16 10:06:23.270319-04
+344	2026-01-16 10:06:28.343391-04	CDU-101	TEMP_TOWER	435.81	1	2026-01-16 10:06:30.208065-04
+345	2026-01-16 10:06:28.343451-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-16 10:06:30.208065-04
+346	2026-01-16 10:06:28.343469-04	CDU-101	FLOW_FEED	9693.91	1	2026-01-16 10:06:30.208065-04
+347	2026-01-16 10:06:28.343486-04	FCC-201	TEMP_REACTOR	484.64	1	2026-01-16 10:06:30.208065-04
+348	2026-01-16 10:06:28.343505-04	FCC-201	CATALYST_ACT	85.37	1	2026-01-16 10:06:30.208065-04
+349	2026-01-16 10:06:28.343522-04	HT-301	TEMP_HYDRO	354.08	1	2026-01-16 10:06:30.208065-04
+350	2026-01-16 10:06:28.343539-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:06:30.208065-04
+351	2026-01-16 10:06:35.541447-04	CDU-101	TEMP_TOWER	375.52	1	2026-01-16 10:06:35.731474-04
+352	2026-01-16 10:06:35.541497-04	CDU-101	PRESS_TOWER	4.96	1	2026-01-16 10:06:35.731474-04
+353	2026-01-16 10:06:35.541514-04	CDU-101	FLOW_FEED	8197.28	1	2026-01-16 10:06:35.731474-04
+354	2026-01-16 10:06:35.54153-04	FCC-201	TEMP_REACTOR	527.99	1	2026-01-16 10:06:35.731474-04
+355	2026-01-16 10:06:35.541546-04	FCC-201	CATALYST_ACT	71.91	1	2026-01-16 10:06:35.731474-04
+356	2026-01-16 10:06:35.541562-04	HT-301	TEMP_HYDRO	333.35	1	2026-01-16 10:06:35.731474-04
+357	2026-01-16 10:06:35.541577-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:06:35.731474-04
+358	2026-01-16 10:06:40.871166-04	CDU-101	TEMP_TOWER	402.13	1	2026-01-16 10:06:41.369528-04
+359	2026-01-16 10:06:40.871217-04	CDU-101	PRESS_TOWER	3.92	1	2026-01-16 10:06:41.369528-04
+360	2026-01-16 10:06:40.871234-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:06:41.369528-04
+361	2026-01-16 10:06:40.871251-04	FCC-201	TEMP_REACTOR	539.43	1	2026-01-16 10:06:41.369528-04
+362	2026-01-16 10:06:40.871266-04	FCC-201	CATALYST_ACT	92.01	1	2026-01-16 10:06:41.369528-04
+363	2026-01-16 10:06:40.871282-04	HT-301	TEMP_HYDRO	348.91	1	2026-01-16 10:06:41.369528-04
+364	2026-01-16 10:06:40.871297-04	HT-301	H2_PRESS	37.72	1	2026-01-16 10:06:41.369528-04
+365	2026-01-16 10:06:46.410855-04	CDU-101	TEMP_TOWER	389.91	1	2026-01-16 10:06:46.618844-04
+366	2026-01-16 10:06:46.410904-04	CDU-101	PRESS_TOWER	4.73	1	2026-01-16 10:06:46.618844-04
+367	2026-01-16 10:06:46.410921-04	CDU-101	FLOW_FEED	10060.59	1	2026-01-16 10:06:46.618844-04
+368	2026-01-16 10:06:46.410937-04	FCC-201	TEMP_REACTOR	511.43	1	2026-01-16 10:06:46.618844-04
+369	2026-01-16 10:06:46.410952-04	FCC-201	CATALYST_ACT	91.93	1	2026-01-16 10:06:46.618844-04
+370	2026-01-16 10:06:46.410968-04	HT-301	TEMP_HYDRO	306.19	1	2026-01-16 10:06:46.618844-04
+371	2026-01-16 10:06:46.410983-04	HT-301	H2_PRESS	32.45	1	2026-01-16 10:06:46.618844-04
+372	2026-01-16 10:06:51.656548-04	CDU-101	TEMP_TOWER	414.53	1	2026-01-16 10:06:52.462667-04
+373	2026-01-16 10:06:51.656651-04	CDU-101	PRESS_TOWER	3.48	1	2026-01-16 10:06:52.462667-04
+374	2026-01-16 10:06:51.656671-04	CDU-101	FLOW_FEED	8093.31	1	2026-01-16 10:06:52.462667-04
+375	2026-01-16 10:06:51.656688-04	FCC-201	TEMP_REACTOR	521.92	1	2026-01-16 10:06:52.462667-04
+376	2026-01-16 10:06:51.656706-04	FCC-201	CATALYST_ACT	71.81	1	2026-01-16 10:06:52.462667-04
+377	2026-01-16 10:06:51.656723-04	HT-301	TEMP_HYDRO	337.82	1	2026-01-16 10:06:52.462667-04
+378	2026-01-16 10:06:51.656741-04	HT-301	H2_PRESS	48.36	1	2026-01-16 10:06:52.462667-04
+379	2026-01-16 10:06:57.530123-04	CDU-101	TEMP_TOWER	405.08	1	2026-01-16 10:06:58.679192-04
+380	2026-01-16 10:06:57.530237-04	CDU-101	PRESS_TOWER	2.71	1	2026-01-16 10:06:58.679192-04
+381	2026-01-16 10:06:57.530258-04	CDU-101	FLOW_FEED	10827.77	1	2026-01-16 10:06:58.679192-04
+382	2026-01-16 10:06:57.530279-04	FCC-201	TEMP_REACTOR	484.33	1	2026-01-16 10:06:58.679192-04
+383	2026-01-16 10:06:57.5303-04	FCC-201	CATALYST_ACT	93.03	1	2026-01-16 10:06:58.679192-04
+384	2026-01-16 10:06:57.530318-04	HT-301	TEMP_HYDRO	315.81	1	2026-01-16 10:06:58.679192-04
+385	2026-01-16 10:06:57.530337-04	HT-301	H2_PRESS	39.38	1	2026-01-16 10:06:58.679192-04
+386	2026-01-16 10:07:03.71444-04	CDU-101	TEMP_TOWER	435.11	1	2026-01-16 10:07:04.195054-04
+387	2026-01-16 10:07:03.714488-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:07:04.195054-04
+388	2026-01-16 10:07:03.714505-04	CDU-101	FLOW_FEED	8180.01	1	2026-01-16 10:07:04.195054-04
+389	2026-01-16 10:07:03.714522-04	FCC-201	TEMP_REACTOR	486.04	1	2026-01-16 10:07:04.195054-04
+390	2026-01-16 10:07:03.714537-04	FCC-201	CATALYST_ACT	87.04	1	2026-01-16 10:07:04.195054-04
+391	2026-01-16 10:07:03.714553-04	HT-301	TEMP_HYDRO	367.67	1	2026-01-16 10:07:04.195054-04
+392	2026-01-16 10:07:03.714568-04	HT-301	H2_PRESS	42.49	1	2026-01-16 10:07:04.195054-04
+393	2026-01-16 10:07:09.311177-04	CDU-101	TEMP_TOWER	412.37	1	2026-01-16 10:07:11.161039-04
+394	2026-01-16 10:07:09.311253-04	CDU-101	PRESS_TOWER	2.51	1	2026-01-16 10:07:11.161039-04
+395	2026-01-16 10:07:09.311271-04	CDU-101	FLOW_FEED	10679.76	1	2026-01-16 10:07:11.161039-04
+396	2026-01-16 10:07:09.311289-04	FCC-201	TEMP_REACTOR	519.01	1	2026-01-16 10:07:11.161039-04
+397	2026-01-16 10:07:09.311305-04	FCC-201	CATALYST_ACT	82.98	1	2026-01-16 10:07:11.161039-04
+398	2026-01-16 10:07:09.311324-04	HT-301	TEMP_HYDRO	378.81	1	2026-01-16 10:07:11.161039-04
+399	2026-01-16 10:07:09.31134-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:07:11.161039-04
+400	2026-01-16 10:07:16.35775-04	CDU-101	TEMP_TOWER	395.38	1	2026-01-16 10:07:16.865005-04
+401	2026-01-16 10:07:16.357815-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:07:16.865005-04
+402	2026-01-16 10:07:16.357835-04	CDU-101	FLOW_FEED	8029.76	1	2026-01-16 10:07:16.865005-04
+403	2026-01-16 10:07:16.357855-04	FCC-201	TEMP_REACTOR	495.99	1	2026-01-16 10:07:16.865005-04
+404	2026-01-16 10:07:16.357873-04	FCC-201	CATALYST_ACT	91.47	1	2026-01-16 10:07:16.865005-04
+405	2026-01-16 10:07:16.357892-04	HT-301	TEMP_HYDRO	340.32	1	2026-01-16 10:07:16.865005-04
+406	2026-01-16 10:07:16.35791-04	HT-301	H2_PRESS	41.63	1	2026-01-16 10:07:16.865005-04
+407	2026-01-16 10:07:21.905408-04	CDU-101	TEMP_TOWER	386.93	1	2026-01-16 10:07:22.224812-04
+408	2026-01-16 10:07:21.905455-04	CDU-101	PRESS_TOWER	4.36	1	2026-01-16 10:07:22.224812-04
+409	2026-01-16 10:07:21.905472-04	CDU-101	FLOW_FEED	10315.72	1	2026-01-16 10:07:22.224812-04
+410	2026-01-16 10:07:21.905488-04	FCC-201	TEMP_REACTOR	490.09	1	2026-01-16 10:07:22.224812-04
+411	2026-01-16 10:07:21.905503-04	FCC-201	CATALYST_ACT	84.97	1	2026-01-16 10:07:22.224812-04
+412	2026-01-16 10:07:21.905519-04	HT-301	TEMP_HYDRO	343.96	1	2026-01-16 10:07:22.224812-04
+413	2026-01-16 10:07:21.905535-04	HT-301	H2_PRESS	33.3	1	2026-01-16 10:07:22.224812-04
+414	2026-01-16 10:07:27.357213-04	CDU-101	TEMP_TOWER	361.05	1	2026-01-16 10:07:27.835577-04
+415	2026-01-16 10:07:27.357272-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:07:27.835577-04
+416	2026-01-16 10:07:27.357292-04	CDU-101	FLOW_FEED	9837.49	1	2026-01-16 10:07:27.835577-04
+417	2026-01-16 10:07:27.35731-04	FCC-201	TEMP_REACTOR	494.78	1	2026-01-16 10:07:27.835577-04
+418	2026-01-16 10:07:27.357329-04	FCC-201	CATALYST_ACT	78.74	1	2026-01-16 10:07:27.835577-04
+419	2026-01-16 10:07:27.357347-04	HT-301	TEMP_HYDRO	327.25	1	2026-01-16 10:07:27.835577-04
+420	2026-01-16 10:07:27.357362-04	HT-301	H2_PRESS	32.07	1	2026-01-16 10:07:27.835577-04
+421	2026-01-16 10:07:32.87251-04	CDU-101	TEMP_TOWER	354.64	1	2026-01-16 10:07:35.629481-04
+422	2026-01-16 10:07:32.872573-04	CDU-101	PRESS_TOWER	3.57	1	2026-01-16 10:07:35.629481-04
+423	2026-01-16 10:07:32.872592-04	CDU-101	FLOW_FEED	9684.81	1	2026-01-16 10:07:35.629481-04
+424	2026-01-16 10:07:32.872609-04	FCC-201	TEMP_REACTOR	495.75	1	2026-01-16 10:07:35.629481-04
+425	2026-01-16 10:07:32.872625-04	FCC-201	CATALYST_ACT	72.72	1	2026-01-16 10:07:35.629481-04
+426	2026-01-16 10:07:32.872642-04	HT-301	TEMP_HYDRO	347.5	1	2026-01-16 10:07:35.629481-04
+427	2026-01-16 10:07:32.872658-04	HT-301	H2_PRESS	30.47	1	2026-01-16 10:07:35.629481-04
+428	2026-01-16 10:07:41.648851-04	CDU-101	TEMP_TOWER	390	1	2026-01-16 10:07:43.316851-04
+429	2026-01-16 10:07:41.648904-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:07:43.316851-04
+430	2026-01-16 10:07:41.648922-04	CDU-101	FLOW_FEED	10851.8	1	2026-01-16 10:07:43.316851-04
+431	2026-01-16 10:07:41.648941-04	FCC-201	TEMP_REACTOR	513.28	1	2026-01-16 10:07:43.316851-04
+432	2026-01-16 10:07:41.648957-04	FCC-201	CATALYST_ACT	78.97	1	2026-01-16 10:07:43.316851-04
+433	2026-01-16 10:07:41.648973-04	HT-301	TEMP_HYDRO	376.79	1	2026-01-16 10:07:43.316851-04
+434	2026-01-16 10:07:41.64899-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:07:43.316851-04
+435	2026-01-16 10:07:48.479585-04	CDU-101	TEMP_TOWER	391.32	1	2026-01-16 10:07:48.676279-04
+436	2026-01-16 10:07:48.479634-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:07:48.676279-04
+437	2026-01-16 10:07:48.479653-04	CDU-101	FLOW_FEED	11281.66	1	2026-01-16 10:07:48.676279-04
+438	2026-01-16 10:07:48.47967-04	FCC-201	TEMP_REACTOR	499.79	1	2026-01-16 10:07:48.676279-04
+439	2026-01-16 10:07:48.479685-04	FCC-201	CATALYST_ACT	83.13	1	2026-01-16 10:07:48.676279-04
+440	2026-01-16 10:07:48.479701-04	HT-301	TEMP_HYDRO	333.8	1	2026-01-16 10:07:48.676279-04
+441	2026-01-16 10:07:48.479716-04	HT-301	H2_PRESS	48.58	1	2026-01-16 10:07:48.676279-04
+442	2026-01-16 10:07:53.700453-04	CDU-101	TEMP_TOWER	422.67	1	2026-01-16 10:07:54.26598-04
+443	2026-01-16 10:07:53.700501-04	CDU-101	PRESS_TOWER	2.74	1	2026-01-16 10:07:54.26598-04
+444	2026-01-16 10:07:53.700519-04	CDU-101	FLOW_FEED	8007.86	1	2026-01-16 10:07:54.26598-04
+445	2026-01-16 10:07:53.700535-04	FCC-201	TEMP_REACTOR	507.45	1	2026-01-16 10:07:54.26598-04
+446	2026-01-16 10:07:53.700551-04	FCC-201	CATALYST_ACT	76.97	1	2026-01-16 10:07:54.26598-04
+447	2026-01-16 10:07:53.700567-04	HT-301	TEMP_HYDRO	316.26	1	2026-01-16 10:07:54.26598-04
+448	2026-01-16 10:07:53.700583-04	HT-301	H2_PRESS	32.17	1	2026-01-16 10:07:54.26598-04
+449	2026-01-16 10:07:59.318598-04	CDU-101	TEMP_TOWER	354.04	1	2026-01-16 10:07:59.574921-04
+450	2026-01-16 10:07:59.318661-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:07:59.574921-04
+451	2026-01-16 10:07:59.318681-04	CDU-101	FLOW_FEED	8760.45	1	2026-01-16 10:07:59.574921-04
+452	2026-01-16 10:07:59.318698-04	FCC-201	TEMP_REACTOR	508.73	1	2026-01-16 10:07:59.574921-04
+453	2026-01-16 10:07:59.318714-04	FCC-201	CATALYST_ACT	82.38	1	2026-01-16 10:07:59.574921-04
+454	2026-01-16 10:07:59.318733-04	HT-301	TEMP_HYDRO	353.31	1	2026-01-16 10:07:59.574921-04
+455	2026-01-16 10:07:59.318751-04	HT-301	H2_PRESS	43.91	1	2026-01-16 10:07:59.574921-04
+456	2026-01-16 10:08:04.6145-04	CDU-101	TEMP_TOWER	399.19	1	2026-01-16 10:08:05.151103-04
+457	2026-01-16 10:08:04.61456-04	CDU-101	PRESS_TOWER	2.97	1	2026-01-16 10:08:05.151103-04
+458	2026-01-16 10:08:04.614581-04	CDU-101	FLOW_FEED	9812.59	1	2026-01-16 10:08:05.151103-04
+459	2026-01-16 10:08:04.6146-04	FCC-201	TEMP_REACTOR	548.21	1	2026-01-16 10:08:05.151103-04
+460	2026-01-16 10:08:04.614617-04	FCC-201	CATALYST_ACT	90.3	1	2026-01-16 10:08:05.151103-04
+461	2026-01-16 10:08:04.614633-04	HT-301	TEMP_HYDRO	334.66	1	2026-01-16 10:08:05.151103-04
+462	2026-01-16 10:08:04.614649-04	HT-301	H2_PRESS	48.03	1	2026-01-16 10:08:05.151103-04
+463	2026-01-16 10:08:10.264078-04	CDU-101	TEMP_TOWER	431.23	1	2026-01-16 10:08:10.458495-04
+464	2026-01-16 10:08:10.264139-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:08:10.458495-04
+465	2026-01-16 10:08:10.26416-04	CDU-101	FLOW_FEED	11517.95	1	2026-01-16 10:08:10.458495-04
+466	2026-01-16 10:08:10.26418-04	FCC-201	TEMP_REACTOR	547.43	1	2026-01-16 10:08:10.458495-04
+467	2026-01-16 10:08:10.264196-04	FCC-201	CATALYST_ACT	84.28	1	2026-01-16 10:08:10.458495-04
+468	2026-01-16 10:08:10.264212-04	HT-301	TEMP_HYDRO	311.19	1	2026-01-16 10:08:10.458495-04
+469	2026-01-16 10:08:10.264227-04	HT-301	H2_PRESS	42.88	1	2026-01-16 10:08:10.458495-04
+470	2026-01-16 10:08:15.494727-04	CDU-101	TEMP_TOWER	380.68	1	2026-01-16 10:08:15.975589-04
+471	2026-01-16 10:08:15.494785-04	CDU-101	PRESS_TOWER	4.81	1	2026-01-16 10:08:15.975589-04
+472	2026-01-16 10:08:15.494803-04	CDU-101	FLOW_FEED	11878.68	1	2026-01-16 10:08:15.975589-04
+473	2026-01-16 10:08:15.49482-04	FCC-201	TEMP_REACTOR	510.84	1	2026-01-16 10:08:15.975589-04
+474	2026-01-16 10:08:15.494836-04	FCC-201	CATALYST_ACT	79.51	1	2026-01-16 10:08:15.975589-04
+475	2026-01-16 10:08:15.494853-04	HT-301	TEMP_HYDRO	371.52	1	2026-01-16 10:08:15.975589-04
+476	2026-01-16 10:08:15.494869-04	HT-301	H2_PRESS	47.32	1	2026-01-16 10:08:15.975589-04
+477	2026-01-16 10:08:21.027572-04	CDU-101	TEMP_TOWER	352.61	1	2026-01-16 10:08:21.244106-04
+478	2026-01-16 10:08:21.027619-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:08:21.244106-04
+479	2026-01-16 10:08:21.027637-04	CDU-101	FLOW_FEED	9103.04	1	2026-01-16 10:08:21.244106-04
+480	2026-01-16 10:08:21.027653-04	FCC-201	TEMP_REACTOR	480.04	1	2026-01-16 10:08:21.244106-04
+481	2026-01-16 10:08:21.027668-04	FCC-201	CATALYST_ACT	78.85	1	2026-01-16 10:08:21.244106-04
+482	2026-01-16 10:08:21.027683-04	HT-301	TEMP_HYDRO	376.51	1	2026-01-16 10:08:21.244106-04
+483	2026-01-16 10:08:21.027698-04	HT-301	H2_PRESS	38.93	1	2026-01-16 10:08:21.244106-04
+484	2026-01-16 10:08:32.018724-04	CDU-101	TEMP_TOWER	350.05	1	2026-01-16 10:08:34.47269-04
+485	2026-01-16 10:08:32.018787-04	CDU-101	PRESS_TOWER	2.53	1	2026-01-16 10:08:34.47269-04
+486	2026-01-16 10:08:32.018806-04	CDU-101	FLOW_FEED	9107.47	1	2026-01-16 10:08:34.47269-04
+487	2026-01-16 10:08:32.018826-04	FCC-201	TEMP_REACTOR	549.46	1	2026-01-16 10:08:34.47269-04
+488	2026-01-16 10:08:32.018842-04	FCC-201	CATALYST_ACT	82.26	1	2026-01-16 10:08:34.47269-04
+489	2026-01-16 10:08:32.018858-04	HT-301	TEMP_HYDRO	367.86	1	2026-01-16 10:08:34.47269-04
+490	2026-01-16 10:08:32.018874-04	HT-301	H2_PRESS	30.82	1	2026-01-16 10:08:34.47269-04
+491	2026-01-16 10:08:39.516184-04	CDU-101	TEMP_TOWER	419.2	1	2026-01-16 10:08:41.73235-04
+492	2026-01-16 10:08:39.516234-04	CDU-101	PRESS_TOWER	4.06	1	2026-01-16 10:08:41.73235-04
+493	2026-01-16 10:08:39.516252-04	CDU-101	FLOW_FEED	9954	1	2026-01-16 10:08:41.73235-04
+494	2026-01-16 10:08:39.516268-04	FCC-201	TEMP_REACTOR	538.09	1	2026-01-16 10:08:41.73235-04
+495	2026-01-16 10:08:39.516284-04	FCC-201	CATALYST_ACT	72.78	1	2026-01-16 10:08:41.73235-04
+496	2026-01-16 10:08:39.516299-04	HT-301	TEMP_HYDRO	344.33	1	2026-01-16 10:08:41.73235-04
+497	2026-01-16 10:08:39.516314-04	HT-301	H2_PRESS	44.75	1	2026-01-16 10:08:41.73235-04
+498	2026-01-16 10:08:46.777615-04	CDU-101	TEMP_TOWER	379.07	1	2026-01-16 10:08:47.310346-04
+499	2026-01-16 10:08:46.777682-04	CDU-101	PRESS_TOWER	3.11	1	2026-01-16 10:08:47.310346-04
+500	2026-01-16 10:08:46.777702-04	CDU-101	FLOW_FEED	10959.22	1	2026-01-16 10:08:47.310346-04
+501	2026-01-16 10:08:46.77772-04	FCC-201	TEMP_REACTOR	529.49	1	2026-01-16 10:08:47.310346-04
+502	2026-01-16 10:08:46.777741-04	FCC-201	CATALYST_ACT	85.67	1	2026-01-16 10:08:47.310346-04
+503	2026-01-16 10:08:46.777759-04	HT-301	TEMP_HYDRO	323.17	1	2026-01-16 10:08:47.310346-04
+504	2026-01-16 10:08:46.777776-04	HT-301	H2_PRESS	39.39	1	2026-01-16 10:08:47.310346-04
+505	2026-01-16 10:08:52.347689-04	CDU-101	TEMP_TOWER	387.76	1	2026-01-16 10:08:52.542953-04
+506	2026-01-16 10:08:52.347737-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:52.542953-04
+507	2026-01-16 10:08:52.347754-04	CDU-101	FLOW_FEED	10036.84	1	2026-01-16 10:08:52.542953-04
+508	2026-01-16 10:08:52.347771-04	FCC-201	TEMP_REACTOR	529.18	1	2026-01-16 10:08:52.542953-04
+509	2026-01-16 10:08:52.347786-04	FCC-201	CATALYST_ACT	72.93	1	2026-01-16 10:08:52.542953-04
+510	2026-01-16 10:08:52.347801-04	HT-301	TEMP_HYDRO	362.29	1	2026-01-16 10:08:52.542953-04
+511	2026-01-16 10:08:52.347816-04	HT-301	H2_PRESS	36.72	1	2026-01-16 10:08:52.542953-04
+512	2026-01-16 10:08:57.58111-04	CDU-101	TEMP_TOWER	384.32	1	2026-01-16 10:08:58.030458-04
+513	2026-01-16 10:08:57.58117-04	CDU-101	PRESS_TOWER	4.62	1	2026-01-16 10:08:58.030458-04
+514	2026-01-16 10:08:57.581189-04	CDU-101	FLOW_FEED	11213.62	1	2026-01-16 10:08:58.030458-04
+515	2026-01-16 10:08:57.581208-04	FCC-201	TEMP_REACTOR	505	1	2026-01-16 10:08:58.030458-04
+516	2026-01-16 10:08:57.581225-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:08:58.030458-04
+517	2026-01-16 10:08:57.581241-04	HT-301	TEMP_HYDRO	361.41	1	2026-01-16 10:08:58.030458-04
+518	2026-01-16 10:08:57.581257-04	HT-301	H2_PRESS	46.75	1	2026-01-16 10:08:58.030458-04
+519	2026-01-16 10:09:03.065275-04	CDU-101	TEMP_TOWER	427.32	1	2026-01-16 10:09:03.294004-04
+520	2026-01-16 10:09:03.065334-04	CDU-101	PRESS_TOWER	3.68	1	2026-01-16 10:09:03.294004-04
+521	2026-01-16 10:09:03.065354-04	CDU-101	FLOW_FEED	9069.18	1	2026-01-16 10:09:03.294004-04
+522	2026-01-16 10:09:03.065371-04	FCC-201	TEMP_REACTOR	514.13	1	2026-01-16 10:09:03.294004-04
+523	2026-01-16 10:09:03.065388-04	FCC-201	CATALYST_ACT	87.65	1	2026-01-16 10:09:03.294004-04
+524	2026-01-16 10:09:03.065404-04	HT-301	TEMP_HYDRO	330.91	1	2026-01-16 10:09:03.294004-04
+525	2026-01-16 10:09:03.065421-04	HT-301	H2_PRESS	49.02	1	2026-01-16 10:09:03.294004-04
+526	2026-01-16 10:09:08.32823-04	CDU-101	TEMP_TOWER	440.56	1	2026-01-16 10:09:08.794526-04
+527	2026-01-16 10:09:08.328293-04	CDU-101	PRESS_TOWER	4.08	1	2026-01-16 10:09:08.794526-04
+528	2026-01-16 10:09:08.328311-04	CDU-101	FLOW_FEED	11141.67	1	2026-01-16 10:09:08.794526-04
+529	2026-01-16 10:09:08.328328-04	FCC-201	TEMP_REACTOR	509.71	1	2026-01-16 10:09:08.794526-04
+530	2026-01-16 10:09:08.328343-04	FCC-201	CATALYST_ACT	83.15	1	2026-01-16 10:09:08.794526-04
+531	2026-01-16 10:09:08.328359-04	HT-301	TEMP_HYDRO	347.87	1	2026-01-16 10:09:08.794526-04
+532	2026-01-16 10:09:08.328374-04	HT-301	H2_PRESS	38.51	1	2026-01-16 10:09:08.794526-04
+533	2026-01-16 10:09:13.822302-04	CDU-101	TEMP_TOWER	359.04	1	2026-01-16 10:09:14.017219-04
+534	2026-01-16 10:09:13.82236-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:09:14.017219-04
+535	2026-01-16 10:09:13.82238-04	CDU-101	FLOW_FEED	10843.84	1	2026-01-16 10:09:14.017219-04
+536	2026-01-16 10:09:13.822397-04	FCC-201	TEMP_REACTOR	502.31	1	2026-01-16 10:09:14.017219-04
+537	2026-01-16 10:09:13.822414-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:09:14.017219-04
+538	2026-01-16 10:09:13.822429-04	HT-301	TEMP_HYDRO	326.07	1	2026-01-16 10:09:14.017219-04
+539	2026-01-16 10:09:13.822446-04	HT-301	H2_PRESS	47.76	1	2026-01-16 10:09:14.017219-04
+540	2026-01-16 10:09:19.041548-04	CDU-101	TEMP_TOWER	367.47	1	2026-01-16 10:09:19.57813-04
+541	2026-01-16 10:09:19.041619-04	CDU-101	PRESS_TOWER	4.17	1	2026-01-16 10:09:19.57813-04
+542	2026-01-16 10:09:19.041638-04	CDU-101	FLOW_FEED	11647.95	1	2026-01-16 10:09:19.57813-04
+543	2026-01-16 10:09:19.041656-04	FCC-201	TEMP_REACTOR	497.24	1	2026-01-16 10:09:19.57813-04
+544	2026-01-16 10:09:19.041675-04	FCC-201	CATALYST_ACT	74.56	1	2026-01-16 10:09:19.57813-04
+545	2026-01-16 10:09:19.041692-04	HT-301	TEMP_HYDRO	308.17	1	2026-01-16 10:09:19.57813-04
+546	2026-01-16 10:09:19.041708-04	HT-301	H2_PRESS	32.8	1	2026-01-16 10:09:19.57813-04
+547	2026-01-16 10:09:26.728146-04	CDU-101	TEMP_TOWER	394.08	1	2026-01-16 10:09:27.257851-04
+548	2026-01-16 10:09:26.728208-04	CDU-101	PRESS_TOWER	3	1	2026-01-16 10:09:27.257851-04
+549	2026-01-16 10:09:26.728228-04	CDU-101	FLOW_FEED	9999.6	1	2026-01-16 10:09:27.257851-04
+550	2026-01-16 10:09:26.728246-04	FCC-201	TEMP_REACTOR	511.66	1	2026-01-16 10:09:27.257851-04
+551	2026-01-16 10:09:26.728264-04	FCC-201	CATALYST_ACT	78.12	1	2026-01-16 10:09:27.257851-04
+552	2026-01-16 10:09:26.728282-04	HT-301	TEMP_HYDRO	308.16	1	2026-01-16 10:09:27.257851-04
+553	2026-01-16 10:09:26.728297-04	HT-301	H2_PRESS	41.39	1	2026-01-16 10:09:27.257851-04
+554	2026-01-16 10:09:32.433019-04	CDU-101	TEMP_TOWER	411.53	1	2026-01-16 10:09:33.051715-04
+555	2026-01-16 10:09:32.434329-04	CDU-101	PRESS_TOWER	4.02	1	2026-01-16 10:09:33.051715-04
+556	2026-01-16 10:09:32.4344-04	CDU-101	FLOW_FEED	9732.85	1	2026-01-16 10:09:33.051715-04
+557	2026-01-16 10:09:32.434422-04	FCC-201	TEMP_REACTOR	535.04	1	2026-01-16 10:09:33.051715-04
+558	2026-01-16 10:09:32.434441-04	FCC-201	CATALYST_ACT	74.52	1	2026-01-16 10:09:33.051715-04
+559	2026-01-16 10:09:32.434458-04	HT-301	TEMP_HYDRO	337.35	1	2026-01-16 10:09:33.051715-04
+560	2026-01-16 10:09:32.434477-04	HT-301	H2_PRESS	32.13	1	2026-01-16 10:09:33.051715-04
+561	2026-01-16 10:09:38.154915-04	CDU-101	TEMP_TOWER	417.95	1	2026-01-16 10:09:38.573307-04
+562	2026-01-16 10:09:38.154979-04	CDU-101	PRESS_TOWER	2.62	1	2026-01-16 10:09:38.573307-04
+563	2026-01-16 10:09:38.155-04	CDU-101	FLOW_FEED	11560.91	1	2026-01-16 10:09:38.573307-04
+564	2026-01-16 10:09:38.15502-04	FCC-201	TEMP_REACTOR	512.54	1	2026-01-16 10:09:38.573307-04
+565	2026-01-16 10:09:38.155038-04	FCC-201	CATALYST_ACT	93.44	1	2026-01-16 10:09:38.573307-04
+566	2026-01-16 10:09:38.155055-04	HT-301	TEMP_HYDRO	331.92	1	2026-01-16 10:09:38.573307-04
+567	2026-01-16 10:09:38.155071-04	HT-301	H2_PRESS	39.82	1	2026-01-16 10:09:38.573307-04
+568	2026-01-16 10:09:43.743069-04	CDU-101	TEMP_TOWER	396.23	1	2026-01-16 10:09:44.473329-04
+569	2026-01-16 10:09:43.743134-04	CDU-101	PRESS_TOWER	3.76	1	2026-01-16 10:09:44.473329-04
+570	2026-01-16 10:09:43.743155-04	CDU-101	FLOW_FEED	10844.6	1	2026-01-16 10:09:44.473329-04
+571	2026-01-16 10:09:43.743174-04	FCC-201	TEMP_REACTOR	546.25	1	2026-01-16 10:09:44.473329-04
+572	2026-01-16 10:09:43.74319-04	FCC-201	CATALYST_ACT	89.77	1	2026-01-16 10:09:44.473329-04
+573	2026-01-16 10:09:43.743206-04	HT-301	TEMP_HYDRO	307.64	1	2026-01-16 10:09:44.473329-04
+574	2026-01-16 10:09:43.743221-04	HT-301	H2_PRESS	47.3	1	2026-01-16 10:09:44.473329-04
+575	2026-01-16 10:09:49.517626-04	CDU-101	TEMP_TOWER	436.52	1	2026-01-16 10:09:50.268867-04
+576	2026-01-16 10:09:49.517681-04	CDU-101	PRESS_TOWER	3.91	1	2026-01-16 10:09:50.268867-04
+577	2026-01-16 10:09:49.517699-04	CDU-101	FLOW_FEED	8288.3	1	2026-01-16 10:09:50.268867-04
+578	2026-01-16 10:09:49.517717-04	FCC-201	TEMP_REACTOR	545.04	1	2026-01-16 10:09:50.268867-04
+579	2026-01-16 10:09:49.517734-04	FCC-201	CATALYST_ACT	87.86	1	2026-01-16 10:09:50.268867-04
+580	2026-01-16 10:09:49.517751-04	HT-301	TEMP_HYDRO	317.1	1	2026-01-16 10:09:50.268867-04
+581	2026-01-16 10:09:49.517769-04	HT-301	H2_PRESS	37.75	1	2026-01-16 10:09:50.268867-04
+582	2026-01-16 10:09:55.383658-04	CDU-101	TEMP_TOWER	412.12	1	2026-01-16 10:09:56.078164-04
+583	2026-01-16 10:09:55.383717-04	CDU-101	PRESS_TOWER	4.34	1	2026-01-16 10:09:56.078164-04
+584	2026-01-16 10:09:55.383735-04	CDU-101	FLOW_FEED	10666.12	1	2026-01-16 10:09:56.078164-04
+585	2026-01-16 10:09:55.383754-04	FCC-201	TEMP_REACTOR	514.42	1	2026-01-16 10:09:56.078164-04
+586	2026-01-16 10:09:55.383771-04	FCC-201	CATALYST_ACT	78.62	1	2026-01-16 10:09:56.078164-04
+587	2026-01-16 10:09:55.383788-04	HT-301	TEMP_HYDRO	369.58	1	2026-01-16 10:09:56.078164-04
+588	2026-01-16 10:09:55.383803-04	HT-301	H2_PRESS	38.41	1	2026-01-16 10:09:56.078164-04
+589	2026-01-16 10:10:01.172685-04	CDU-101	TEMP_TOWER	430.63	1	2026-01-16 10:10:01.959461-04
+590	2026-01-16 10:10:01.172749-04	CDU-101	PRESS_TOWER	3.22	1	2026-01-16 10:10:01.959461-04
+591	2026-01-16 10:10:01.172769-04	CDU-101	FLOW_FEED	9679.78	1	2026-01-16 10:10:01.959461-04
+592	2026-01-16 10:10:01.172788-04	FCC-201	TEMP_REACTOR	491.99	1	2026-01-16 10:10:01.959461-04
+593	2026-01-16 10:10:01.172804-04	FCC-201	CATALYST_ACT	75.05	1	2026-01-16 10:10:01.959461-04
+594	2026-01-16 10:10:01.172821-04	HT-301	TEMP_HYDRO	362.35	1	2026-01-16 10:10:01.959461-04
+595	2026-01-16 10:10:01.172837-04	HT-301	H2_PRESS	48.29	1	2026-01-16 10:10:01.959461-04
+596	2026-01-16 10:10:07.453342-04	CDU-101	TEMP_TOWER	398.65	1	2026-01-16 10:10:09.175854-04
+597	2026-01-16 10:10:07.453401-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:10:09.175854-04
+598	2026-01-16 10:10:07.453419-04	CDU-101	FLOW_FEED	9660.72	1	2026-01-16 10:10:09.175854-04
+599	2026-01-16 10:10:07.453437-04	FCC-201	TEMP_REACTOR	519.1	1	2026-01-16 10:10:09.175854-04
+600	2026-01-16 10:10:07.453453-04	FCC-201	CATALYST_ACT	83.93	1	2026-01-16 10:10:09.175854-04
+601	2026-01-16 10:10:07.453469-04	HT-301	TEMP_HYDRO	325.93	1	2026-01-16 10:10:09.175854-04
+602	2026-01-16 10:10:07.453484-04	HT-301	H2_PRESS	44.51	1	2026-01-16 10:10:09.175854-04
+603	2026-01-16 10:10:14.263994-04	CDU-101	TEMP_TOWER	401.98	1	2026-01-16 10:10:14.602756-04
+604	2026-01-16 10:10:14.264055-04	CDU-101	PRESS_TOWER	2.89	1	2026-01-16 10:10:14.602756-04
+605	2026-01-16 10:10:14.264074-04	CDU-101	FLOW_FEED	9734.2	1	2026-01-16 10:10:14.602756-04
+606	2026-01-16 10:10:14.264092-04	FCC-201	TEMP_REACTOR	502.21	1	2026-01-16 10:10:14.602756-04
+607	2026-01-16 10:10:14.264109-04	FCC-201	CATALYST_ACT	71.14	1	2026-01-16 10:10:14.602756-04
+608	2026-01-16 10:10:14.264127-04	HT-301	TEMP_HYDRO	356.23	1	2026-01-16 10:10:14.602756-04
+609	2026-01-16 10:10:14.264143-04	HT-301	H2_PRESS	30.61	1	2026-01-16 10:10:14.602756-04
+610	2026-01-16 10:10:19.702369-04	CDU-101	TEMP_TOWER	388.23	1	2026-01-16 10:10:20.276746-04
+611	2026-01-16 10:10:19.702425-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:10:20.276746-04
+612	2026-01-16 10:10:19.702442-04	CDU-101	FLOW_FEED	10559.28	1	2026-01-16 10:10:20.276746-04
+613	2026-01-16 10:10:19.702459-04	FCC-201	TEMP_REACTOR	534.34	1	2026-01-16 10:10:20.276746-04
+614	2026-01-16 10:10:19.702475-04	FCC-201	CATALYST_ACT	90.06	1	2026-01-16 10:10:20.276746-04
+615	2026-01-16 10:10:19.702491-04	HT-301	TEMP_HYDRO	308.75	1	2026-01-16 10:10:20.276746-04
+616	2026-01-16 10:10:19.702507-04	HT-301	H2_PRESS	38.2	1	2026-01-16 10:10:20.276746-04
+617	2026-01-16 10:10:25.39917-04	CDU-101	TEMP_TOWER	406.84	1	2026-01-16 10:10:25.788487-04
+618	2026-01-16 10:10:25.399227-04	CDU-101	PRESS_TOWER	3.56	1	2026-01-16 10:10:25.788487-04
+619	2026-01-16 10:10:25.399246-04	CDU-101	FLOW_FEED	10291.69	1	2026-01-16 10:10:25.788487-04
+620	2026-01-16 10:10:25.399263-04	FCC-201	TEMP_REACTOR	481.65	1	2026-01-16 10:10:25.788487-04
+621	2026-01-16 10:10:25.399279-04	FCC-201	CATALYST_ACT	77.4	1	2026-01-16 10:10:25.788487-04
+622	2026-01-16 10:10:25.399296-04	HT-301	TEMP_HYDRO	314.25	1	2026-01-16 10:10:25.788487-04
+623	2026-01-16 10:10:25.399312-04	HT-301	H2_PRESS	37.23	1	2026-01-16 10:10:25.788487-04
+624	2026-01-16 10:10:30.898369-04	CDU-101	TEMP_TOWER	410.52	1	2026-01-16 10:10:31.546032-04
+625	2026-01-16 10:10:30.898444-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:10:31.546032-04
+626	2026-01-16 10:10:30.898465-04	CDU-101	FLOW_FEED	11087.77	1	2026-01-16 10:10:31.546032-04
+627	2026-01-16 10:10:30.898484-04	FCC-201	TEMP_REACTOR	487.2	1	2026-01-16 10:10:31.546032-04
+628	2026-01-16 10:10:30.898502-04	FCC-201	CATALYST_ACT	82.46	1	2026-01-16 10:10:31.546032-04
+629	2026-01-16 10:10:30.898519-04	HT-301	TEMP_HYDRO	345.89	1	2026-01-16 10:10:31.546032-04
+630	2026-01-16 10:10:30.898536-04	HT-301	H2_PRESS	37.99	1	2026-01-16 10:10:31.546032-04
+631	2026-01-16 10:10:36.626385-04	CDU-101	TEMP_TOWER	365.5	1	2026-01-16 10:10:36.904497-04
+632	2026-01-16 10:10:36.626437-04	CDU-101	PRESS_TOWER	3.82	1	2026-01-16 10:10:36.904497-04
+633	2026-01-16 10:10:36.626454-04	CDU-101	FLOW_FEED	9603.14	1	2026-01-16 10:10:36.904497-04
+634	2026-01-16 10:10:36.626472-04	FCC-201	TEMP_REACTOR	515.26	1	2026-01-16 10:10:36.904497-04
+635	2026-01-16 10:10:36.626487-04	FCC-201	CATALYST_ACT	87.21	1	2026-01-16 10:10:36.904497-04
+636	2026-01-16 10:10:36.626504-04	HT-301	TEMP_HYDRO	306.97	1	2026-01-16 10:10:36.904497-04
+637	2026-01-16 10:10:36.626521-04	HT-301	H2_PRESS	31.17	1	2026-01-16 10:10:36.904497-04
+638	2026-01-16 10:10:41.937432-04	CDU-101	TEMP_TOWER	438.93	1	2026-01-16 10:10:42.485514-04
+639	2026-01-16 10:10:41.937493-04	CDU-101	PRESS_TOWER	4.63	1	2026-01-16 10:10:42.485514-04
+640	2026-01-16 10:10:41.937513-04	CDU-101	FLOW_FEED	8685.25	1	2026-01-16 10:10:42.485514-04
+641	2026-01-16 10:10:41.93753-04	FCC-201	TEMP_REACTOR	543.37	1	2026-01-16 10:10:42.485514-04
+642	2026-01-16 10:10:41.937548-04	FCC-201	CATALYST_ACT	79.91	1	2026-01-16 10:10:42.485514-04
+643	2026-01-16 10:10:41.937566-04	HT-301	TEMP_HYDRO	354.33	1	2026-01-16 10:10:42.485514-04
+644	2026-01-16 10:10:41.937584-04	HT-301	H2_PRESS	30.19	1	2026-01-16 10:10:42.485514-04
+645	2026-01-16 10:10:47.548803-04	CDU-101	TEMP_TOWER	354.38	1	2026-01-16 10:10:48.188065-04
+646	2026-01-16 10:10:47.548871-04	CDU-101	PRESS_TOWER	4.55	1	2026-01-16 10:10:48.188065-04
+647	2026-01-16 10:10:47.548889-04	CDU-101	FLOW_FEED	8589.09	1	2026-01-16 10:10:48.188065-04
+648	2026-01-16 10:10:47.548907-04	FCC-201	TEMP_REACTOR	534.62	1	2026-01-16 10:10:48.188065-04
+649	2026-01-16 10:10:47.548923-04	FCC-201	CATALYST_ACT	84.66	1	2026-01-16 10:10:48.188065-04
+650	2026-01-16 10:10:47.54894-04	HT-301	TEMP_HYDRO	359.7	1	2026-01-16 10:10:48.188065-04
+651	2026-01-16 10:10:47.548957-04	HT-301	H2_PRESS	42.57	1	2026-01-16 10:10:48.188065-04
+652	2026-01-16 10:10:53.249152-04	CDU-101	TEMP_TOWER	364.57	1	2026-01-16 10:10:54.766173-04
+653	2026-01-16 10:10:53.249217-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:10:54.766173-04
+654	2026-01-16 10:10:53.249237-04	CDU-101	FLOW_FEED	8482.94	1	2026-01-16 10:10:54.766173-04
+655	2026-01-16 10:10:53.249256-04	FCC-201	TEMP_REACTOR	505.02	1	2026-01-16 10:10:54.766173-04
+656	2026-01-16 10:10:53.249273-04	FCC-201	CATALYST_ACT	88.07	1	2026-01-16 10:10:54.766173-04
+657	2026-01-16 10:10:53.249292-04	HT-301	TEMP_HYDRO	358.76	1	2026-01-16 10:10:54.766173-04
+658	2026-01-16 10:10:53.249309-04	HT-301	H2_PRESS	36.92	1	2026-01-16 10:10:54.766173-04
+659	2026-01-16 10:11:00.012543-04	CDU-101	TEMP_TOWER	352.79	1	2026-01-16 10:11:00.345359-04
+660	2026-01-16 10:11:00.012603-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:11:00.345359-04
+661	2026-01-16 10:11:00.012624-04	CDU-101	FLOW_FEED	8288.23	1	2026-01-16 10:11:00.345359-04
+662	2026-01-16 10:11:00.012642-04	FCC-201	TEMP_REACTOR	527.23	1	2026-01-16 10:11:00.345359-04
+663	2026-01-16 10:11:00.012658-04	FCC-201	CATALYST_ACT	70.65	1	2026-01-16 10:11:00.345359-04
+664	2026-01-16 10:11:00.012675-04	HT-301	TEMP_HYDRO	308.32	1	2026-01-16 10:11:00.345359-04
+665	2026-01-16 10:11:00.012692-04	HT-301	H2_PRESS	34.55	1	2026-01-16 10:11:00.345359-04
+666	2026-01-16 10:11:05.426656-04	CDU-101	TEMP_TOWER	359.96	1	2026-01-16 10:11:05.959417-04
+667	2026-01-16 10:11:05.426709-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:11:05.959417-04
+668	2026-01-16 10:11:05.426726-04	CDU-101	FLOW_FEED	11029.8	1	2026-01-16 10:11:05.959417-04
+669	2026-01-16 10:11:05.426742-04	FCC-201	TEMP_REACTOR	488.54	1	2026-01-16 10:11:05.959417-04
+670	2026-01-16 10:11:05.426758-04	FCC-201	CATALYST_ACT	83.4	1	2026-01-16 10:11:05.959417-04
+671	2026-01-16 10:11:05.426774-04	HT-301	TEMP_HYDRO	342.4	1	2026-01-16 10:11:05.959417-04
+672	2026-01-16 10:11:05.42679-04	HT-301	H2_PRESS	47.82	1	2026-01-16 10:11:05.959417-04
+673	2026-01-16 10:11:11.007003-04	CDU-101	TEMP_TOWER	434.59	1	2026-01-16 10:11:11.258225-04
+674	2026-01-16 10:11:11.007067-04	CDU-101	PRESS_TOWER	4.93	1	2026-01-16 10:11:11.258225-04
+675	2026-01-16 10:11:11.007088-04	CDU-101	FLOW_FEED	10612.94	1	2026-01-16 10:11:11.258225-04
+676	2026-01-16 10:11:11.007107-04	FCC-201	TEMP_REACTOR	545.96	1	2026-01-16 10:11:11.258225-04
+677	2026-01-16 10:11:11.007125-04	FCC-201	CATALYST_ACT	77.1	1	2026-01-16 10:11:11.258225-04
+678	2026-01-16 10:11:11.007143-04	HT-301	TEMP_HYDRO	327.44	1	2026-01-16 10:11:11.258225-04
+679	2026-01-16 10:11:11.007161-04	HT-301	H2_PRESS	41.21	1	2026-01-16 10:11:11.258225-04
+680	2026-01-16 10:22:31.026173-04	CDU-101	TEMP_TOWER	358.98	1	2026-01-16 10:22:33.358948-04
+681	2026-01-16 10:22:31.026253-04	CDU-101	PRESS_TOWER	3.08	1	2026-01-16 10:22:33.358948-04
+682	2026-01-16 10:22:31.026279-04	CDU-101	FLOW_FEED	10326.75	1	2026-01-16 10:22:33.358948-04
+683	2026-01-16 10:22:31.026301-04	FCC-201	TEMP_REACTOR	531.72	1	2026-01-16 10:22:33.358948-04
+684	2026-01-16 10:22:31.02632-04	FCC-201	CATALYST_ACT	85.4	1	2026-01-16 10:22:33.358948-04
+685	2026-01-16 10:22:31.026339-04	HT-301	TEMP_HYDRO	340.9	1	2026-01-16 10:22:33.358948-04
+686	2026-01-16 10:22:31.026357-04	HT-301	H2_PRESS	49.04	1	2026-01-16 10:22:33.358948-04
+687	2026-01-16 10:22:39.426801-04	CDU-101	TEMP_TOWER	440.3	1	2026-01-16 10:22:39.634186-04
+688	2026-01-16 10:22:39.42685-04	CDU-101	PRESS_TOWER	3.16	1	2026-01-16 10:22:39.634186-04
+689	2026-01-16 10:22:39.426867-04	CDU-101	FLOW_FEED	10129	1	2026-01-16 10:22:39.634186-04
+690	2026-01-16 10:22:39.426883-04	FCC-201	TEMP_REACTOR	519.24	1	2026-01-16 10:22:39.634186-04
+691	2026-01-16 10:22:39.426899-04	FCC-201	CATALYST_ACT	90.96	1	2026-01-16 10:22:39.634186-04
+692	2026-01-16 10:22:39.426915-04	HT-301	TEMP_HYDRO	320.38	1	2026-01-16 10:22:39.634186-04
+693	2026-01-16 10:22:39.42693-04	HT-301	H2_PRESS	36.82	1	2026-01-16 10:22:39.634186-04
+694	2026-01-16 10:22:44.762972-04	CDU-101	TEMP_TOWER	416.18	1	2026-01-16 10:22:45.213068-04
+695	2026-01-16 10:22:44.763025-04	CDU-101	PRESS_TOWER	2.76	1	2026-01-16 10:22:45.213068-04
+696	2026-01-16 10:22:44.763042-04	CDU-101	FLOW_FEED	11696.57	1	2026-01-16 10:22:45.213068-04
+697	2026-01-16 10:22:44.76306-04	FCC-201	TEMP_REACTOR	486.74	1	2026-01-16 10:22:45.213068-04
+698	2026-01-16 10:22:44.763076-04	FCC-201	CATALYST_ACT	93.27	1	2026-01-16 10:22:45.213068-04
+699	2026-01-16 10:22:44.763093-04	HT-301	TEMP_HYDRO	308.53	1	2026-01-16 10:22:45.213068-04
+700	2026-01-16 10:22:44.763109-04	HT-301	H2_PRESS	42.9	1	2026-01-16 10:22:45.213068-04
+701	2026-01-16 10:22:50.273965-04	CDU-101	TEMP_TOWER	420.77	1	2026-01-16 10:22:52.507711-04
+702	2026-01-16 10:22:50.274021-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:22:52.507711-04
+703	2026-01-16 10:22:50.274039-04	CDU-101	FLOW_FEED	8544.89	1	2026-01-16 10:22:52.507711-04
+704	2026-01-16 10:22:50.274056-04	FCC-201	TEMP_REACTOR	518.24	1	2026-01-16 10:22:52.507711-04
+705	2026-01-16 10:22:50.274073-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:22:52.507711-04
+706	2026-01-16 10:22:50.274092-04	HT-301	TEMP_HYDRO	352.22	1	2026-01-16 10:22:52.507711-04
+707	2026-01-16 10:22:50.27411-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:22:52.507711-04
+708	2026-01-16 10:22:57.55014-04	CDU-101	TEMP_TOWER	444.5	1	2026-01-16 10:23:00.071391-04
+709	2026-01-16 10:22:57.550193-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:23:00.071391-04
+710	2026-01-16 10:22:57.550211-04	CDU-101	FLOW_FEED	8955.9	1	2026-01-16 10:23:00.071391-04
+711	2026-01-16 10:22:57.550228-04	FCC-201	TEMP_REACTOR	482.05	1	2026-01-16 10:23:00.071391-04
+712	2026-01-16 10:22:57.550244-04	FCC-201	CATALYST_ACT	94.06	1	2026-01-16 10:23:00.071391-04
+713	2026-01-16 10:22:57.550261-04	HT-301	TEMP_HYDRO	352.7	1	2026-01-16 10:23:00.071391-04
+714	2026-01-16 10:22:57.550277-04	HT-301	H2_PRESS	38.07	1	2026-01-16 10:23:00.071391-04
+715	2026-01-16 10:23:09.820166-04	CDU-101	TEMP_TOWER	381.8	1	2026-01-16 10:23:12.875869-04
+716	2026-01-16 10:23:09.82023-04	CDU-101	PRESS_TOWER	4.69	1	2026-01-16 10:23:12.875869-04
+717	2026-01-16 10:23:09.820249-04	CDU-101	FLOW_FEED	11129.83	1	2026-01-16 10:23:12.875869-04
+718	2026-01-16 10:23:09.820268-04	FCC-201	TEMP_REACTOR	544.36	1	2026-01-16 10:23:12.875869-04
+719	2026-01-16 10:23:09.820285-04	FCC-201	CATALYST_ACT	78.46	1	2026-01-16 10:23:12.875869-04
+720	2026-01-16 10:23:09.820303-04	HT-301	TEMP_HYDRO	305.24	1	2026-01-16 10:23:12.875869-04
+721	2026-01-16 10:23:09.820319-04	HT-301	H2_PRESS	43.74	1	2026-01-16 10:23:12.875869-04
+722	2026-01-16 10:23:17.917636-04	CDU-101	TEMP_TOWER	371.72	1	2026-01-16 10:23:20.163172-04
+723	2026-01-16 10:23:17.917705-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:23:20.163172-04
+724	2026-01-16 10:23:17.917722-04	CDU-101	FLOW_FEED	11924.52	1	2026-01-16 10:23:20.163172-04
+725	2026-01-16 10:23:17.917741-04	FCC-201	TEMP_REACTOR	505.61	1	2026-01-16 10:23:20.163172-04
+726	2026-01-16 10:23:17.917759-04	FCC-201	CATALYST_ACT	89.61	1	2026-01-16 10:23:20.163172-04
+727	2026-01-16 10:23:17.917778-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:23:20.163172-04
+728	2026-01-16 10:23:17.917795-04	HT-301	H2_PRESS	35.92	1	2026-01-16 10:23:20.163172-04
+729	2026-01-16 10:23:25.213596-04	CDU-101	TEMP_TOWER	371.21	1	2026-01-16 10:23:27.858328-04
+730	2026-01-16 10:23:25.213661-04	CDU-101	PRESS_TOWER	4.12	1	2026-01-16 10:23:27.858328-04
+731	2026-01-16 10:23:25.213681-04	CDU-101	FLOW_FEED	11264.42	1	2026-01-16 10:23:27.858328-04
+732	2026-01-16 10:23:25.213702-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:23:27.858328-04
+733	2026-01-16 10:23:25.213719-04	FCC-201	CATALYST_ACT	73.28	1	2026-01-16 10:23:27.858328-04
+734	2026-01-16 10:23:25.213736-04	HT-301	TEMP_HYDRO	304.66	1	2026-01-16 10:23:27.858328-04
+735	2026-01-16 10:23:25.213752-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:23:27.858328-04
+736	2026-01-16 10:23:32.904164-04	CDU-101	TEMP_TOWER	445.75	1	2026-01-16 10:23:33.246675-04
+737	2026-01-16 10:23:32.904218-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:23:33.246675-04
+738	2026-01-16 10:23:32.904235-04	CDU-101	FLOW_FEED	10727.24	1	2026-01-16 10:23:33.246675-04
+739	2026-01-16 10:23:32.904252-04	FCC-201	TEMP_REACTOR	547.9	1	2026-01-16 10:23:33.246675-04
+740	2026-01-16 10:23:32.904268-04	FCC-201	CATALYST_ACT	80.09	1	2026-01-16 10:23:33.246675-04
+741	2026-01-16 10:23:32.904284-04	HT-301	TEMP_HYDRO	327.38	1	2026-01-16 10:23:33.246675-04
+742	2026-01-16 10:23:32.904299-04	HT-301	H2_PRESS	48.61	1	2026-01-16 10:23:33.246675-04
+743	2026-01-16 10:23:38.275745-04	CDU-101	TEMP_TOWER	409.25	1	2026-01-16 10:23:40.867905-04
+744	2026-01-16 10:23:38.275807-04	CDU-101	PRESS_TOWER	3.25	1	2026-01-16 10:23:40.867905-04
+745	2026-01-16 10:23:38.275826-04	CDU-101	FLOW_FEED	8468.85	1	2026-01-16 10:23:40.867905-04
+746	2026-01-16 10:23:38.275845-04	FCC-201	TEMP_REACTOR	539.57	1	2026-01-16 10:23:40.867905-04
+747	2026-01-16 10:23:38.27586-04	FCC-201	CATALYST_ACT	87.58	1	2026-01-16 10:23:40.867905-04
+748	2026-01-16 10:23:38.275877-04	HT-301	TEMP_HYDRO	338.61	1	2026-01-16 10:23:40.867905-04
+749	2026-01-16 10:23:38.275892-04	HT-301	H2_PRESS	41.75	1	2026-01-16 10:23:40.867905-04
+750	2026-01-16 10:23:45.946101-04	CDU-101	TEMP_TOWER	383.69	1	2026-01-16 10:23:46.231207-04
+751	2026-01-16 10:23:45.946159-04	CDU-101	PRESS_TOWER	4.16	1	2026-01-16 10:23:46.231207-04
+752	2026-01-16 10:23:45.946177-04	CDU-101	FLOW_FEED	9468	1	2026-01-16 10:23:46.231207-04
+753	2026-01-16 10:23:45.946195-04	FCC-201	TEMP_REACTOR	491.29	1	2026-01-16 10:23:46.231207-04
+754	2026-01-16 10:23:45.946211-04	FCC-201	CATALYST_ACT	74.68	1	2026-01-16 10:23:46.231207-04
+755	2026-01-16 10:23:45.946227-04	HT-301	TEMP_HYDRO	338.66	1	2026-01-16 10:23:46.231207-04
+756	2026-01-16 10:23:45.946244-04	HT-301	H2_PRESS	39.52	1	2026-01-16 10:23:46.231207-04
+757	2026-01-16 10:23:51.263802-04	CDU-101	TEMP_TOWER	423.45	1	2026-01-16 10:23:51.80562-04
+758	2026-01-16 10:23:51.265008-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:23:51.80562-04
+759	2026-01-16 10:23:51.265086-04	CDU-101	FLOW_FEED	9566.36	1	2026-01-16 10:23:51.80562-04
+760	2026-01-16 10:23:51.265108-04	FCC-201	TEMP_REACTOR	492.29	1	2026-01-16 10:23:51.80562-04
+761	2026-01-16 10:23:51.265127-04	FCC-201	CATALYST_ACT	77.5	1	2026-01-16 10:23:51.80562-04
+762	2026-01-16 10:23:51.265145-04	HT-301	TEMP_HYDRO	300.93	1	2026-01-16 10:23:51.80562-04
+763	2026-01-16 10:23:51.265163-04	HT-301	H2_PRESS	48.18	1	2026-01-16 10:23:51.80562-04
+764	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:07.10153-04
+765	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:07.10153-04
+766	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:07.10153-04
+767	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:07.10153-04
+768	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:07.10153-04
+769	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:07.10153-04
+770	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:07.10153-04
+771	2026-01-16 10:23:56.89139-04	CDU-101	TEMP_TOWER	433.15	1	2026-01-16 10:24:09.662083-04
+772	2026-01-16 10:23:56.891439-04	CDU-101	PRESS_TOWER	3.01	1	2026-01-16 10:24:09.662083-04
+773	2026-01-16 10:23:56.891455-04	CDU-101	FLOW_FEED	9422.47	1	2026-01-16 10:24:09.662083-04
+774	2026-01-16 10:23:56.891471-04	FCC-201	TEMP_REACTOR	487.09	1	2026-01-16 10:24:09.662083-04
+775	2026-01-16 10:23:56.891486-04	FCC-201	CATALYST_ACT	73.89	1	2026-01-16 10:24:09.662083-04
+776	2026-01-16 10:23:56.891502-04	HT-301	TEMP_HYDRO	376.89	1	2026-01-16 10:24:09.662083-04
+777	2026-01-16 10:23:56.891517-04	HT-301	H2_PRESS	47.41	1	2026-01-16 10:24:09.662083-04
+778	2026-01-16 10:24:14.922041-04	CDU-101	TEMP_TOWER	410.66	1	2026-01-16 10:24:15.125166-04
+779	2026-01-16 10:24:14.922107-04	CDU-101	PRESS_TOWER	3.71	1	2026-01-16 10:24:15.125166-04
+780	2026-01-16 10:24:14.922168-04	CDU-101	FLOW_FEED	10547.47	1	2026-01-16 10:24:15.125166-04
+781	2026-01-16 10:24:14.922189-04	FCC-201	TEMP_REACTOR	526.99	1	2026-01-16 10:24:15.125166-04
+782	2026-01-16 10:24:14.922205-04	FCC-201	CATALYST_ACT	78.75	1	2026-01-16 10:24:15.125166-04
+783	2026-01-16 10:24:14.922225-04	HT-301	TEMP_HYDRO	325.18	1	2026-01-16 10:24:15.125166-04
+784	2026-01-16 10:24:14.922241-04	HT-301	H2_PRESS	47.97	1	2026-01-16 10:24:15.125166-04
+785	2026-01-16 10:24:20.192866-04	CDU-101	TEMP_TOWER	353.73	1	2026-01-16 10:24:20.683471-04
+786	2026-01-16 10:24:20.192923-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:24:20.683471-04
+787	2026-01-16 10:24:20.19294-04	CDU-101	FLOW_FEED	8834.56	1	2026-01-16 10:24:20.683471-04
+788	2026-01-16 10:24:20.192957-04	FCC-201	TEMP_REACTOR	495.19	1	2026-01-16 10:24:20.683471-04
+789	2026-01-16 10:24:20.192972-04	FCC-201	CATALYST_ACT	86.04	1	2026-01-16 10:24:20.683471-04
+790	2026-01-16 10:24:20.192987-04	HT-301	TEMP_HYDRO	368.94	1	2026-01-16 10:24:20.683471-04
+791	2026-01-16 10:24:20.193001-04	HT-301	H2_PRESS	39.98	1	2026-01-16 10:24:20.683471-04
+792	2026-01-16 10:24:25.723755-04	CDU-101	TEMP_TOWER	408.59	1	2026-01-16 10:24:25.921512-04
+793	2026-01-16 10:24:25.723802-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:24:25.921512-04
+794	2026-01-16 10:24:25.723819-04	CDU-101	FLOW_FEED	10353.57	1	2026-01-16 10:24:25.921512-04
+795	2026-01-16 10:24:25.723836-04	FCC-201	TEMP_REACTOR	536.57	1	2026-01-16 10:24:25.921512-04
+796	2026-01-16 10:24:25.72385-04	FCC-201	CATALYST_ACT	70.85	1	2026-01-16 10:24:25.921512-04
+797	2026-01-16 10:24:25.723866-04	HT-301	TEMP_HYDRO	335.36	1	2026-01-16 10:24:25.921512-04
+798	2026-01-16 10:24:25.72388-04	HT-301	H2_PRESS	46.27	1	2026-01-16 10:24:25.921512-04
+799	2026-01-16 10:24:30.972691-04	CDU-101	TEMP_TOWER	418.73	1	2026-01-16 10:24:33.439834-04
+800	2026-01-16 10:24:30.972748-04	CDU-101	PRESS_TOWER	4.26	1	2026-01-16 10:24:33.439834-04
+801	2026-01-16 10:24:30.972767-04	CDU-101	FLOW_FEED	8943.52	1	2026-01-16 10:24:33.439834-04
+802	2026-01-16 10:24:30.972785-04	FCC-201	TEMP_REACTOR	490.15	1	2026-01-16 10:24:33.439834-04
+803	2026-01-16 10:24:30.972802-04	FCC-201	CATALYST_ACT	88.79	1	2026-01-16 10:24:33.439834-04
+804	2026-01-16 10:24:30.972818-04	HT-301	TEMP_HYDRO	372.1	1	2026-01-16 10:24:33.439834-04
+805	2026-01-16 10:24:30.972834-04	HT-301	H2_PRESS	34.99	1	2026-01-16 10:24:33.439834-04
+806	2026-01-16 10:24:38.48167-04	CDU-101	TEMP_TOWER	436.15	1	2026-01-16 10:24:38.679329-04
+807	2026-01-16 10:24:38.481719-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:24:38.679329-04
+808	2026-01-16 10:24:38.481735-04	CDU-101	FLOW_FEED	10006.84	1	2026-01-16 10:24:38.679329-04
+809	2026-01-16 10:24:38.481752-04	FCC-201	TEMP_REACTOR	482.7	1	2026-01-16 10:24:38.679329-04
+810	2026-01-16 10:24:38.481767-04	FCC-201	CATALYST_ACT	85.82	1	2026-01-16 10:24:38.679329-04
+811	2026-01-16 10:24:38.481782-04	HT-301	TEMP_HYDRO	360.97	1	2026-01-16 10:24:38.679329-04
+812	2026-01-16 10:24:38.481797-04	HT-301	H2_PRESS	43.11	1	2026-01-16 10:24:38.679329-04
+813	2026-01-16 10:24:43.705794-04	CDU-101	TEMP_TOWER	401.51	1	2026-01-16 10:24:44.171045-04
+814	2026-01-16 10:24:43.705842-04	CDU-101	PRESS_TOWER	4.41	1	2026-01-16 10:24:44.171045-04
+815	2026-01-16 10:24:43.705858-04	CDU-101	FLOW_FEED	9772.79	1	2026-01-16 10:24:44.171045-04
+816	2026-01-16 10:24:43.705874-04	FCC-201	TEMP_REACTOR	493.79	1	2026-01-16 10:24:44.171045-04
+817	2026-01-16 10:24:43.705889-04	FCC-201	CATALYST_ACT	70.86	1	2026-01-16 10:24:44.171045-04
+818	2026-01-16 10:24:43.705904-04	HT-301	TEMP_HYDRO	300.42	1	2026-01-16 10:24:44.171045-04
+819	2026-01-16 10:24:43.705919-04	HT-301	H2_PRESS	33.5	1	2026-01-16 10:24:44.171045-04
+820	2026-01-16 10:24:49.207696-04	CDU-101	TEMP_TOWER	438.37	1	2026-01-16 10:24:49.404001-04
+821	2026-01-16 10:24:49.207741-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:24:49.404001-04
+822	2026-01-16 10:24:49.207758-04	CDU-101	FLOW_FEED	9095.93	1	2026-01-16 10:24:49.404001-04
+823	2026-01-16 10:24:49.207774-04	FCC-201	TEMP_REACTOR	508.84	1	2026-01-16 10:24:49.404001-04
+824	2026-01-16 10:24:49.207789-04	FCC-201	CATALYST_ACT	71.28	1	2026-01-16 10:24:49.404001-04
+825	2026-01-16 10:24:49.207804-04	HT-301	TEMP_HYDRO	312.47	1	2026-01-16 10:24:49.404001-04
+826	2026-01-16 10:24:49.207819-04	HT-301	H2_PRESS	40.83	1	2026-01-16 10:24:49.404001-04
+827	2026-01-16 10:24:54.441585-04	CDU-101	TEMP_TOWER	365.77	1	2026-01-16 10:24:56.924932-04
+828	2026-01-16 10:24:54.441641-04	CDU-101	PRESS_TOWER	3.74	1	2026-01-16 10:24:56.924932-04
+829	2026-01-16 10:24:54.441727-04	CDU-101	FLOW_FEED	11448.45	1	2026-01-16 10:24:56.924932-04
+830	2026-01-16 10:24:54.441759-04	FCC-201	TEMP_REACTOR	519.71	1	2026-01-16 10:24:56.924932-04
+831	2026-01-16 10:24:54.441778-04	FCC-201	CATALYST_ACT	73.81	1	2026-01-16 10:24:56.924932-04
+832	2026-01-16 10:24:54.441822-04	HT-301	TEMP_HYDRO	312.68	1	2026-01-16 10:24:56.924932-04
+833	2026-01-16 10:24:54.441848-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:24:56.924932-04
+834	2026-01-16 10:25:01.958688-04	CDU-101	TEMP_TOWER	436.54	1	2026-01-16 10:25:02.153953-04
+835	2026-01-16 10:25:01.958734-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:25:02.153953-04
+836	2026-01-16 10:25:01.958751-04	CDU-101	FLOW_FEED	8121.98	1	2026-01-16 10:25:02.153953-04
+837	2026-01-16 10:25:01.958767-04	FCC-201	TEMP_REACTOR	519.88	1	2026-01-16 10:25:02.153953-04
+838	2026-01-16 10:25:01.958782-04	FCC-201	CATALYST_ACT	87.38	1	2026-01-16 10:25:02.153953-04
+839	2026-01-16 10:25:01.958797-04	HT-301	TEMP_HYDRO	331.13	1	2026-01-16 10:25:02.153953-04
+840	2026-01-16 10:25:01.958812-04	HT-301	H2_PRESS	35.16	1	2026-01-16 10:25:02.153953-04
+841	2026-01-16 10:25:07.1926-04	CDU-101	TEMP_TOWER	386.03	1	2026-01-16 10:25:07.651512-04
+842	2026-01-16 10:25:07.192666-04	CDU-101	PRESS_TOWER	2.67	1	2026-01-16 10:25:07.651512-04
+843	2026-01-16 10:25:07.192684-04	CDU-101	FLOW_FEED	10693.3	1	2026-01-16 10:25:07.651512-04
+844	2026-01-16 10:25:07.192703-04	FCC-201	TEMP_REACTOR	548.94	1	2026-01-16 10:25:07.651512-04
+845	2026-01-16 10:25:07.192721-04	FCC-201	CATALYST_ACT	89.09	1	2026-01-16 10:25:07.651512-04
+846	2026-01-16 10:25:07.192738-04	HT-301	TEMP_HYDRO	368.74	1	2026-01-16 10:25:07.651512-04
+847	2026-01-16 10:25:07.192754-04	HT-301	H2_PRESS	30.92	1	2026-01-16 10:25:07.651512-04
+848	2026-01-16 10:25:12.685617-04	CDU-101	TEMP_TOWER	413.64	1	2026-01-16 10:25:14.89209-04
+849	2026-01-16 10:25:12.685675-04	CDU-101	PRESS_TOWER	2.66	1	2026-01-16 10:25:14.89209-04
+850	2026-01-16 10:25:12.685694-04	CDU-101	FLOW_FEED	9565.77	1	2026-01-16 10:25:14.89209-04
+851	2026-01-16 10:25:12.685713-04	FCC-201	TEMP_REACTOR	520.31	1	2026-01-16 10:25:14.89209-04
+852	2026-01-16 10:25:12.685729-04	FCC-201	CATALYST_ACT	78.36	1	2026-01-16 10:25:14.89209-04
+853	2026-01-16 10:25:12.685746-04	HT-301	TEMP_HYDRO	370.73	1	2026-01-16 10:25:14.89209-04
+854	2026-01-16 10:25:12.685763-04	HT-301	H2_PRESS	43.42	1	2026-01-16 10:25:14.89209-04
+855	2026-01-16 10:25:19.918858-04	CDU-101	TEMP_TOWER	405.66	1	2026-01-16 10:25:20.394652-04
+856	2026-01-16 10:25:19.918906-04	CDU-101	PRESS_TOWER	3.02	1	2026-01-16 10:25:20.394652-04
+857	2026-01-16 10:25:19.918923-04	CDU-101	FLOW_FEED	10081.2	1	2026-01-16 10:25:20.394652-04
+858	2026-01-16 10:25:19.918939-04	FCC-201	TEMP_REACTOR	507.95	1	2026-01-16 10:25:20.394652-04
+859	2026-01-16 10:25:19.918954-04	FCC-201	CATALYST_ACT	85.14	1	2026-01-16 10:25:20.394652-04
+860	2026-01-16 10:25:19.91897-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:25:20.394652-04
+861	2026-01-16 10:25:19.918984-04	HT-301	H2_PRESS	49.57	1	2026-01-16 10:25:20.394652-04
+862	2026-01-16 10:25:25.428324-04	CDU-101	TEMP_TOWER	389.09	1	2026-01-16 10:25:25.62286-04
+863	2026-01-16 10:25:25.428375-04	CDU-101	PRESS_TOWER	3.17	1	2026-01-16 10:25:25.62286-04
+864	2026-01-16 10:25:25.428392-04	CDU-101	FLOW_FEED	8504.42	1	2026-01-16 10:25:25.62286-04
+865	2026-01-16 10:25:25.428407-04	FCC-201	TEMP_REACTOR	503.79	1	2026-01-16 10:25:25.62286-04
+866	2026-01-16 10:25:25.428422-04	FCC-201	CATALYST_ACT	76.98	1	2026-01-16 10:25:25.62286-04
+867	2026-01-16 10:25:25.428437-04	HT-301	TEMP_HYDRO	372.74	1	2026-01-16 10:25:25.62286-04
+868	2026-01-16 10:25:25.428452-04	HT-301	H2_PRESS	44.53	1	2026-01-16 10:25:25.62286-04
+869	2026-01-16 10:25:30.66533-04	CDU-101	TEMP_TOWER	371.07	1	2026-01-16 10:25:33.134725-04
+870	2026-01-16 10:25:30.66539-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:25:33.134725-04
+871	2026-01-16 10:25:30.665408-04	CDU-101	FLOW_FEED	8786.6	1	2026-01-16 10:25:33.134725-04
+872	2026-01-16 10:25:30.665425-04	FCC-201	TEMP_REACTOR	488.73	1	2026-01-16 10:25:33.134725-04
+873	2026-01-16 10:25:30.66544-04	FCC-201	CATALYST_ACT	88.69	1	2026-01-16 10:25:33.134725-04
+874	2026-01-16 10:25:30.665455-04	HT-301	TEMP_HYDRO	312.62	1	2026-01-16 10:25:33.134725-04
+875	2026-01-16 10:25:30.66547-04	HT-301	H2_PRESS	40.08	1	2026-01-16 10:25:33.134725-04
+876	2026-01-16 10:25:38.175427-04	CDU-101	TEMP_TOWER	361.94	1	2026-01-16 10:25:38.391081-04
+877	2026-01-16 10:25:38.175484-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:25:38.391081-04
+878	2026-01-16 10:25:38.175503-04	CDU-101	FLOW_FEED	10299.44	1	2026-01-16 10:25:38.391081-04
+879	2026-01-16 10:25:38.17552-04	FCC-201	TEMP_REACTOR	490.94	1	2026-01-16 10:25:38.391081-04
+880	2026-01-16 10:25:38.175536-04	FCC-201	CATALYST_ACT	78.35	1	2026-01-16 10:25:38.391081-04
+881	2026-01-16 10:25:38.175552-04	HT-301	TEMP_HYDRO	339.51	1	2026-01-16 10:25:38.391081-04
+882	2026-01-16 10:25:38.175653-04	HT-301	H2_PRESS	38.35	1	2026-01-16 10:25:38.391081-04
+883	2026-01-16 10:25:43.44182-04	CDU-101	TEMP_TOWER	374.02	1	2026-01-16 10:25:43.929966-04
+884	2026-01-16 10:25:43.441884-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:43.929966-04
+885	2026-01-16 10:25:43.441903-04	CDU-101	FLOW_FEED	8917.93	1	2026-01-16 10:25:43.929966-04
+886	2026-01-16 10:25:43.441921-04	FCC-201	TEMP_REACTOR	547.99	1	2026-01-16 10:25:43.929966-04
+887	2026-01-16 10:25:43.441937-04	FCC-201	CATALYST_ACT	70.51	1	2026-01-16 10:25:43.929966-04
+888	2026-01-16 10:25:43.441955-04	HT-301	TEMP_HYDRO	304.49	1	2026-01-16 10:25:43.929966-04
+889	2026-01-16 10:25:43.441971-04	HT-301	H2_PRESS	34.82	1	2026-01-16 10:25:43.929966-04
+890	2026-01-16 10:25:48.962178-04	CDU-101	TEMP_TOWER	390.39	1	2026-01-16 10:25:51.181699-04
+891	2026-01-16 10:25:48.962237-04	CDU-101	PRESS_TOWER	2.79	1	2026-01-16 10:25:51.181699-04
+892	2026-01-16 10:25:48.962257-04	CDU-101	FLOW_FEED	10329.41	1	2026-01-16 10:25:51.181699-04
+893	2026-01-16 10:25:48.962275-04	FCC-201	TEMP_REACTOR	548.1	1	2026-01-16 10:25:51.181699-04
+894	2026-01-16 10:25:48.962292-04	FCC-201	CATALYST_ACT	70.31	1	2026-01-16 10:25:51.181699-04
+895	2026-01-16 10:25:48.962308-04	HT-301	TEMP_HYDRO	372.19	1	2026-01-16 10:25:51.181699-04
+896	2026-01-16 10:25:48.962325-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:25:51.181699-04
+897	2026-01-16 10:25:56.385547-04	CDU-101	TEMP_TOWER	383.17	1	2026-01-16 10:25:56.877935-04
+898	2026-01-16 10:25:56.385608-04	CDU-101	PRESS_TOWER	3.2	1	2026-01-16 10:25:56.877935-04
+899	2026-01-16 10:25:56.385627-04	CDU-101	FLOW_FEED	11151.18	1	2026-01-16 10:25:56.877935-04
+900	2026-01-16 10:25:56.385648-04	FCC-201	TEMP_REACTOR	542.42	1	2026-01-16 10:25:56.877935-04
+901	2026-01-16 10:25:56.385664-04	FCC-201	CATALYST_ACT	87.15	1	2026-01-16 10:25:56.877935-04
+902	2026-01-16 10:25:56.385682-04	HT-301	TEMP_HYDRO	366.51	1	2026-01-16 10:25:56.877935-04
+903	2026-01-16 10:25:56.385698-04	HT-301	H2_PRESS	30.91	1	2026-01-16 10:25:56.877935-04
+904	2026-01-16 10:26:01.984273-04	CDU-101	TEMP_TOWER	411.67	1	2026-01-16 10:26:02.188-04
+905	2026-01-16 10:26:01.984322-04	CDU-101	PRESS_TOWER	3.27	1	2026-01-16 10:26:02.188-04
+906	2026-01-16 10:26:01.98434-04	CDU-101	FLOW_FEED	11397.47	1	2026-01-16 10:26:02.188-04
+907	2026-01-16 10:26:01.984357-04	FCC-201	TEMP_REACTOR	486.69	1	2026-01-16 10:26:02.188-04
+908	2026-01-16 10:26:01.984373-04	FCC-201	CATALYST_ACT	85.41	1	2026-01-16 10:26:02.188-04
+909	2026-01-16 10:26:01.984389-04	HT-301	TEMP_HYDRO	325.36	1	2026-01-16 10:26:02.188-04
+910	2026-01-16 10:26:01.984404-04	HT-301	H2_PRESS	37.81	1	2026-01-16 10:26:02.188-04
+911	2026-01-16 10:26:07.220643-04	CDU-101	TEMP_TOWER	363.33	1	2026-01-16 10:26:07.692443-04
+912	2026-01-16 10:26:07.220699-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:26:07.692443-04
+913	2026-01-16 10:26:07.220717-04	CDU-101	FLOW_FEED	10561.95	1	2026-01-16 10:26:07.692443-04
+914	2026-01-16 10:26:07.220735-04	FCC-201	TEMP_REACTOR	497.22	1	2026-01-16 10:26:07.692443-04
+915	2026-01-16 10:26:07.22075-04	FCC-201	CATALYST_ACT	94.2	1	2026-01-16 10:26:07.692443-04
+916	2026-01-16 10:26:07.220766-04	HT-301	TEMP_HYDRO	301.43	1	2026-01-16 10:26:07.692443-04
+917	2026-01-16 10:26:07.220781-04	HT-301	H2_PRESS	49.74	1	2026-01-16 10:26:07.692443-04
+918	2026-01-16 10:26:12.722608-04	CDU-101	TEMP_TOWER	357.97	1	2026-01-16 10:26:12.924255-04
+919	2026-01-16 10:26:12.722664-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:26:12.924255-04
+920	2026-01-16 10:26:12.722683-04	CDU-101	FLOW_FEED	11633.39	1	2026-01-16 10:26:12.924255-04
+921	2026-01-16 10:26:12.722701-04	FCC-201	TEMP_REACTOR	508.41	1	2026-01-16 10:26:12.924255-04
+922	2026-01-16 10:26:12.722718-04	FCC-201	CATALYST_ACT	82.49	1	2026-01-16 10:26:12.924255-04
+923	2026-01-16 10:26:12.722735-04	HT-301	TEMP_HYDRO	365.45	1	2026-01-16 10:26:12.924255-04
+924	2026-01-16 10:26:12.722751-04	HT-301	H2_PRESS	44.39	1	2026-01-16 10:26:12.924255-04
+925	2026-01-16 10:26:17.951141-04	CDU-101	TEMP_TOWER	352.65	1	2026-01-16 10:26:18.41653-04
+926	2026-01-16 10:26:17.951189-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:26:18.41653-04
+927	2026-01-16 10:26:17.951206-04	CDU-101	FLOW_FEED	9716.79	1	2026-01-16 10:26:18.41653-04
+928	2026-01-16 10:26:17.951222-04	FCC-201	TEMP_REACTOR	495.37	1	2026-01-16 10:26:18.41653-04
+929	2026-01-16 10:26:17.951237-04	FCC-201	CATALYST_ACT	89.93	1	2026-01-16 10:26:18.41653-04
+930	2026-01-16 10:26:17.951253-04	HT-301	TEMP_HYDRO	376.63	1	2026-01-16 10:26:18.41653-04
+931	2026-01-16 10:26:17.951268-04	HT-301	H2_PRESS	44.37	1	2026-01-16 10:26:18.41653-04
+932	2026-01-16 10:26:23.449916-04	CDU-101	TEMP_TOWER	408.89	1	2026-01-16 10:26:23.654996-04
+933	2026-01-16 10:26:23.449966-04	CDU-101	PRESS_TOWER	3.05	1	2026-01-16 10:26:23.654996-04
+934	2026-01-16 10:26:23.449984-04	CDU-101	FLOW_FEED	8275.24	1	2026-01-16 10:26:23.654996-04
+935	2026-01-16 10:26:23.450001-04	FCC-201	TEMP_REACTOR	547.87	1	2026-01-16 10:26:23.654996-04
+936	2026-01-16 10:26:23.450017-04	FCC-201	CATALYST_ACT	89.24	1	2026-01-16 10:26:23.654996-04
+937	2026-01-16 10:26:23.450032-04	HT-301	TEMP_HYDRO	366.4	1	2026-01-16 10:26:23.654996-04
+938	2026-01-16 10:26:23.450047-04	HT-301	H2_PRESS	45.25	1	2026-01-16 10:26:23.654996-04
+939	2026-01-16 10:26:28.907667-04	CDU-101	TEMP_TOWER	354.69	1	2026-01-16 10:26:29.411128-04
+940	2026-01-16 10:26:28.907732-04	CDU-101	PRESS_TOWER	4.35	1	2026-01-16 10:26:29.411128-04
+941	2026-01-16 10:26:28.90775-04	CDU-101	FLOW_FEED	8499.95	1	2026-01-16 10:26:29.411128-04
+942	2026-01-16 10:26:28.907767-04	FCC-201	TEMP_REACTOR	528.69	1	2026-01-16 10:26:29.411128-04
+943	2026-01-16 10:26:28.907783-04	FCC-201	CATALYST_ACT	80.39	1	2026-01-16 10:26:29.411128-04
+944	2026-01-16 10:26:28.907798-04	HT-301	TEMP_HYDRO	339.05	1	2026-01-16 10:26:29.411128-04
+945	2026-01-16 10:26:28.907813-04	HT-301	H2_PRESS	36.94	1	2026-01-16 10:26:29.411128-04
+946	2026-01-16 10:26:34.441743-04	CDU-101	TEMP_TOWER	429.69	1	2026-01-16 10:26:36.676509-04
+947	2026-01-16 10:26:34.441803-04	CDU-101	PRESS_TOWER	4.89	1	2026-01-16 10:26:36.676509-04
+948	2026-01-16 10:26:34.441824-04	CDU-101	FLOW_FEED	10249.63	1	2026-01-16 10:26:36.676509-04
+949	2026-01-16 10:26:34.441842-04	FCC-201	TEMP_REACTOR	520.53	1	2026-01-16 10:26:36.676509-04
+950	2026-01-16 10:26:34.441859-04	FCC-201	CATALYST_ACT	88.99	1	2026-01-16 10:26:36.676509-04
+951	2026-01-16 10:26:34.441875-04	HT-301	TEMP_HYDRO	326.87	1	2026-01-16 10:26:36.676509-04
+952	2026-01-16 10:26:34.441891-04	HT-301	H2_PRESS	32.16	1	2026-01-16 10:26:36.676509-04
+953	2026-01-16 10:26:41.704094-04	CDU-101	TEMP_TOWER	410.01	1	2026-01-16 10:26:44.193435-04
+954	2026-01-16 10:26:41.704161-04	CDU-101	PRESS_TOWER	4.82	1	2026-01-16 10:26:44.193435-04
+955	2026-01-16 10:26:41.704179-04	CDU-101	FLOW_FEED	10806.24	1	2026-01-16 10:26:44.193435-04
+956	2026-01-16 10:26:41.704196-04	FCC-201	TEMP_REACTOR	509.04	1	2026-01-16 10:26:44.193435-04
+957	2026-01-16 10:26:41.704212-04	FCC-201	CATALYST_ACT	86.77	1	2026-01-16 10:26:44.193435-04
+958	2026-01-16 10:26:41.704228-04	HT-301	TEMP_HYDRO	309.14	1	2026-01-16 10:26:44.193435-04
+959	2026-01-16 10:26:41.704243-04	HT-301	H2_PRESS	41.23	1	2026-01-16 10:26:44.193435-04
+960	2026-01-16 10:26:49.236814-04	CDU-101	TEMP_TOWER	368.52	1	2026-01-16 10:26:49.435897-04
+961	2026-01-16 10:26:49.236863-04	CDU-101	PRESS_TOWER	4.83	1	2026-01-16 10:26:49.435897-04
+962	2026-01-16 10:26:49.23688-04	CDU-101	FLOW_FEED	11256.66	1	2026-01-16 10:26:49.435897-04
+963	2026-01-16 10:26:49.236896-04	FCC-201	TEMP_REACTOR	536.85	1	2026-01-16 10:26:49.435897-04
+964	2026-01-16 10:26:49.236911-04	FCC-201	CATALYST_ACT	79.42	1	2026-01-16 10:26:49.435897-04
+965	2026-01-16 10:26:49.236926-04	HT-301	TEMP_HYDRO	325.8	1	2026-01-16 10:26:49.435897-04
+966	2026-01-16 10:26:49.236941-04	HT-301	H2_PRESS	30.65	1	2026-01-16 10:26:49.435897-04
+967	2026-01-16 10:26:54.487623-04	CDU-101	TEMP_TOWER	392.86	1	2026-01-16 10:26:56.986218-04
+968	2026-01-16 10:26:54.487681-04	CDU-101	PRESS_TOWER	4.09	1	2026-01-16 10:26:56.986218-04
+969	2026-01-16 10:26:54.487699-04	CDU-101	FLOW_FEED	9070.59	1	2026-01-16 10:26:56.986218-04
+970	2026-01-16 10:26:54.487718-04	FCC-201	TEMP_REACTOR	485.72	1	2026-01-16 10:26:56.986218-04
+971	2026-01-16 10:26:54.487733-04	FCC-201	CATALYST_ACT	86.35	1	2026-01-16 10:26:56.986218-04
+972	2026-01-16 10:26:54.48775-04	HT-301	TEMP_HYDRO	314.18	1	2026-01-16 10:26:56.986218-04
+973	2026-01-16 10:26:54.487766-04	HT-301	H2_PRESS	30.72	1	2026-01-16 10:26:56.986218-04
+974	2026-01-16 10:27:02.037656-04	CDU-101	TEMP_TOWER	410.73	1	2026-01-16 10:27:02.240397-04
+975	2026-01-16 10:27:02.037722-04	CDU-101	PRESS_TOWER	3.53	1	2026-01-16 10:27:02.240397-04
+976	2026-01-16 10:27:02.037761-04	CDU-101	FLOW_FEED	11284.66	1	2026-01-16 10:27:02.240397-04
+977	2026-01-16 10:27:02.037783-04	FCC-201	TEMP_REACTOR	486.05	1	2026-01-16 10:27:02.240397-04
+978	2026-01-16 10:27:02.037799-04	FCC-201	CATALYST_ACT	93.69	1	2026-01-16 10:27:02.240397-04
+979	2026-01-16 10:27:02.037815-04	HT-301	TEMP_HYDRO	345.25	1	2026-01-16 10:27:02.240397-04
+980	2026-01-16 10:27:02.03783-04	HT-301	H2_PRESS	40.89	1	2026-01-16 10:27:02.240397-04
+981	2026-01-16 10:27:07.328399-04	CDU-101	TEMP_TOWER	405.11	1	2026-01-16 10:27:07.78589-04
+982	2026-01-16 10:27:07.328448-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:27:07.78589-04
+983	2026-01-16 10:27:07.328465-04	CDU-101	FLOW_FEED	10000.77	1	2026-01-16 10:27:07.78589-04
+984	2026-01-16 10:27:07.328481-04	FCC-201	TEMP_REACTOR	544.72	1	2026-01-16 10:27:07.78589-04
+985	2026-01-16 10:27:07.328496-04	FCC-201	CATALYST_ACT	81.75	1	2026-01-16 10:27:07.78589-04
+986	2026-01-16 10:27:07.328511-04	HT-301	TEMP_HYDRO	323.08	1	2026-01-16 10:27:07.78589-04
+987	2026-01-16 10:27:07.328525-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:27:07.78589-04
+988	2026-01-16 10:27:12.832719-04	CDU-101	TEMP_TOWER	355.54	1	2026-01-16 10:27:13.03091-04
+989	2026-01-16 10:27:12.832778-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-16 10:27:13.03091-04
+990	2026-01-16 10:27:12.832798-04	CDU-101	FLOW_FEED	9969.96	1	2026-01-16 10:27:13.03091-04
+991	2026-01-16 10:27:12.832817-04	FCC-201	TEMP_REACTOR	521.73	1	2026-01-16 10:27:13.03091-04
+992	2026-01-16 10:27:12.832833-04	FCC-201	CATALYST_ACT	71.43	1	2026-01-16 10:27:13.03091-04
+993	2026-01-16 10:27:12.83285-04	HT-301	TEMP_HYDRO	329.63	1	2026-01-16 10:27:13.03091-04
+994	2026-01-16 10:27:12.832869-04	HT-301	H2_PRESS	38.81	1	2026-01-16 10:27:13.03091-04
+995	2026-01-16 10:27:18.084868-04	CDU-101	TEMP_TOWER	407.33	1	2026-01-16 10:27:18.563452-04
+996	2026-01-16 10:27:18.084935-04	CDU-101	PRESS_TOWER	4.18	1	2026-01-16 10:27:18.563452-04
+997	2026-01-16 10:27:18.084954-04	CDU-101	FLOW_FEED	10807.02	1	2026-01-16 10:27:18.563452-04
+998	2026-01-16 10:27:18.084972-04	FCC-201	TEMP_REACTOR	481.66	1	2026-01-16 10:27:18.563452-04
+999	2026-01-16 10:27:18.084991-04	FCC-201	CATALYST_ACT	79.62	1	2026-01-16 10:27:18.563452-04
+1000	2026-01-16 10:27:18.085008-04	HT-301	TEMP_HYDRO	335.97	1	2026-01-16 10:27:18.563452-04
+1001	2026-01-16 10:27:18.085024-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:27:18.563452-04
+1002	2026-01-16 10:27:23.602675-04	CDU-101	TEMP_TOWER	428.04	1	2026-01-16 10:27:23.801929-04
+1003	2026-01-16 10:27:23.602735-04	CDU-101	PRESS_TOWER	4.5	1	2026-01-16 10:27:23.801929-04
+1004	2026-01-16 10:27:23.602753-04	CDU-101	FLOW_FEED	11577.31	1	2026-01-16 10:27:23.801929-04
+1005	2026-01-16 10:27:23.602771-04	FCC-201	TEMP_REACTOR	514.85	1	2026-01-16 10:27:23.801929-04
+1006	2026-01-16 10:27:23.602786-04	FCC-201	CATALYST_ACT	85.3	1	2026-01-16 10:27:23.801929-04
+1007	2026-01-16 10:27:23.602802-04	HT-301	TEMP_HYDRO	371.88	1	2026-01-16 10:27:23.801929-04
+1008	2026-01-16 10:27:23.602818-04	HT-301	H2_PRESS	44.57	1	2026-01-16 10:27:23.801929-04
+1009	2026-01-16 10:27:28.833674-04	CDU-101	TEMP_TOWER	408.01	1	2026-01-16 10:27:29.297608-04
+1010	2026-01-16 10:27:28.833724-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:27:29.297608-04
+1011	2026-01-16 10:27:28.833741-04	CDU-101	FLOW_FEED	9583.36	1	2026-01-16 10:27:29.297608-04
+1012	2026-01-16 10:27:28.833757-04	FCC-201	TEMP_REACTOR	488.69	1	2026-01-16 10:27:29.297608-04
+1013	2026-01-16 10:27:28.833772-04	FCC-201	CATALYST_ACT	74.74	1	2026-01-16 10:27:29.297608-04
+1014	2026-01-16 10:27:28.833787-04	HT-301	TEMP_HYDRO	358.5	1	2026-01-16 10:27:29.297608-04
+1015	2026-01-16 10:27:28.833801-04	HT-301	H2_PRESS	38.9	1	2026-01-16 10:27:29.297608-04
+1016	2026-01-16 10:27:34.325241-04	CDU-101	TEMP_TOWER	441.23	1	2026-01-16 10:27:34.525996-04
+1017	2026-01-16 10:27:34.325296-04	CDU-101	PRESS_TOWER	4.76	1	2026-01-16 10:27:34.525996-04
+1018	2026-01-16 10:27:34.325313-04	CDU-101	FLOW_FEED	10076.64	1	2026-01-16 10:27:34.525996-04
+1019	2026-01-16 10:27:34.32533-04	FCC-201	TEMP_REACTOR	526.87	1	2026-01-16 10:27:34.525996-04
+1020	2026-01-16 10:27:34.325346-04	FCC-201	CATALYST_ACT	72.68	1	2026-01-16 10:27:34.525996-04
+1021	2026-01-16 10:27:34.325363-04	HT-301	TEMP_HYDRO	341.3	1	2026-01-16 10:27:34.525996-04
+1022	2026-01-16 10:27:34.325379-04	HT-301	H2_PRESS	41.57	1	2026-01-16 10:27:34.525996-04
+1023	2026-01-16 10:27:39.567608-04	CDU-101	TEMP_TOWER	371.79	1	2026-01-16 10:27:40.029484-04
+1024	2026-01-16 10:27:39.567673-04	CDU-101	PRESS_TOWER	2.91	1	2026-01-16 10:27:40.029484-04
+1025	2026-01-16 10:27:39.567693-04	CDU-101	FLOW_FEED	9698.52	1	2026-01-16 10:27:40.029484-04
+1026	2026-01-16 10:27:39.567713-04	FCC-201	TEMP_REACTOR	544.38	1	2026-01-16 10:27:40.029484-04
+1027	2026-01-16 10:27:39.56773-04	FCC-201	CATALYST_ACT	77.14	1	2026-01-16 10:27:40.029484-04
+1028	2026-01-16 10:27:39.567746-04	HT-301	TEMP_HYDRO	323.05	1	2026-01-16 10:27:40.029484-04
+1029	2026-01-16 10:27:39.567764-04	HT-301	H2_PRESS	41.54	1	2026-01-16 10:27:40.029484-04
+1030	2026-01-16 10:27:45.080497-04	CDU-101	TEMP_TOWER	385.72	1	2026-01-16 10:27:45.339448-04
+1031	2026-01-16 10:27:45.080565-04	CDU-101	PRESS_TOWER	3.47	1	2026-01-16 10:27:45.339448-04
+1032	2026-01-16 10:27:45.080583-04	CDU-101	FLOW_FEED	11079.8	1	2026-01-16 10:27:45.339448-04
+1033	2026-01-16 10:27:45.080602-04	FCC-201	TEMP_REACTOR	500.62	1	2026-01-16 10:27:45.339448-04
+1034	2026-01-16 10:27:45.080618-04	FCC-201	CATALYST_ACT	82.34	1	2026-01-16 10:27:45.339448-04
+1035	2026-01-16 10:27:45.080636-04	HT-301	TEMP_HYDRO	341.42	1	2026-01-16 10:27:45.339448-04
+1036	2026-01-16 10:27:45.080653-04	HT-301	H2_PRESS	39	1	2026-01-16 10:27:45.339448-04
+1037	2026-01-16 10:27:50.403439-04	CDU-101	TEMP_TOWER	413.22	1	2026-01-16 10:27:50.982057-04
+1038	2026-01-16 10:27:50.4035-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:27:50.982057-04
+1039	2026-01-16 10:27:50.403519-04	CDU-101	FLOW_FEED	10932.95	1	2026-01-16 10:27:50.982057-04
+1040	2026-01-16 10:27:50.403538-04	FCC-201	TEMP_REACTOR	540.44	1	2026-01-16 10:27:50.982057-04
+1041	2026-01-16 10:27:50.403555-04	FCC-201	CATALYST_ACT	73.09	1	2026-01-16 10:27:50.982057-04
+1042	2026-01-16 10:27:50.403572-04	HT-301	TEMP_HYDRO	324.46	1	2026-01-16 10:27:50.982057-04
+1043	2026-01-16 10:27:50.40359-04	HT-301	H2_PRESS	35.75	1	2026-01-16 10:27:50.982057-04
+1044	2026-01-16 10:27:56.024708-04	CDU-101	TEMP_TOWER	426.96	1	2026-01-16 10:27:56.229611-04
+1045	2026-01-16 10:27:56.024757-04	CDU-101	PRESS_TOWER	3.52	1	2026-01-16 10:27:56.229611-04
+1046	2026-01-16 10:27:56.024773-04	CDU-101	FLOW_FEED	8090.48	1	2026-01-16 10:27:56.229611-04
+1047	2026-01-16 10:27:56.024789-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:27:56.229611-04
+1048	2026-01-16 10:27:56.024804-04	FCC-201	CATALYST_ACT	77.24	1	2026-01-16 10:27:56.229611-04
+1049	2026-01-16 10:27:56.024819-04	HT-301	TEMP_HYDRO	359.65	1	2026-01-16 10:27:56.229611-04
+1050	2026-01-16 10:27:56.024834-04	HT-301	H2_PRESS	38.22	1	2026-01-16 10:27:56.229611-04
+1051	2026-01-16 10:28:01.279124-04	CDU-101	TEMP_TOWER	428.12	1	2026-01-16 10:28:03.773878-04
+1052	2026-01-16 10:28:01.279184-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:28:03.773878-04
+1053	2026-01-16 10:28:01.279204-04	CDU-101	FLOW_FEED	9945.52	1	2026-01-16 10:28:03.773878-04
+1054	2026-01-16 10:28:01.279221-04	FCC-201	TEMP_REACTOR	485.04	1	2026-01-16 10:28:03.773878-04
+1055	2026-01-16 10:28:01.279239-04	FCC-201	CATALYST_ACT	82.23	1	2026-01-16 10:28:03.773878-04
+1056	2026-01-16 10:28:01.279256-04	HT-301	TEMP_HYDRO	360.02	1	2026-01-16 10:28:03.773878-04
+1057	2026-01-16 10:28:01.279274-04	HT-301	H2_PRESS	41.79	1	2026-01-16 10:28:03.773878-04
+1058	2026-01-16 10:28:08.83085-04	CDU-101	TEMP_TOWER	399.42	1	2026-01-16 10:28:09.041362-04
+1059	2026-01-16 10:28:08.830898-04	CDU-101	PRESS_TOWER	3.54	1	2026-01-16 10:28:09.041362-04
+1060	2026-01-16 10:28:08.830914-04	CDU-101	FLOW_FEED	8906.48	1	2026-01-16 10:28:09.041362-04
+1061	2026-01-16 10:28:08.830931-04	FCC-201	TEMP_REACTOR	525.86	1	2026-01-16 10:28:09.041362-04
+1062	2026-01-16 10:28:08.830946-04	FCC-201	CATALYST_ACT	90.39	1	2026-01-16 10:28:09.041362-04
+1063	2026-01-16 10:28:08.830961-04	HT-301	TEMP_HYDRO	379.73	1	2026-01-16 10:28:09.041362-04
+1064	2026-01-16 10:28:08.830976-04	HT-301	H2_PRESS	38.89	1	2026-01-16 10:28:09.041362-04
+1065	2026-01-16 10:28:14.119088-04	CDU-101	TEMP_TOWER	431.49	1	2026-01-16 10:28:14.585242-04
+1066	2026-01-16 10:28:14.119134-04	CDU-101	PRESS_TOWER	3.51	1	2026-01-16 10:28:14.585242-04
+1067	2026-01-16 10:28:14.119151-04	CDU-101	FLOW_FEED	9598.56	1	2026-01-16 10:28:14.585242-04
+1068	2026-01-16 10:28:14.119167-04	FCC-201	TEMP_REACTOR	483.55	1	2026-01-16 10:28:14.585242-04
+1069	2026-01-16 10:28:14.119182-04	FCC-201	CATALYST_ACT	90.23	1	2026-01-16 10:28:14.585242-04
+1070	2026-01-16 10:28:14.119197-04	HT-301	TEMP_HYDRO	361.71	1	2026-01-16 10:28:14.585242-04
+1071	2026-01-16 10:28:14.119231-04	HT-301	H2_PRESS	45.95	1	2026-01-16 10:28:14.585242-04
+1072	2026-01-16 10:28:19.633631-04	CDU-101	TEMP_TOWER	390.77	1	2026-01-16 10:28:19.834349-04
+1073	2026-01-16 10:28:19.633689-04	CDU-101	PRESS_TOWER	3.8	1	2026-01-16 10:28:19.834349-04
+1074	2026-01-16 10:28:19.633706-04	CDU-101	FLOW_FEED	11130.18	1	2026-01-16 10:28:19.834349-04
+1075	2026-01-16 10:28:19.633723-04	FCC-201	TEMP_REACTOR	546.82	1	2026-01-16 10:28:19.834349-04
+1076	2026-01-16 10:28:19.633738-04	FCC-201	CATALYST_ACT	79.09	1	2026-01-16 10:28:19.834349-04
+1077	2026-01-16 10:28:19.633753-04	HT-301	TEMP_HYDRO	318.43	1	2026-01-16 10:28:19.834349-04
+1078	2026-01-16 10:28:19.633767-04	HT-301	H2_PRESS	45.07	1	2026-01-16 10:28:19.834349-04
+1079	2026-01-16 10:28:24.871588-04	CDU-101	TEMP_TOWER	379.06	1	2026-01-16 10:28:25.381005-04
+1080	2026-01-16 10:28:24.871647-04	CDU-101	PRESS_TOWER	2.61	1	2026-01-16 10:28:25.381005-04
+1081	2026-01-16 10:28:24.871665-04	CDU-101	FLOW_FEED	10650.56	1	2026-01-16 10:28:25.381005-04
+1082	2026-01-16 10:28:24.871682-04	FCC-201	TEMP_REACTOR	526.08	1	2026-01-16 10:28:25.381005-04
+1083	2026-01-16 10:28:24.871698-04	FCC-201	CATALYST_ACT	92.22	1	2026-01-16 10:28:25.381005-04
+1084	2026-01-16 10:28:24.871714-04	HT-301	TEMP_HYDRO	322.58	1	2026-01-16 10:28:25.381005-04
+1085	2026-01-16 10:28:24.87173-04	HT-301	H2_PRESS	43.55	1	2026-01-16 10:28:25.381005-04
+1086	2026-01-16 10:28:30.432187-04	CDU-101	TEMP_TOWER	390.08	1	2026-01-16 10:28:31.375496-04
+1087	2026-01-16 10:28:30.432254-04	CDU-101	PRESS_TOWER	4.98	1	2026-01-16 10:28:31.375496-04
+1088	2026-01-16 10:28:30.432274-04	CDU-101	FLOW_FEED	10013.36	1	2026-01-16 10:28:31.375496-04
+1089	2026-01-16 10:28:30.432292-04	FCC-201	TEMP_REACTOR	511.73	1	2026-01-16 10:28:31.375496-04
+1090	2026-01-16 10:28:30.432307-04	FCC-201	CATALYST_ACT	82.93	1	2026-01-16 10:28:31.375496-04
+1091	2026-01-16 10:28:30.432322-04	HT-301	TEMP_HYDRO	306.26	1	2026-01-16 10:28:31.375496-04
+1092	2026-01-16 10:28:30.432341-04	HT-301	H2_PRESS	31.34	1	2026-01-16 10:28:31.375496-04
+1093	2026-01-16 10:28:36.434876-04	CDU-101	TEMP_TOWER	420.32	1	2026-01-16 10:28:39.282138-04
+1094	2026-01-16 10:28:36.434936-04	CDU-101	PRESS_TOWER	4.74	1	2026-01-16 10:28:39.282138-04
+1095	2026-01-16 10:28:36.434956-04	CDU-101	FLOW_FEED	11317.28	1	2026-01-16 10:28:39.282138-04
+1096	2026-01-16 10:28:36.434974-04	FCC-201	TEMP_REACTOR	531.71	1	2026-01-16 10:28:39.282138-04
+1097	2026-01-16 10:28:36.43499-04	FCC-201	CATALYST_ACT	77.18	1	2026-01-16 10:28:39.282138-04
+1098	2026-01-16 10:28:36.435006-04	HT-301	TEMP_HYDRO	373.04	1	2026-01-16 10:28:39.282138-04
+1099	2026-01-16 10:28:36.435023-04	HT-301	H2_PRESS	44.55	1	2026-01-16 10:28:39.282138-04
+1100	2026-01-16 10:28:46.585833-04	CDU-101	TEMP_TOWER	397.18	1	2026-01-16 10:28:52.286659-04
+1101	2026-01-16 10:28:46.58591-04	CDU-101	PRESS_TOWER	4.71	1	2026-01-16 10:28:52.286659-04
+1102	2026-01-16 10:28:46.585927-04	CDU-101	FLOW_FEED	10179.37	1	2026-01-16 10:28:52.286659-04
+1103	2026-01-16 10:28:46.585945-04	FCC-201	TEMP_REACTOR	542.86	1	2026-01-16 10:28:52.286659-04
+1104	2026-01-16 10:28:46.585963-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:28:52.286659-04
+1105	2026-01-16 10:28:46.58598-04	HT-301	TEMP_HYDRO	326.83	1	2026-01-16 10:28:52.286659-04
+1106	2026-01-16 10:28:46.585995-04	HT-301	H2_PRESS	32.6	1	2026-01-16 10:28:52.286659-04
+1107	2026-01-16 10:28:57.387675-04	CDU-101	TEMP_TOWER	405.19	1	2026-01-16 10:28:57.766465-04
+1108	2026-01-16 10:28:57.387734-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:28:57.766465-04
+1109	2026-01-16 10:28:57.387751-04	CDU-101	FLOW_FEED	9510.35	1	2026-01-16 10:28:57.766465-04
+1110	2026-01-16 10:28:57.387768-04	FCC-201	TEMP_REACTOR	480.95	1	2026-01-16 10:28:57.766465-04
+1111	2026-01-16 10:28:57.387785-04	FCC-201	CATALYST_ACT	78.72	1	2026-01-16 10:28:57.766465-04
+1112	2026-01-16 10:28:57.387802-04	HT-301	TEMP_HYDRO	325.25	1	2026-01-16 10:28:57.766465-04
+1113	2026-01-16 10:28:57.387818-04	HT-301	H2_PRESS	39.83	1	2026-01-16 10:28:57.766465-04
+1114	2026-01-16 10:29:02.833763-04	CDU-101	TEMP_TOWER	394.06	1	2026-01-16 10:29:03.346602-04
+1115	2026-01-16 10:29:02.833818-04	CDU-101	PRESS_TOWER	4.78	1	2026-01-16 10:29:03.346602-04
+1116	2026-01-16 10:29:02.833838-04	CDU-101	FLOW_FEED	10883.96	1	2026-01-16 10:29:03.346602-04
+1117	2026-01-16 10:29:02.833854-04	FCC-201	TEMP_REACTOR	537.98	1	2026-01-16 10:29:03.346602-04
+1118	2026-01-16 10:29:02.83387-04	FCC-201	CATALYST_ACT	74.42	1	2026-01-16 10:29:03.346602-04
+1119	2026-01-16 10:29:02.833885-04	HT-301	TEMP_HYDRO	309.22	1	2026-01-16 10:29:03.346602-04
+1120	2026-01-16 10:29:02.8339-04	HT-301	H2_PRESS	49.53	1	2026-01-16 10:29:03.346602-04
+1121	2026-01-16 10:29:08.377875-04	CDU-101	TEMP_TOWER	410.05	1	2026-01-16 10:29:10.577338-04
+1122	2026-01-16 10:29:08.377935-04	CDU-101	PRESS_TOWER	4.97	1	2026-01-16 10:29:10.577338-04
+1123	2026-01-16 10:29:08.377955-04	CDU-101	FLOW_FEED	11330.81	1	2026-01-16 10:29:10.577338-04
+1124	2026-01-16 10:29:08.377972-04	FCC-201	TEMP_REACTOR	503.53	1	2026-01-16 10:29:10.577338-04
+1125	2026-01-16 10:29:08.377989-04	FCC-201	CATALYST_ACT	84.9	1	2026-01-16 10:29:10.577338-04
+1126	2026-01-16 10:29:08.378006-04	HT-301	TEMP_HYDRO	358.81	1	2026-01-16 10:29:10.577338-04
+1127	2026-01-16 10:29:08.378022-04	HT-301	H2_PRESS	37.33	1	2026-01-16 10:29:10.577338-04
+1128	2026-01-16 10:29:15.624626-04	CDU-101	TEMP_TOWER	422.5	1	2026-01-16 10:29:18.212705-04
+1129	2026-01-16 10:29:15.624686-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:18.212705-04
+1130	2026-01-16 10:29:15.624705-04	CDU-101	FLOW_FEED	9802.32	1	2026-01-16 10:29:18.212705-04
+1131	2026-01-16 10:29:15.624724-04	FCC-201	TEMP_REACTOR	487.49	1	2026-01-16 10:29:18.212705-04
+1132	2026-01-16 10:29:15.624741-04	FCC-201	CATALYST_ACT	94.62	1	2026-01-16 10:29:18.212705-04
+1133	2026-01-16 10:29:15.624758-04	HT-301	TEMP_HYDRO	334.33	1	2026-01-16 10:29:18.212705-04
+1134	2026-01-16 10:29:15.624775-04	HT-301	H2_PRESS	31.95	1	2026-01-16 10:29:18.212705-04
+1135	2026-01-16 10:29:23.296516-04	CDU-101	TEMP_TOWER	356.92	1	2026-01-16 10:29:23.562659-04
+1136	2026-01-16 10:29:23.296578-04	CDU-101	PRESS_TOWER	4.42	1	2026-01-16 10:29:23.562659-04
+1137	2026-01-16 10:29:23.296595-04	CDU-101	FLOW_FEED	11852.17	1	2026-01-16 10:29:23.562659-04
+1138	2026-01-16 10:29:23.296611-04	FCC-201	TEMP_REACTOR	517.64	1	2026-01-16 10:29:23.562659-04
+1139	2026-01-16 10:29:23.296626-04	FCC-201	CATALYST_ACT	90.05	1	2026-01-16 10:29:23.562659-04
+1140	2026-01-16 10:29:23.296642-04	HT-301	TEMP_HYDRO	351.82	1	2026-01-16 10:29:23.562659-04
+1141	2026-01-16 10:29:23.296657-04	HT-301	H2_PRESS	45.04	1	2026-01-16 10:29:23.562659-04
+1142	2026-01-16 10:29:28.703804-04	CDU-101	TEMP_TOWER	386.52	1	2026-01-16 10:29:29.195216-04
+1143	2026-01-16 10:29:28.703862-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-16 10:29:29.195216-04
+1144	2026-01-16 10:29:28.70388-04	CDU-101	FLOW_FEED	8608.47	1	2026-01-16 10:29:29.195216-04
+1145	2026-01-16 10:29:28.703897-04	FCC-201	TEMP_REACTOR	501.03	1	2026-01-16 10:29:29.195216-04
+1146	2026-01-16 10:29:28.703913-04	FCC-201	CATALYST_ACT	85.46	1	2026-01-16 10:29:29.195216-04
+1147	2026-01-16 10:29:28.70393-04	HT-301	TEMP_HYDRO	371.69	1	2026-01-16 10:29:29.195216-04
+1148	2026-01-16 10:29:28.703947-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:29:29.195216-04
+1149	2026-01-16 10:29:34.22273-04	CDU-101	TEMP_TOWER	355.56	1	2026-01-16 10:29:34.438862-04
+1150	2026-01-16 10:29:34.222777-04	CDU-101	PRESS_TOWER	3.3	1	2026-01-16 10:29:34.438862-04
+1151	2026-01-16 10:29:34.222793-04	CDU-101	FLOW_FEED	11455.22	1	2026-01-16 10:29:34.438862-04
+1152	2026-01-16 10:29:34.222809-04	FCC-201	TEMP_REACTOR	542.09	1	2026-01-16 10:29:34.438862-04
+1153	2026-01-16 10:29:34.222824-04	FCC-201	CATALYST_ACT	79.77	1	2026-01-16 10:29:34.438862-04
+1154	2026-01-16 10:29:34.222839-04	HT-301	TEMP_HYDRO	338.86	1	2026-01-16 10:29:34.438862-04
+1155	2026-01-16 10:29:34.222854-04	HT-301	H2_PRESS	49.16	1	2026-01-16 10:29:34.438862-04
+1156	2026-01-16 10:29:39.473288-04	CDU-101	TEMP_TOWER	378.7	1	2026-01-16 10:29:39.944023-04
+1157	2026-01-16 10:29:39.473354-04	CDU-101	PRESS_TOWER	2.81	1	2026-01-16 10:29:39.944023-04
+1158	2026-01-16 10:29:39.473372-04	CDU-101	FLOW_FEED	10990.54	1	2026-01-16 10:29:39.944023-04
+1159	2026-01-16 10:29:39.473392-04	FCC-201	TEMP_REACTOR	541.95	1	2026-01-16 10:29:39.944023-04
+1160	2026-01-16 10:29:39.473408-04	FCC-201	CATALYST_ACT	84.65	1	2026-01-16 10:29:39.944023-04
+1161	2026-01-16 10:29:39.473425-04	HT-301	TEMP_HYDRO	348.03	1	2026-01-16 10:29:39.944023-04
+1162	2026-01-16 10:29:39.473441-04	HT-301	H2_PRESS	46.22	1	2026-01-16 10:29:39.944023-04
+1163	2026-01-16 10:29:44.970842-04	CDU-101	TEMP_TOWER	434.33	1	2026-01-16 10:29:45.171287-04
+1164	2026-01-16 10:29:44.970904-04	CDU-101	PRESS_TOWER	2.6	1	2026-01-16 10:29:45.171287-04
+1165	2026-01-16 10:29:44.970924-04	CDU-101	FLOW_FEED	9846.45	1	2026-01-16 10:29:45.171287-04
+1166	2026-01-16 10:29:44.97094-04	FCC-201	TEMP_REACTOR	499.19	1	2026-01-16 10:29:45.171287-04
+1167	2026-01-16 10:29:44.970955-04	FCC-201	CATALYST_ACT	74.13	1	2026-01-16 10:29:45.171287-04
+1168	2026-01-16 10:29:44.970971-04	HT-301	TEMP_HYDRO	377.38	1	2026-01-16 10:29:45.171287-04
+1169	2026-01-16 10:29:44.970986-04	HT-301	H2_PRESS	37.27	1	2026-01-16 10:29:45.171287-04
+1170	2026-01-16 10:29:50.21744-04	CDU-101	TEMP_TOWER	423.31	1	2026-01-16 10:29:50.710103-04
+1171	2026-01-16 10:29:50.217495-04	CDU-101	PRESS_TOWER	2.65	1	2026-01-16 10:29:50.710103-04
+1172	2026-01-16 10:29:50.217512-04	CDU-101	FLOW_FEED	11312.31	1	2026-01-16 10:29:50.710103-04
+1173	2026-01-16 10:29:50.217529-04	FCC-201	TEMP_REACTOR	539.19	1	2026-01-16 10:29:50.710103-04
+1174	2026-01-16 10:29:50.217545-04	FCC-201	CATALYST_ACT	72.65	1	2026-01-16 10:29:50.710103-04
+1175	2026-01-16 10:29:50.217561-04	HT-301	TEMP_HYDRO	346.56	1	2026-01-16 10:29:50.710103-04
+1176	2026-01-16 10:29:50.217577-04	HT-301	H2_PRESS	38.16	1	2026-01-16 10:29:50.710103-04
+1177	2026-01-16 10:29:55.762175-04	CDU-101	TEMP_TOWER	397.87	1	2026-01-16 10:29:55.998134-04
+1178	2026-01-16 10:29:55.762233-04	CDU-101	PRESS_TOWER	3.6	1	2026-01-16 10:29:55.998134-04
+1179	2026-01-16 10:29:55.762253-04	CDU-101	FLOW_FEED	11751.32	1	2026-01-16 10:29:55.998134-04
+1180	2026-01-16 10:29:55.762271-04	FCC-201	TEMP_REACTOR	548.44	1	2026-01-16 10:29:55.998134-04
+1181	2026-01-16 10:29:55.762288-04	FCC-201	CATALYST_ACT	71.03	1	2026-01-16 10:29:55.998134-04
+1182	2026-01-16 10:29:55.762305-04	HT-301	TEMP_HYDRO	347.62	1	2026-01-16 10:29:55.998134-04
+1183	2026-01-16 10:29:55.762324-04	HT-301	H2_PRESS	35.93	1	2026-01-16 10:29:55.998134-04
+1184	2026-01-16 10:30:01.041043-04	CDU-101	TEMP_TOWER	402.09	1	2026-01-16 10:30:01.532518-04
+1185	2026-01-16 10:30:01.041091-04	CDU-101	PRESS_TOWER	4.75	1	2026-01-16 10:30:01.532518-04
+1186	2026-01-16 10:30:01.041108-04	CDU-101	FLOW_FEED	11624.26	1	2026-01-16 10:30:01.532518-04
+1187	2026-01-16 10:30:01.041124-04	FCC-201	TEMP_REACTOR	506.18	1	2026-01-16 10:30:01.532518-04
+1188	2026-01-16 10:30:01.041139-04	FCC-201	CATALYST_ACT	75.98	1	2026-01-16 10:30:01.532518-04
+1189	2026-01-16 10:30:01.041157-04	HT-301	TEMP_HYDRO	366.47	1	2026-01-16 10:30:01.532518-04
+1190	2026-01-16 10:30:01.041173-04	HT-301	H2_PRESS	42.94	1	2026-01-16 10:30:01.532518-04
+1191	2026-01-16 10:30:06.571181-04	CDU-101	TEMP_TOWER	440.17	1	2026-01-16 10:30:12.745873-04
+1192	2026-01-16 10:30:06.571239-04	CDU-101	PRESS_TOWER	3.55	1	2026-01-16 10:30:12.745873-04
+1193	2026-01-16 10:30:06.571259-04	CDU-101	FLOW_FEED	11972.92	1	2026-01-16 10:30:12.745873-04
+1194	2026-01-16 10:30:06.571278-04	FCC-201	TEMP_REACTOR	517.11	1	2026-01-16 10:30:12.745873-04
+1195	2026-01-16 10:30:06.571293-04	FCC-201	CATALYST_ACT	72.51	1	2026-01-16 10:30:12.745873-04
+1196	2026-01-16 10:30:06.57131-04	HT-301	TEMP_HYDRO	371.91	1	2026-01-16 10:30:12.745873-04
+1197	2026-01-16 10:30:06.571326-04	HT-301	H2_PRESS	48.21	1	2026-01-16 10:30:12.745873-04
+1198	2026-01-16 10:30:17.778307-04	CDU-101	TEMP_TOWER	353.74	1	2026-01-16 10:30:18.439965-04
+1199	2026-01-16 10:30:17.77837-04	CDU-101	PRESS_TOWER	4.47	1	2026-01-16 10:30:18.439965-04
+1200	2026-01-16 10:30:17.778389-04	CDU-101	FLOW_FEED	9174.31	1	2026-01-16 10:30:18.439965-04
+1201	2026-01-16 10:30:17.778407-04	FCC-201	TEMP_REACTOR	481.95	1	2026-01-16 10:30:18.439965-04
+1202	2026-01-16 10:30:17.778423-04	FCC-201	CATALYST_ACT	84.19	1	2026-01-16 10:30:18.439965-04
+1203	2026-01-16 10:30:17.778442-04	HT-301	TEMP_HYDRO	352.91	1	2026-01-16 10:30:18.439965-04
+1204	2026-01-16 10:30:17.778458-04	HT-301	H2_PRESS	34.78	1	2026-01-16 10:30:18.439965-04
+1205	2026-01-16 10:30:23.497972-04	CDU-101	TEMP_TOWER	414.89	1	2026-01-16 10:30:23.823558-04
+1206	2026-01-16 10:30:23.498019-04	CDU-101	PRESS_TOWER	4.43	1	2026-01-16 10:30:23.823558-04
+1207	2026-01-16 10:30:23.498036-04	CDU-101	FLOW_FEED	11808.42	1	2026-01-16 10:30:23.823558-04
+1208	2026-01-16 10:30:23.498052-04	FCC-201	TEMP_REACTOR	536.89	1	2026-01-16 10:30:23.823558-04
+1209	2026-01-16 10:30:23.498067-04	FCC-201	CATALYST_ACT	91.54	1	2026-01-16 10:30:23.823558-04
+1210	2026-01-16 10:30:23.498081-04	HT-301	TEMP_HYDRO	376.32	1	2026-01-16 10:30:23.823558-04
+1211	2026-01-16 10:30:23.498096-04	HT-301	H2_PRESS	33.8	1	2026-01-16 10:30:23.823558-04
+1212	2026-01-16 10:30:28.895949-04	CDU-101	TEMP_TOWER	408.34	1	2026-01-16 10:30:29.357518-04
+1213	2026-01-16 10:30:28.895997-04	CDU-101	PRESS_TOWER	4.05	1	2026-01-16 10:30:29.357518-04
+1214	2026-01-16 10:30:28.896014-04	CDU-101	FLOW_FEED	9884.94	1	2026-01-16 10:30:29.357518-04
+1215	2026-01-16 10:30:28.89603-04	FCC-201	TEMP_REACTOR	506.77	1	2026-01-16 10:30:29.357518-04
+1216	2026-01-16 10:30:28.896045-04	FCC-201	CATALYST_ACT	93.46	1	2026-01-16 10:30:29.357518-04
+1217	2026-01-16 10:30:28.89606-04	HT-301	TEMP_HYDRO	310.88	1	2026-01-16 10:30:29.357518-04
+1218	2026-01-16 10:30:28.896075-04	HT-301	H2_PRESS	34.23	1	2026-01-16 10:30:29.357518-04
+1219	2026-01-16 10:30:34.516517-04	CDU-101	TEMP_TOWER	411.95	1	2026-01-16 10:30:38.218901-04
+1220	2026-01-16 10:30:34.517033-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:38.218901-04
+1221	2026-01-16 10:30:34.517096-04	CDU-101	FLOW_FEED	10174.93	1	2026-01-16 10:30:38.218901-04
+1222	2026-01-16 10:30:34.51712-04	FCC-201	TEMP_REACTOR	493.46	1	2026-01-16 10:30:38.218901-04
+1223	2026-01-16 10:30:34.517138-04	FCC-201	CATALYST_ACT	87.59	1	2026-01-16 10:30:38.218901-04
+1224	2026-01-16 10:30:34.517154-04	HT-301	TEMP_HYDRO	361.29	1	2026-01-16 10:30:38.218901-04
+1225	2026-01-16 10:30:34.517171-04	HT-301	H2_PRESS	46.93	1	2026-01-16 10:30:38.218901-04
+1226	2026-01-16 10:30:43.265957-04	CDU-101	TEMP_TOWER	379.2	1	2026-01-16 10:30:43.782537-04
+1227	2026-01-16 10:30:43.266007-04	CDU-101	PRESS_TOWER	3.59	1	2026-01-16 10:30:43.782537-04
+1228	2026-01-16 10:30:43.266025-04	CDU-101	FLOW_FEED	11635.26	1	2026-01-16 10:30:43.782537-04
+1229	2026-01-16 10:30:43.266042-04	FCC-201	TEMP_REACTOR	495.85	1	2026-01-16 10:30:43.782537-04
+1230	2026-01-16 10:30:43.266057-04	FCC-201	CATALYST_ACT	73.83	1	2026-01-16 10:30:43.782537-04
+1231	2026-01-16 10:30:43.266072-04	HT-301	TEMP_HYDRO	335.67	1	2026-01-16 10:30:43.782537-04
+1232	2026-01-16 10:30:43.266088-04	HT-301	H2_PRESS	32.54	1	2026-01-16 10:30:43.782537-04
+1233	2026-01-16 10:30:48.83423-04	CDU-101	TEMP_TOWER	377.54	1	2026-01-16 10:30:51.190296-04
+1234	2026-01-16 10:30:48.834458-04	CDU-101	PRESS_TOWER	3.35	1	2026-01-16 10:30:51.190296-04
+1235	2026-01-16 10:30:48.834485-04	CDU-101	FLOW_FEED	8851.93	1	2026-01-16 10:30:51.190296-04
+1236	2026-01-16 10:30:48.834503-04	FCC-201	TEMP_REACTOR	518.66	1	2026-01-16 10:30:51.190296-04
+1237	2026-01-16 10:30:48.834522-04	FCC-201	CATALYST_ACT	71.54	1	2026-01-16 10:30:51.190296-04
+1238	2026-01-16 10:30:48.834542-04	HT-301	TEMP_HYDRO	373.84	1	2026-01-16 10:30:51.190296-04
+1239	2026-01-16 10:30:48.83456-04	HT-301	H2_PRESS	48.79	1	2026-01-16 10:30:51.190296-04
+1240	2026-01-16 10:30:56.255287-04	CDU-101	TEMP_TOWER	404.37	1	2026-01-16 10:30:56.729258-04
+1241	2026-01-16 10:30:56.255348-04	CDU-101	PRESS_TOWER	4.56	1	2026-01-16 10:30:56.729258-04
+1242	2026-01-16 10:30:56.255366-04	CDU-101	FLOW_FEED	9682.12	1	2026-01-16 10:30:56.729258-04
+1243	2026-01-16 10:30:56.255383-04	FCC-201	TEMP_REACTOR	547.67	1	2026-01-16 10:30:56.729258-04
+1244	2026-01-16 10:30:56.255398-04	FCC-201	CATALYST_ACT	94.66	1	2026-01-16 10:30:56.729258-04
+1245	2026-01-16 10:30:56.255413-04	HT-301	TEMP_HYDRO	349.46	1	2026-01-16 10:30:56.729258-04
+1246	2026-01-16 10:30:56.255428-04	HT-301	H2_PRESS	36.31	1	2026-01-16 10:30:56.729258-04
+1247	2026-01-16 10:31:01.770982-04	CDU-101	TEMP_TOWER	394.97	1	2026-01-16 10:31:02.607016-04
+1248	2026-01-16 10:31:01.771081-04	CDU-101	PRESS_TOWER	2.64	1	2026-01-16 10:31:02.607016-04
+1249	2026-01-16 10:31:01.771107-04	CDU-101	FLOW_FEED	10800.69	1	2026-01-16 10:31:02.607016-04
+1250	2026-01-16 10:31:01.771126-04	FCC-201	TEMP_REACTOR	548.12	1	2026-01-16 10:31:02.607016-04
+1251	2026-01-16 10:31:01.771143-04	FCC-201	CATALYST_ACT	82.85	1	2026-01-16 10:31:02.607016-04
+1252	2026-01-16 10:31:01.771201-04	HT-301	TEMP_HYDRO	377.28	1	2026-01-16 10:31:02.607016-04
+1253	2026-01-16 10:31:01.771219-04	HT-301	H2_PRESS	44.48	1	2026-01-16 10:31:02.607016-04
+1254	2026-01-16 10:31:07.64956-04	CDU-101	TEMP_TOWER	400.73	1	2026-01-16 10:31:14.284358-04
+1255	2026-01-16 10:31:07.649685-04	CDU-101	PRESS_TOWER	4.27	1	2026-01-16 10:31:14.284358-04
+1256	2026-01-16 10:31:07.649705-04	CDU-101	FLOW_FEED	9229.64	1	2026-01-16 10:31:14.284358-04
+1257	2026-01-16 10:31:07.649723-04	FCC-201	TEMP_REACTOR	519.64	1	2026-01-16 10:31:14.284358-04
+1258	2026-01-16 10:31:07.64974-04	FCC-201	CATALYST_ACT	77.66	1	2026-01-16 10:31:14.284358-04
+1259	2026-01-16 10:31:07.649756-04	HT-301	TEMP_HYDRO	308.24	1	2026-01-16 10:31:14.284358-04
+1260	2026-01-16 10:31:07.649774-04	HT-301	H2_PRESS	30.08	1	2026-01-16 10:31:14.284358-04
+1261	2026-01-16 10:31:19.317384-04	CDU-101	TEMP_TOWER	357.18	1	2026-01-16 10:31:20.117792-04
+1262	2026-01-16 10:31:19.317434-04	CDU-101	PRESS_TOWER	4.84	1	2026-01-16 10:31:20.117792-04
+1263	2026-01-16 10:31:19.31745-04	CDU-101	FLOW_FEED	10250.33	1	2026-01-16 10:31:20.117792-04
+1264	2026-01-16 10:31:19.317466-04	FCC-201	TEMP_REACTOR	491.17	1	2026-01-16 10:31:20.117792-04
+1265	2026-01-16 10:31:19.317481-04	FCC-201	CATALYST_ACT	74.91	1	2026-01-16 10:31:20.117792-04
+1266	2026-01-16 10:31:19.317497-04	HT-301	TEMP_HYDRO	346.28	1	2026-01-16 10:31:20.117792-04
+1267	2026-01-16 10:31:19.317511-04	HT-301	H2_PRESS	45.98	1	2026-01-16 10:31:20.117792-04
+1268	2026-01-16 10:31:25.23139-04	CDU-101	TEMP_TOWER	424.02	1	2026-01-16 10:31:25.851161-04
+1269	2026-01-16 10:31:25.231471-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:31:25.851161-04
+1270	2026-01-16 10:31:25.231489-04	CDU-101	FLOW_FEED	8703.81	1	2026-01-16 10:31:25.851161-04
+1271	2026-01-16 10:31:25.231508-04	FCC-201	TEMP_REACTOR	515.76	1	2026-01-16 10:31:25.851161-04
+1272	2026-01-16 10:31:25.231525-04	FCC-201	CATALYST_ACT	71.45	1	2026-01-16 10:31:25.851161-04
+1273	2026-01-16 10:31:25.231541-04	HT-301	TEMP_HYDRO	356.49	1	2026-01-16 10:31:25.851161-04
+1274	2026-01-16 10:31:25.231559-04	HT-301	H2_PRESS	47.33	1	2026-01-16 10:31:25.851161-04
+1275	2026-01-16 10:31:30.939591-04	CDU-101	TEMP_TOWER	360.94	1	2026-01-16 10:31:34.171122-04
+1276	2026-01-16 10:31:30.939652-04	CDU-101	PRESS_TOWER	2.54	1	2026-01-16 10:31:34.171122-04
+1277	2026-01-16 10:31:30.939673-04	CDU-101	FLOW_FEED	8136.45	1	2026-01-16 10:31:34.171122-04
+1278	2026-01-16 10:31:30.93969-04	FCC-201	TEMP_REACTOR	518.25	1	2026-01-16 10:31:34.171122-04
+1279	2026-01-16 10:31:30.939707-04	FCC-201	CATALYST_ACT	78.95	1	2026-01-16 10:31:34.171122-04
+1280	2026-01-16 10:31:30.939723-04	HT-301	TEMP_HYDRO	302.13	1	2026-01-16 10:31:34.171122-04
+1281	2026-01-16 10:31:30.939741-04	HT-301	H2_PRESS	35.76	1	2026-01-16 10:31:34.171122-04
+1282	2026-01-16 10:31:39.407564-04	CDU-101	TEMP_TOWER	363.29	1	2026-01-16 10:31:40.538398-04
+1283	2026-01-16 10:31:39.40765-04	CDU-101	PRESS_TOWER	3.97	1	2026-01-16 10:31:40.538398-04
+1284	2026-01-16 10:31:39.407668-04	CDU-101	FLOW_FEED	10670.08	1	2026-01-16 10:31:40.538398-04
+1285	2026-01-16 10:31:39.407685-04	FCC-201	TEMP_REACTOR	524.02	1	2026-01-16 10:31:40.538398-04
+1286	2026-01-16 10:31:39.4077-04	FCC-201	CATALYST_ACT	71.26	1	2026-01-16 10:31:40.538398-04
+1287	2026-01-16 10:31:39.407716-04	HT-301	TEMP_HYDRO	301.55	1	2026-01-16 10:31:40.538398-04
+1288	2026-01-16 10:31:39.407731-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:31:40.538398-04
+1289	2026-01-16 10:31:45.867603-04	CDU-101	TEMP_TOWER	419.42	1	2026-01-16 10:31:46.555631-04
+1290	2026-01-16 10:31:45.86772-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:31:46.555631-04
+1291	2026-01-16 10:31:45.867741-04	CDU-101	FLOW_FEED	11225.31	1	2026-01-16 10:31:46.555631-04
+1292	2026-01-16 10:31:45.867761-04	FCC-201	TEMP_REACTOR	544.47	1	2026-01-16 10:31:46.555631-04
+1293	2026-01-16 10:31:45.867778-04	FCC-201	CATALYST_ACT	85.69	1	2026-01-16 10:31:46.555631-04
+1294	2026-01-16 10:31:45.867795-04	HT-301	TEMP_HYDRO	304.73	1	2026-01-16 10:31:46.555631-04
+1295	2026-01-16 10:31:45.867815-04	HT-301	H2_PRESS	38.71	1	2026-01-16 10:31:46.555631-04
+1296	2026-01-16 10:31:51.664903-04	CDU-101	TEMP_TOWER	406.4	1	2026-01-16 10:31:54.476581-04
+1297	2026-01-16 10:31:51.664971-04	CDU-101	PRESS_TOWER	3.43	1	2026-01-16 10:31:54.476581-04
+1298	2026-01-16 10:31:51.66499-04	CDU-101	FLOW_FEED	8392.11	1	2026-01-16 10:31:54.476581-04
+1299	2026-01-16 10:31:51.66501-04	FCC-201	TEMP_REACTOR	526.16	1	2026-01-16 10:31:54.476581-04
+1300	2026-01-16 10:31:51.665027-04	FCC-201	CATALYST_ACT	71.94	1	2026-01-16 10:31:54.476581-04
+1301	2026-01-16 10:31:51.665044-04	HT-301	TEMP_HYDRO	343.15	1	2026-01-16 10:31:54.476581-04
+1302	2026-01-16 10:31:51.66506-04	HT-301	H2_PRESS	31.83	1	2026-01-16 10:31:54.476581-04
+1303	2026-01-16 10:32:00.615406-04	CDU-101	TEMP_TOWER	443.45	1	2026-01-16 10:32:01.599685-04
+1304	2026-01-16 10:32:00.615503-04	CDU-101	PRESS_TOWER	3.04	1	2026-01-16 10:32:01.599685-04
+1305	2026-01-16 10:32:00.615523-04	CDU-101	FLOW_FEED	9016.95	1	2026-01-16 10:32:01.599685-04
+1306	2026-01-16 10:32:00.615589-04	FCC-201	TEMP_REACTOR	530.01	1	2026-01-16 10:32:01.599685-04
+1307	2026-01-16 10:32:00.615609-04	FCC-201	CATALYST_ACT	91.76	1	2026-01-16 10:32:01.599685-04
+1308	2026-01-16 10:32:00.615625-04	HT-301	TEMP_HYDRO	353.24	1	2026-01-16 10:32:01.599685-04
+1309	2026-01-16 10:32:00.615645-04	HT-301	H2_PRESS	49.49	1	2026-01-16 10:32:01.599685-04
+1310	2026-01-16 10:32:09.326671-04	CDU-101	TEMP_TOWER	388.31	1	2026-01-16 10:32:12.204717-04
+1311	2026-01-16 10:32:09.326737-04	CDU-101	PRESS_TOWER	4.23	1	2026-01-16 10:32:12.204717-04
+1312	2026-01-16 10:32:09.326759-04	CDU-101	FLOW_FEED	8401.27	1	2026-01-16 10:32:12.204717-04
+1313	2026-01-16 10:32:09.326778-04	FCC-201	TEMP_REACTOR	494.36	1	2026-01-16 10:32:12.204717-04
+1314	2026-01-16 10:32:09.326796-04	FCC-201	CATALYST_ACT	91	1	2026-01-16 10:32:12.204717-04
+1315	2026-01-16 10:32:09.326814-04	HT-301	TEMP_HYDRO	359.89	1	2026-01-16 10:32:12.204717-04
+1316	2026-01-16 10:32:09.326829-04	HT-301	H2_PRESS	40.67	1	2026-01-16 10:32:12.204717-04
+1317	2026-01-16 10:32:17.396486-04	CDU-101	TEMP_TOWER	358.4	1	2026-01-16 10:32:17.738737-04
+1318	2026-01-16 10:32:17.396559-04	CDU-101	PRESS_TOWER	3.96	1	2026-01-16 10:32:17.738737-04
+1319	2026-01-16 10:32:17.396579-04	CDU-101	FLOW_FEED	9768.87	1	2026-01-16 10:32:17.738737-04
+1320	2026-01-16 10:32:17.3966-04	FCC-201	TEMP_REACTOR	541.83	1	2026-01-16 10:32:17.738737-04
+1321	2026-01-16 10:32:17.396617-04	FCC-201	CATALYST_ACT	85.1	1	2026-01-16 10:32:17.738737-04
+1322	2026-01-16 10:32:17.396634-04	HT-301	TEMP_HYDRO	369.4	1	2026-01-16 10:32:17.738737-04
+1323	2026-01-16 10:32:17.396651-04	HT-301	H2_PRESS	35.35	1	2026-01-16 10:32:17.738737-04
+1324	2026-01-16 10:32:22.872986-04	CDU-101	TEMP_TOWER	419.35	1	2026-01-16 10:32:24.235468-04
+1325	2026-01-16 10:32:22.873065-04	CDU-101	PRESS_TOWER	3.33	1	2026-01-16 10:32:24.235468-04
+1326	2026-01-16 10:32:22.873085-04	CDU-101	FLOW_FEED	8581.79	1	2026-01-16 10:32:24.235468-04
+1327	2026-01-16 10:32:22.873104-04	FCC-201	TEMP_REACTOR	533.52	1	2026-01-16 10:32:24.235468-04
+1328	2026-01-16 10:32:22.873122-04	FCC-201	CATALYST_ACT	75.79	1	2026-01-16 10:32:24.235468-04
+1329	2026-01-16 10:32:22.873138-04	HT-301	TEMP_HYDRO	368.58	1	2026-01-16 10:32:24.235468-04
+1330	2026-01-16 10:32:22.873155-04	HT-301	H2_PRESS	35.54	1	2026-01-16 10:32:24.235468-04
+1331	2026-01-16 10:32:29.896867-04	CDU-101	TEMP_TOWER	362.48	1	2026-01-16 10:32:30.281874-04
+1332	2026-01-16 10:32:29.896927-04	CDU-101	PRESS_TOWER	3.44	1	2026-01-16 10:32:30.281874-04
+1333	2026-01-16 10:32:29.896949-04	CDU-101	FLOW_FEED	9186.29	1	2026-01-16 10:32:30.281874-04
+1334	2026-01-16 10:32:29.896967-04	FCC-201	TEMP_REACTOR	495.6	1	2026-01-16 10:32:30.281874-04
+1335	2026-01-16 10:32:29.896983-04	FCC-201	CATALYST_ACT	84.52	1	2026-01-16 10:32:30.281874-04
+1336	2026-01-16 10:32:29.897001-04	HT-301	TEMP_HYDRO	349.92	1	2026-01-16 10:32:30.281874-04
+1337	2026-01-16 10:32:29.89702-04	HT-301	H2_PRESS	47.73	1	2026-01-16 10:32:30.281874-04
+1338	2026-01-16 10:32:35.393358-04	CDU-101	TEMP_TOWER	381.03	1	2026-01-16 10:32:36.064363-04
+1339	2026-01-16 10:32:35.39342-04	CDU-101	PRESS_TOWER	2.95	1	2026-01-16 10:32:36.064363-04
+1340	2026-01-16 10:32:35.393438-04	CDU-101	FLOW_FEED	8166.6	1	2026-01-16 10:32:36.064363-04
+1341	2026-01-16 10:32:35.393456-04	FCC-201	TEMP_REACTOR	531.02	1	2026-01-16 10:32:36.064363-04
+1342	2026-01-16 10:32:35.393472-04	FCC-201	CATALYST_ACT	80.94	1	2026-01-16 10:32:36.064363-04
+1343	2026-01-16 10:32:35.393489-04	HT-301	TEMP_HYDRO	301.58	1	2026-01-16 10:32:36.064363-04
+1344	2026-01-16 10:32:35.393507-04	HT-301	H2_PRESS	44.78	1	2026-01-16 10:32:36.064363-04
+1345	2026-01-16 10:32:41.211862-04	CDU-101	TEMP_TOWER	423.36	1	2026-01-16 10:32:41.521975-04
+1346	2026-01-16 10:32:41.21192-04	CDU-101	PRESS_TOWER	3.73	1	2026-01-16 10:32:41.521975-04
+1347	2026-01-16 10:32:41.211938-04	CDU-101	FLOW_FEED	9548.44	1	2026-01-16 10:32:41.521975-04
+1348	2026-01-16 10:32:41.211957-04	FCC-201	TEMP_REACTOR	532.23	1	2026-01-16 10:32:41.521975-04
+1349	2026-01-16 10:32:41.211973-04	FCC-201	CATALYST_ACT	77.48	1	2026-01-16 10:32:41.521975-04
+1350	2026-01-16 10:32:41.211989-04	HT-301	TEMP_HYDRO	372.69	1	2026-01-16 10:32:41.521975-04
+1351	2026-01-16 10:32:41.212005-04	HT-301	H2_PRESS	30.38	1	2026-01-16 10:32:41.521975-04
+1352	2026-01-16 10:32:46.552203-04	CDU-101	TEMP_TOWER	397.47	1	2026-01-16 10:32:49.218202-04
+1353	2026-01-16 10:32:46.552262-04	CDU-101	PRESS_TOWER	4.01	1	2026-01-16 10:32:49.218202-04
+1354	2026-01-16 10:32:46.552283-04	CDU-101	FLOW_FEED	11476.17	1	2026-01-16 10:32:49.218202-04
+1355	2026-01-16 10:32:46.552302-04	FCC-201	TEMP_REACTOR	515.12	1	2026-01-16 10:32:49.218202-04
+1356	2026-01-16 10:32:46.552321-04	FCC-201	CATALYST_ACT	92.45	1	2026-01-16 10:32:49.218202-04
+1357	2026-01-16 10:32:46.552339-04	HT-301	TEMP_HYDRO	342.45	1	2026-01-16 10:32:49.218202-04
+1358	2026-01-16 10:32:46.552356-04	HT-301	H2_PRESS	31.27	1	2026-01-16 10:32:49.218202-04
+1359	2026-01-16 10:32:54.296948-04	CDU-101	TEMP_TOWER	385.75	1	2026-01-16 10:32:54.493525-04
+1360	2026-01-16 10:32:54.296998-04	CDU-101	PRESS_TOWER	3.03	1	2026-01-16 10:32:54.493525-04
+1361	2026-01-16 10:32:54.297015-04	CDU-101	FLOW_FEED	8096.41	1	2026-01-16 10:32:54.493525-04
+1362	2026-01-16 10:32:54.297032-04	FCC-201	TEMP_REACTOR	546.73	1	2026-01-16 10:32:54.493525-04
+1363	2026-01-16 10:32:54.297046-04	FCC-201	CATALYST_ACT	80.43	1	2026-01-16 10:32:54.493525-04
+1364	2026-01-16 10:32:54.297063-04	HT-301	TEMP_HYDRO	359.25	1	2026-01-16 10:32:54.493525-04
+1365	2026-01-16 10:32:54.297078-04	HT-301	H2_PRESS	41.7	1	2026-01-16 10:32:54.493525-04
+1366	2026-01-16 10:32:59.555964-04	CDU-101	TEMP_TOWER	377.09	1	2026-01-16 10:33:02.164792-04
+1367	2026-01-16 10:32:59.556023-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:33:02.164792-04
+1368	2026-01-16 10:32:59.556042-04	CDU-101	FLOW_FEED	8561.83	1	2026-01-16 10:33:02.164792-04
+1369	2026-01-16 10:32:59.55606-04	FCC-201	TEMP_REACTOR	523.35	1	2026-01-16 10:33:02.164792-04
+1370	2026-01-16 10:32:59.556076-04	FCC-201	CATALYST_ACT	85.72	1	2026-01-16 10:33:02.164792-04
+1371	2026-01-16 10:32:59.556093-04	HT-301	TEMP_HYDRO	358.33	1	2026-01-16 10:33:02.164792-04
+1372	2026-01-16 10:32:59.55611-04	HT-301	H2_PRESS	35.36	1	2026-01-16 10:33:02.164792-04
+1373	2026-01-16 10:33:07.273094-04	CDU-101	TEMP_TOWER	406.61	1	2026-01-16 10:33:07.497101-04
+1374	2026-01-16 10:33:07.273143-04	CDU-101	PRESS_TOWER	4.19	1	2026-01-16 10:33:07.497101-04
+1375	2026-01-16 10:33:07.273161-04	CDU-101	FLOW_FEED	8137.3	1	2026-01-16 10:33:07.497101-04
+1376	2026-01-16 10:33:07.273178-04	FCC-201	TEMP_REACTOR	517.25	1	2026-01-16 10:33:07.497101-04
+1377	2026-01-16 10:33:07.273193-04	FCC-201	CATALYST_ACT	92.65	1	2026-01-16 10:33:07.497101-04
+1378	2026-01-16 10:33:07.273208-04	HT-301	TEMP_HYDRO	318.42	1	2026-01-16 10:33:07.497101-04
+1379	2026-01-16 10:33:07.273223-04	HT-301	H2_PRESS	40.73	1	2026-01-16 10:33:07.497101-04
+1380	2026-01-16 10:33:12.529268-04	CDU-101	TEMP_TOWER	385.52	1	2026-01-16 10:33:13.00047-04
+1381	2026-01-16 10:33:12.529329-04	CDU-101	PRESS_TOWER	3.63	1	2026-01-16 10:33:13.00047-04
+1382	2026-01-16 10:33:12.529347-04	CDU-101	FLOW_FEED	10373.21	1	2026-01-16 10:33:13.00047-04
+1383	2026-01-16 10:33:12.529364-04	FCC-201	TEMP_REACTOR	524.69	1	2026-01-16 10:33:13.00047-04
+1384	2026-01-16 10:33:12.52938-04	FCC-201	CATALYST_ACT	92.35	1	2026-01-16 10:33:13.00047-04
+1385	2026-01-16 10:33:12.529395-04	HT-301	TEMP_HYDRO	320.21	1	2026-01-16 10:33:13.00047-04
+1386	2026-01-16 10:33:12.52941-04	HT-301	H2_PRESS	46.63	1	2026-01-16 10:33:13.00047-04
+1387	2026-01-16 10:33:21.248244-04	CDU-101	TEMP_TOWER	399.47	1	2026-01-16 10:33:21.640509-04
+1388	2026-01-16 10:33:21.24832-04	CDU-101	PRESS_TOWER	4.9	1	2026-01-16 10:33:21.640509-04
+1389	2026-01-16 10:33:21.248339-04	CDU-101	FLOW_FEED	10195.7	1	2026-01-16 10:33:21.640509-04
+1390	2026-01-16 10:33:21.248356-04	FCC-201	TEMP_REACTOR	549.71	1	2026-01-16 10:33:21.640509-04
+1391	2026-01-16 10:33:21.248373-04	FCC-201	CATALYST_ACT	74.43	1	2026-01-16 10:33:21.640509-04
+1392	2026-01-16 10:33:21.248389-04	HT-301	TEMP_HYDRO	377.12	1	2026-01-16 10:33:21.640509-04
+1393	2026-01-16 10:33:21.248406-04	HT-301	H2_PRESS	36.56	1	2026-01-16 10:33:21.640509-04
+1394	2026-01-16 10:33:26.694202-04	CDU-101	TEMP_TOWER	433.79	1	2026-01-16 10:33:27.157112-04
+1395	2026-01-16 10:33:26.694261-04	CDU-101	PRESS_TOWER	3.39	1	2026-01-16 10:33:27.157112-04
+1396	2026-01-16 10:33:26.69428-04	CDU-101	FLOW_FEED	9751.95	1	2026-01-16 10:33:27.157112-04
+1397	2026-01-16 10:33:26.694297-04	FCC-201	TEMP_REACTOR	505.57	1	2026-01-16 10:33:27.157112-04
+1398	2026-01-16 10:33:26.694314-04	FCC-201	CATALYST_ACT	80.74	1	2026-01-16 10:33:27.157112-04
+1399	2026-01-16 10:33:26.69433-04	HT-301	TEMP_HYDRO	333.75	1	2026-01-16 10:33:27.157112-04
+1400	2026-01-16 10:33:26.694346-04	HT-301	H2_PRESS	39.23	1	2026-01-16 10:33:27.157112-04
+1401	2026-01-16 10:33:32.202708-04	CDU-101	TEMP_TOWER	429.51	1	2026-01-16 10:33:32.4361-04
+1402	2026-01-16 10:33:32.202768-04	CDU-101	PRESS_TOWER	2.87	1	2026-01-16 10:33:32.4361-04
+1403	2026-01-16 10:33:32.202789-04	CDU-101	FLOW_FEED	8275.45	1	2026-01-16 10:33:32.4361-04
+1404	2026-01-16 10:33:32.202806-04	FCC-201	TEMP_REACTOR	548.04	1	2026-01-16 10:33:32.4361-04
+1405	2026-01-16 10:33:32.202823-04	FCC-201	CATALYST_ACT	76.81	1	2026-01-16 10:33:32.4361-04
+1406	2026-01-16 10:33:32.202839-04	HT-301	TEMP_HYDRO	368.22	1	2026-01-16 10:33:32.4361-04
+1407	2026-01-16 10:33:32.202855-04	HT-301	H2_PRESS	42.27	1	2026-01-16 10:33:32.4361-04
+1408	2026-01-16 10:33:37.477779-04	CDU-101	TEMP_TOWER	386.89	1	2026-01-16 10:33:39.983945-04
+1409	2026-01-16 10:33:37.477837-04	CDU-101	PRESS_TOWER	3.1	1	2026-01-16 10:33:39.983945-04
+1410	2026-01-16 10:33:37.477854-04	CDU-101	FLOW_FEED	9034.87	1	2026-01-16 10:33:39.983945-04
+1411	2026-01-16 10:33:37.477872-04	FCC-201	TEMP_REACTOR	488.96	1	2026-01-16 10:33:39.983945-04
+1412	2026-01-16 10:33:37.477886-04	FCC-201	CATALYST_ACT	80.46	1	2026-01-16 10:33:39.983945-04
+1413	2026-01-16 10:33:37.477902-04	HT-301	TEMP_HYDRO	332.33	1	2026-01-16 10:33:39.983945-04
+1414	2026-01-16 10:33:37.477917-04	HT-301	H2_PRESS	34.54	1	2026-01-16 10:33:39.983945-04
+1415	2026-01-16 10:33:45.036201-04	CDU-101	TEMP_TOWER	424.83	1	2026-01-16 10:33:45.262717-04
+1416	2026-01-16 10:33:45.036255-04	CDU-101	PRESS_TOWER	4.48	1	2026-01-16 10:33:45.262717-04
+1417	2026-01-16 10:33:45.036273-04	CDU-101	FLOW_FEED	10095.67	1	2026-01-16 10:33:45.262717-04
+1418	2026-01-16 10:33:45.036289-04	FCC-201	TEMP_REACTOR	523.18	1	2026-01-16 10:33:45.262717-04
+1419	2026-01-16 10:33:45.036304-04	FCC-201	CATALYST_ACT	71.74	1	2026-01-16 10:33:45.262717-04
+1420	2026-01-16 10:33:45.036319-04	HT-301	TEMP_HYDRO	330.83	1	2026-01-16 10:33:45.262717-04
+1421	2026-01-16 10:33:45.036334-04	HT-301	H2_PRESS	32.19	1	2026-01-16 10:33:45.262717-04
+1422	2026-01-16 10:33:50.326776-04	CDU-101	TEMP_TOWER	403.86	1	2026-01-16 10:33:58.55448-04
+1423	2026-01-16 10:33:50.32684-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:33:58.55448-04
+1424	2026-01-16 10:33:50.326858-04	CDU-101	FLOW_FEED	8652.82	1	2026-01-16 10:33:58.55448-04
+1425	2026-01-16 10:33:50.326877-04	FCC-201	TEMP_REACTOR	532.66	1	2026-01-16 10:33:58.55448-04
+1426	2026-01-16 10:33:50.326894-04	FCC-201	CATALYST_ACT	78.32	1	2026-01-16 10:33:58.55448-04
+1427	2026-01-16 10:33:50.32691-04	HT-301	TEMP_HYDRO	362.01	1	2026-01-16 10:33:58.55448-04
+1428	2026-01-16 10:33:50.326926-04	HT-301	H2_PRESS	42.52	1	2026-01-16 10:33:58.55448-04
+1429	2026-01-16 10:34:03.622918-04	CDU-101	TEMP_TOWER	386.46	1	2026-01-16 10:34:04.164338-04
+1430	2026-01-16 10:34:03.622984-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:34:04.164338-04
+1431	2026-01-16 10:34:03.623005-04	CDU-101	FLOW_FEED	11742.54	1	2026-01-16 10:34:04.164338-04
+1432	2026-01-16 10:34:03.623024-04	FCC-201	TEMP_REACTOR	501.34	1	2026-01-16 10:34:04.164338-04
+1433	2026-01-16 10:34:03.623041-04	FCC-201	CATALYST_ACT	72.8	1	2026-01-16 10:34:04.164338-04
+1434	2026-01-16 10:34:03.623058-04	HT-301	TEMP_HYDRO	335.7	1	2026-01-16 10:34:04.164338-04
+1435	2026-01-16 10:34:03.623075-04	HT-301	H2_PRESS	43.57	1	2026-01-16 10:34:04.164338-04
+1436	2026-01-16 10:34:09.206976-04	CDU-101	TEMP_TOWER	350.46	1	2026-01-16 10:34:09.450243-04
+1437	2026-01-16 10:34:09.207045-04	CDU-101	PRESS_TOWER	2.82	1	2026-01-16 10:34:09.450243-04
+1438	2026-01-16 10:34:09.207064-04	CDU-101	FLOW_FEED	10611.57	1	2026-01-16 10:34:09.450243-04
+1439	2026-01-16 10:34:09.207081-04	FCC-201	TEMP_REACTOR	510.62	1	2026-01-16 10:34:09.450243-04
+1440	2026-01-16 10:34:09.207099-04	FCC-201	CATALYST_ACT	81.4	1	2026-01-16 10:34:09.450243-04
+1441	2026-01-16 10:34:09.207117-04	HT-301	TEMP_HYDRO	328.49	1	2026-01-16 10:34:09.450243-04
+1442	2026-01-16 10:34:09.207134-04	HT-301	H2_PRESS	34.87	1	2026-01-16 10:34:09.450243-04
+1443	2026-01-16 10:34:14.48283-04	CDU-101	TEMP_TOWER	414.51	1	2026-01-16 10:34:17.00368-04
+1444	2026-01-16 10:34:14.482891-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:34:17.00368-04
+1445	2026-01-16 10:34:14.482909-04	CDU-101	FLOW_FEED	9838.7	1	2026-01-16 10:34:17.00368-04
+1446	2026-01-16 10:34:14.482927-04	FCC-201	TEMP_REACTOR	542.14	1	2026-01-16 10:34:17.00368-04
+1447	2026-01-16 10:34:14.482943-04	FCC-201	CATALYST_ACT	77.34	1	2026-01-16 10:34:17.00368-04
+1448	2026-01-16 10:34:14.482958-04	HT-301	TEMP_HYDRO	378.14	1	2026-01-16 10:34:17.00368-04
+1449	2026-01-16 10:34:14.482974-04	HT-301	H2_PRESS	49.45	1	2026-01-16 10:34:17.00368-04
+1450	2026-01-16 10:34:22.038612-04	CDU-101	TEMP_TOWER	365.68	1	2026-01-16 10:34:22.30655-04
+1451	2026-01-16 10:34:22.038673-04	CDU-101	PRESS_TOWER	4.95	1	2026-01-16 10:34:22.30655-04
+1452	2026-01-16 10:34:22.038693-04	CDU-101	FLOW_FEED	8800.62	1	2026-01-16 10:34:22.30655-04
+1453	2026-01-16 10:34:22.038712-04	FCC-201	TEMP_REACTOR	480.01	1	2026-01-16 10:34:22.30655-04
+1454	2026-01-16 10:34:22.038727-04	FCC-201	CATALYST_ACT	77.11	1	2026-01-16 10:34:22.30655-04
+1455	2026-01-16 10:34:22.038743-04	HT-301	TEMP_HYDRO	337.39	1	2026-01-16 10:34:22.30655-04
+1456	2026-01-16 10:34:22.03876-04	HT-301	H2_PRESS	36.09	1	2026-01-16 10:34:22.30655-04
+1457	2026-01-16 10:34:27.339392-04	CDU-101	TEMP_TOWER	395.05	1	2026-01-16 10:34:27.883442-04
+1458	2026-01-16 10:34:27.339473-04	CDU-101	PRESS_TOWER	3.81	1	2026-01-16 10:34:27.883442-04
+1459	2026-01-16 10:34:27.339492-04	CDU-101	FLOW_FEED	8415.83	1	2026-01-16 10:34:27.883442-04
+1460	2026-01-16 10:34:27.339513-04	FCC-201	TEMP_REACTOR	546.22	1	2026-01-16 10:34:27.883442-04
+1461	2026-01-16 10:34:27.339531-04	FCC-201	CATALYST_ACT	79.24	1	2026-01-16 10:34:27.883442-04
+1462	2026-01-16 10:34:27.339547-04	HT-301	TEMP_HYDRO	365.73	1	2026-01-16 10:34:27.883442-04
+1463	2026-01-16 10:34:27.339563-04	HT-301	H2_PRESS	49.99	1	2026-01-16 10:34:27.883442-04
+1464	2026-01-16 10:34:32.918522-04	CDU-101	TEMP_TOWER	422.03	1	2026-01-16 10:34:33.110994-04
+1465	2026-01-16 10:34:32.918573-04	CDU-101	PRESS_TOWER	3.83	1	2026-01-16 10:34:33.110994-04
+1466	2026-01-16 10:34:32.918589-04	CDU-101	FLOW_FEED	8067.06	1	2026-01-16 10:34:33.110994-04
+1467	2026-01-16 10:34:32.918605-04	FCC-201	TEMP_REACTOR	508.55	1	2026-01-16 10:34:33.110994-04
+1468	2026-01-16 10:34:32.91862-04	FCC-201	CATALYST_ACT	75.07	1	2026-01-16 10:34:33.110994-04
+1469	2026-01-16 10:34:32.918635-04	HT-301	TEMP_HYDRO	371.39	1	2026-01-16 10:34:33.110994-04
+1470	2026-01-16 10:34:32.91865-04	HT-301	H2_PRESS	47.63	1	2026-01-16 10:34:33.110994-04
+1471	2026-01-16 10:34:38.186718-04	CDU-101	TEMP_TOWER	375.55	1	2026-01-16 10:34:38.654647-04
+1472	2026-01-16 10:34:38.186775-04	CDU-101	PRESS_TOWER	3.78	1	2026-01-16 10:34:38.654647-04
+1473	2026-01-16 10:34:38.186793-04	CDU-101	FLOW_FEED	11036.33	1	2026-01-16 10:34:38.654647-04
+1474	2026-01-16 10:34:38.186813-04	FCC-201	TEMP_REACTOR	491.23	1	2026-01-16 10:34:38.654647-04
+1475	2026-01-16 10:34:38.18683-04	FCC-201	CATALYST_ACT	93.71	1	2026-01-16 10:34:38.654647-04
+1476	2026-01-16 10:34:38.186846-04	HT-301	TEMP_HYDRO	323.31	1	2026-01-16 10:34:38.654647-04
+1477	2026-01-16 10:34:38.186862-04	HT-301	H2_PRESS	44.74	1	2026-01-16 10:34:38.654647-04
+1478	2026-01-16 10:34:43.718707-04	CDU-101	TEMP_TOWER	430.54	1	2026-01-16 10:34:45.919293-04
+1479	2026-01-16 10:34:43.718766-04	CDU-101	PRESS_TOWER	3.93	1	2026-01-16 10:34:45.919293-04
+1480	2026-01-16 10:34:43.718785-04	CDU-101	FLOW_FEED	9808.91	1	2026-01-16 10:34:45.919293-04
+1481	2026-01-16 10:34:43.718802-04	FCC-201	TEMP_REACTOR	547.88	1	2026-01-16 10:34:45.919293-04
+1482	2026-01-16 10:34:43.718819-04	FCC-201	CATALYST_ACT	75.57	1	2026-01-16 10:34:45.919293-04
+1483	2026-01-16 10:34:43.718836-04	HT-301	TEMP_HYDRO	303.23	1	2026-01-16 10:34:45.919293-04
+1484	2026-01-16 10:34:43.718852-04	HT-301	H2_PRESS	31.32	1	2026-01-16 10:34:45.919293-04
+1485	2026-01-16 10:34:50.978722-04	CDU-101	TEMP_TOWER	431.68	1	2026-01-16 10:34:51.429352-04
+1486	2026-01-16 10:34:50.978785-04	CDU-101	PRESS_TOWER	2.98	1	2026-01-16 10:34:51.429352-04
+1487	2026-01-16 10:34:50.978803-04	CDU-101	FLOW_FEED	10576.43	1	2026-01-16 10:34:51.429352-04
+1488	2026-01-16 10:34:50.978824-04	FCC-201	TEMP_REACTOR	545.01	1	2026-01-16 10:34:51.429352-04
+1489	2026-01-16 10:34:50.978841-04	FCC-201	CATALYST_ACT	87.55	1	2026-01-16 10:34:51.429352-04
+1490	2026-01-16 10:34:50.978858-04	HT-301	TEMP_HYDRO	328.18	1	2026-01-16 10:34:51.429352-04
+1491	2026-01-16 10:34:50.978876-04	HT-301	H2_PRESS	40.99	1	2026-01-16 10:34:51.429352-04
+1492	2026-01-16 10:34:56.457603-04	CDU-101	TEMP_TOWER	415.03	1	2026-01-16 10:34:56.648045-04
+1493	2026-01-16 10:34:56.457657-04	CDU-101	PRESS_TOWER	2.77	1	2026-01-16 10:34:56.648045-04
+1494	2026-01-16 10:34:56.457674-04	CDU-101	FLOW_FEED	10877.67	1	2026-01-16 10:34:56.648045-04
+1495	2026-01-16 10:34:56.45769-04	FCC-201	TEMP_REACTOR	528.05	1	2026-01-16 10:34:56.648045-04
+1496	2026-01-16 10:34:56.457705-04	FCC-201	CATALYST_ACT	92.2	1	2026-01-16 10:34:56.648045-04
+1497	2026-01-16 10:34:56.45772-04	HT-301	TEMP_HYDRO	337.08	1	2026-01-16 10:34:56.648045-04
+1498	2026-01-16 10:34:56.457735-04	HT-301	H2_PRESS	49.6	1	2026-01-16 10:34:56.648045-04
+1499	2026-01-16 10:35:01.681978-04	CDU-101	TEMP_TOWER	433.68	1	2026-01-16 10:35:04.144458-04
+1500	2026-01-16 10:35:01.682036-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-16 10:35:04.144458-04
+1501	2026-01-16 10:35:01.682055-04	CDU-101	FLOW_FEED	10855.79	1	2026-01-16 10:35:04.144458-04
+1502	2026-01-16 10:35:01.682073-04	FCC-201	TEMP_REACTOR	533.64	1	2026-01-16 10:35:04.144458-04
+1503	2026-01-16 10:35:01.682091-04	FCC-201	CATALYST_ACT	87.92	1	2026-01-16 10:35:04.144458-04
+1504	2026-01-16 10:35:01.682108-04	HT-301	TEMP_HYDRO	345.07	1	2026-01-16 10:35:04.144458-04
+1505	2026-01-16 10:35:01.682127-04	HT-301	H2_PRESS	35.05	1	2026-01-16 10:35:04.144458-04
+1506	2026-01-16 10:35:09.173089-04	CDU-101	TEMP_TOWER	425.75	1	2026-01-16 10:35:09.371006-04
+1507	2026-01-16 10:35:09.173137-04	CDU-101	PRESS_TOWER	3.4	1	2026-01-16 10:35:09.371006-04
+1508	2026-01-16 10:35:09.173154-04	CDU-101	FLOW_FEED	11542.61	1	2026-01-16 10:35:09.371006-04
+1509	2026-01-16 10:35:09.173171-04	FCC-201	TEMP_REACTOR	490.07	1	2026-01-16 10:35:09.371006-04
+1510	2026-01-16 10:35:09.173187-04	FCC-201	CATALYST_ACT	86.67	1	2026-01-16 10:35:09.371006-04
+1511	2026-01-16 10:35:09.173202-04	HT-301	TEMP_HYDRO	311.71	1	2026-01-16 10:35:09.371006-04
+1512	2026-01-16 10:35:09.173218-04	HT-301	H2_PRESS	34.38	1	2026-01-16 10:35:09.371006-04
+1513	2026-01-16 10:35:14.406287-04	CDU-101	TEMP_TOWER	404.17	1	2026-01-16 10:35:16.883747-04
+1514	2026-01-16 10:35:14.406345-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-16 10:35:16.883747-04
+1515	2026-01-16 10:35:14.406364-04	CDU-101	FLOW_FEED	8004.3	1	2026-01-16 10:35:16.883747-04
+1516	2026-01-16 10:35:14.406382-04	FCC-201	TEMP_REACTOR	495.28	1	2026-01-16 10:35:16.883747-04
+1517	2026-01-16 10:35:14.406398-04	FCC-201	CATALYST_ACT	83.84	1	2026-01-16 10:35:16.883747-04
+1518	2026-01-16 10:35:14.406417-04	HT-301	TEMP_HYDRO	306.17	1	2026-01-16 10:35:16.883747-04
+1519	2026-01-16 10:35:14.406434-04	HT-301	H2_PRESS	44.61	1	2026-01-16 10:35:16.883747-04
+1520	2026-01-16 10:35:21.917377-04	CDU-101	TEMP_TOWER	377.52	1	2026-01-16 10:35:22.110085-04
+1521	2026-01-16 10:35:21.917439-04	CDU-101	PRESS_TOWER	3.29	1	2026-01-16 10:35:22.110085-04
+1522	2026-01-16 10:35:21.917458-04	CDU-101	FLOW_FEED	9448.95	1	2026-01-16 10:35:22.110085-04
+1523	2026-01-16 10:35:21.917476-04	FCC-201	TEMP_REACTOR	510.59	1	2026-01-16 10:35:22.110085-04
+1524	2026-01-16 10:35:21.917492-04	FCC-201	CATALYST_ACT	89.94	1	2026-01-16 10:35:22.110085-04
+1525	2026-01-16 10:35:21.917507-04	HT-301	TEMP_HYDRO	311.21	1	2026-01-16 10:35:22.110085-04
+1526	2026-01-16 10:35:21.917522-04	HT-301	H2_PRESS	35.49	1	2026-01-16 10:35:22.110085-04
+1527	2026-01-16 10:35:27.143586-04	CDU-101	TEMP_TOWER	372.86	1	2026-01-16 10:35:29.60218-04
+1528	2026-01-16 10:35:27.143649-04	CDU-101	PRESS_TOWER	2.57	1	2026-01-16 10:35:29.60218-04
+1529	2026-01-16 10:35:27.143667-04	CDU-101	FLOW_FEED	9155.05	1	2026-01-16 10:35:29.60218-04
+1530	2026-01-16 10:35:27.143685-04	FCC-201	TEMP_REACTOR	528.54	1	2026-01-16 10:35:29.60218-04
+1531	2026-01-16 10:35:27.143702-04	FCC-201	CATALYST_ACT	78.71	1	2026-01-16 10:35:29.60218-04
+1532	2026-01-16 10:35:27.143719-04	HT-301	TEMP_HYDRO	328.6	1	2026-01-16 10:35:29.60218-04
+1533	2026-01-16 10:35:27.143738-04	HT-301	H2_PRESS	43.26	1	2026-01-16 10:35:29.60218-04
+1534	2026-01-16 10:35:34.626863-04	CDU-101	TEMP_TOWER	382.32	1	2026-01-16 10:35:36.852263-04
+1535	2026-01-16 10:35:34.626922-04	CDU-101	PRESS_TOWER	3.7	1	2026-01-16 10:35:36.852263-04
+1536	2026-01-16 10:35:34.626941-04	CDU-101	FLOW_FEED	8097.34	1	2026-01-16 10:35:36.852263-04
+1537	2026-01-16 10:35:34.626959-04	FCC-201	TEMP_REACTOR	545.07	1	2026-01-16 10:35:36.852263-04
+1538	2026-01-16 10:35:34.626976-04	FCC-201	CATALYST_ACT	78.24	1	2026-01-16 10:35:36.852263-04
+1539	2026-01-16 10:35:34.626992-04	HT-301	TEMP_HYDRO	369.02	1	2026-01-16 10:35:36.852263-04
+1540	2026-01-16 10:35:34.627009-04	HT-301	H2_PRESS	32.85	1	2026-01-16 10:35:36.852263-04
+1541	2026-01-16 10:35:41.884529-04	CDU-101	TEMP_TOWER	442.24	1	2026-01-16 10:35:44.434377-04
+1542	2026-01-16 10:35:41.884585-04	CDU-101	PRESS_TOWER	2.94	1	2026-01-16 10:35:44.434377-04
+1543	2026-01-16 10:35:41.884604-04	CDU-101	FLOW_FEED	9108.04	1	2026-01-16 10:35:44.434377-04
+1544	2026-01-16 10:35:41.884622-04	FCC-201	TEMP_REACTOR	486.84	1	2026-01-16 10:35:44.434377-04
+1545	2026-01-16 10:35:41.884638-04	FCC-201	CATALYST_ACT	71.27	1	2026-01-16 10:35:44.434377-04
+1546	2026-01-16 10:35:41.884655-04	HT-301	TEMP_HYDRO	318.02	1	2026-01-16 10:35:44.434377-04
+1547	2026-01-16 10:35:41.884672-04	HT-301	H2_PRESS	40.13	1	2026-01-16 10:35:44.434377-04
+1548	2026-01-16 10:35:49.464505-04	CDU-101	TEMP_TOWER	408.92	1	2026-01-16 10:35:49.786845-04
+1549	2026-01-16 10:35:49.464568-04	CDU-101	PRESS_TOWER	2.59	1	2026-01-16 10:35:49.786845-04
+1550	2026-01-16 10:35:49.464587-04	CDU-101	FLOW_FEED	8892.7	1	2026-01-16 10:35:49.786845-04
+1551	2026-01-16 10:35:49.464606-04	FCC-201	TEMP_REACTOR	537.83	1	2026-01-16 10:35:49.786845-04
+1552	2026-01-16 10:35:49.464622-04	FCC-201	CATALYST_ACT	90.59	1	2026-01-16 10:35:49.786845-04
+1553	2026-01-16 10:35:49.464639-04	HT-301	TEMP_HYDRO	335.13	1	2026-01-16 10:35:49.786845-04
+1554	2026-01-16 10:35:49.464656-04	HT-301	H2_PRESS	42.21	1	2026-01-16 10:35:49.786845-04
+1555	2026-01-16 10:35:54.968581-04	CDU-101	TEMP_TOWER	420.68	1	2026-01-16 10:35:55.432417-04
+1556	2026-01-16 10:35:54.968629-04	CDU-101	PRESS_TOWER	4.54	1	2026-01-16 10:35:55.432417-04
+1557	2026-01-16 10:35:54.968646-04	CDU-101	FLOW_FEED	8307.64	1	2026-01-16 10:35:55.432417-04
+1558	2026-01-16 10:35:54.968662-04	FCC-201	TEMP_REACTOR	532.44	1	2026-01-16 10:35:55.432417-04
+1559	2026-01-16 10:35:54.968677-04	FCC-201	CATALYST_ACT	92.78	1	2026-01-16 10:35:55.432417-04
+1560	2026-01-16 10:35:54.968692-04	HT-301	TEMP_HYDRO	310.02	1	2026-01-16 10:35:55.432417-04
+1561	2026-01-16 10:35:54.968707-04	HT-301	H2_PRESS	33.61	1	2026-01-16 10:35:55.432417-04
+1606	2026-01-30 19:45:20.512786-04	FCC-201	TEMP_REACTOR	134.3	1	2026-01-31 17:45:20.522734-04
+1607	2026-01-30 19:45:20.512786-04	FCC-201	CATALYST_ACT	11.61	1	2026-01-31 17:45:20.524233-04
+1608	2026-01-30 18:45:20.575282-04	FCC-201	TEMP_REACTOR	170.8	1	2026-01-31 17:45:20.581287-04
+1609	2026-01-30 18:45:20.575282-04	FCC-201	CATALYST_ACT	85.46	1	2026-01-31 17:45:20.582725-04
+1610	2026-01-30 17:45:20.575282-04	FCC-201	TEMP_REACTOR	78.66	1	2026-01-31 17:45:20.58416-04
+1611	2026-01-30 17:45:20.575282-04	FCC-201	CATALYST_ACT	85.3	1	2026-01-31 17:45:20.585749-04
+1612	2026-01-30 16:45:20.575282-04	FCC-201	TEMP_REACTOR	140.26	1	2026-01-31 17:45:20.587161-04
+1613	2026-01-30 16:45:20.575282-04	FCC-201	CATALYST_ACT	84.09	1	2026-01-31 17:45:20.588577-04
+1614	2026-01-30 15:45:20.606529-04	FCC-201	TEMP_REACTOR	86.87	1	2026-01-31 17:45:20.611065-04
+1615	2026-01-30 15:45:20.606529-04	FCC-201	CATALYST_ACT	12.63	1	2026-01-31 17:45:20.612489-04
+1616	2026-01-30 14:45:20.606529-04	FCC-201	TEMP_REACTOR	73.37	1	2026-01-31 17:45:20.613921-04
+1617	2026-01-30 14:45:20.606529-04	FCC-201	CATALYST_ACT	5.78	1	2026-01-31 17:45:20.615322-04
+1618	2026-01-30 13:45:20.606529-04	FCC-201	TEMP_REACTOR	158.12	1	2026-01-31 17:45:20.61676-04
+1619	2026-01-30 13:45:20.606529-04	FCC-201	CATALYST_ACT	38.61	1	2026-01-31 17:45:20.618156-04
+1620	2026-01-30 12:45:20.606529-04	FCC-201	TEMP_REACTOR	116.37	1	2026-01-31 17:45:20.619573-04
+1621	2026-01-30 12:45:20.606529-04	FCC-201	CATALYST_ACT	8.06	1	2026-01-31 17:45:20.620984-04
+1622	2026-01-30 11:45:20.622154-04	FCC-201	TEMP_REACTOR	167.15	1	2026-01-31 17:45:20.622476-04
+1623	2026-01-30 11:45:20.622154-04	FCC-201	CATALYST_ACT	75.5	1	2026-01-31 17:45:20.624413-04
+1624	2026-01-30 10:45:20.622154-04	FCC-201	TEMP_REACTOR	89.22	1	2026-01-31 17:45:20.625858-04
+1625	2026-01-30 10:45:20.622154-04	FCC-201	CATALYST_ACT	1.81	1	2026-01-31 17:45:20.636988-04
+1626	2026-01-30 09:45:20.637785-04	FCC-201	TEMP_REACTOR	177.46	1	2026-01-31 17:45:20.638602-04
+1627	2026-01-30 09:45:20.637785-04	FCC-201	CATALYST_ACT	89.07	1	2026-01-31 17:45:20.640508-04
+1628	2026-01-30 08:45:20.637785-04	FCC-201	TEMP_REACTOR	81.65	1	2026-01-31 17:45:20.642023-04
+1629	2026-01-30 08:45:20.637785-04	FCC-201	CATALYST_ACT	31.15	1	2026-01-31 17:45:20.643451-04
+1630	2026-01-30 07:45:20.637785-04	FCC-201	TEMP_REACTOR	218.25	1	2026-01-31 17:45:20.644902-04
+1631	2026-01-30 07:45:20.637785-04	FCC-201	CATALYST_ACT	20.21	1	2026-01-31 17:45:20.646553-04
+1632	2026-01-30 06:45:20.637785-04	FCC-201	TEMP_REACTOR	100.9	1	2026-01-31 17:45:20.648479-04
+1633	2026-01-30 06:45:20.637785-04	FCC-201	CATALYST_ACT	92.99	1	2026-01-31 17:45:20.64993-04
+1634	2026-01-30 05:45:20.637785-04	FCC-201	TEMP_REACTOR	183.41	1	2026-01-31 17:45:20.651349-04
+1635	2026-01-30 05:45:20.637785-04	FCC-201	CATALYST_ACT	0.61	1	2026-01-31 17:45:20.652746-04
+1636	2026-01-30 04:45:20.653408-04	FCC-201	TEMP_REACTOR	154.69	1	2026-01-31 17:45:20.654513-04
+1637	2026-01-30 04:45:20.653408-04	FCC-201	CATALYST_ACT	111.71	1	2026-01-31 17:45:20.656613-04
+1638	2026-01-30 03:45:20.657319-04	FCC-201	TEMP_REACTOR	57.73	1	2026-01-31 17:45:20.658078-04
+1639	2026-01-30 03:45:20.657319-04	FCC-201	CATALYST_ACT	29.23	1	2026-01-31 17:45:20.659499-04
+1640	2026-01-30 02:45:20.668887-04	FCC-201	TEMP_REACTOR	108.39	1	2026-01-31 17:45:20.669637-04
+1641	2026-01-30 02:45:20.668887-04	FCC-201	CATALYST_ACT	66.37	1	2026-01-31 17:45:20.671068-04
+1642	2026-01-30 01:45:20.668887-04	FCC-201	TEMP_REACTOR	191.53	1	2026-01-31 17:45:20.672722-04
+1643	2026-01-30 01:45:20.668887-04	FCC-201	CATALYST_ACT	26.54	1	2026-01-31 17:45:20.674166-04
+1644	2026-01-30 00:45:20.668887-04	FCC-201	TEMP_REACTOR	81.02	1	2026-01-31 17:45:20.675593-04
+1645	2026-01-30 00:45:20.668887-04	FCC-201	CATALYST_ACT	43.92	1	2026-01-31 17:45:20.677002-04
+1646	2026-01-29 23:45:20.668887-04	FCC-201	TEMP_REACTOR	122.03	1	2026-01-31 17:45:20.678428-04
+1647	2026-01-29 23:45:20.668887-04	FCC-201	CATALYST_ACT	26.09	1	2026-01-31 17:45:20.680623-04
+1648	2026-01-29 22:45:20.668887-04	FCC-201	TEMP_REACTOR	192.02	1	2026-01-31 17:45:20.682115-04
+1649	2026-01-29 22:45:20.668887-04	FCC-201	CATALYST_ACT	38.36	1	2026-01-31 17:45:20.68352-04
+1650	2026-01-29 21:45:20.684528-04	FCC-201	TEMP_REACTOR	172.29	1	2026-01-31 17:45:20.684985-04
+1651	2026-01-29 21:45:20.684528-04	FCC-201	CATALYST_ACT	22.95	1	2026-01-31 17:45:20.686393-04
+1652	2026-01-29 20:45:20.684528-04	FCC-201	TEMP_REACTOR	141.62	1	2026-01-31 17:45:20.688299-04
+1653	2026-01-29 20:45:20.684528-04	FCC-201	CATALYST_ACT	89.83	1	2026-01-31 17:45:20.689744-04
+1654	2026-01-29 19:45:20.684528-04	FCC-201	TEMP_REACTOR	125.21	1	2026-01-31 17:45:20.691179-04
+1655	2026-01-29 19:45:20.684528-04	FCC-201	CATALYST_ACT	29.13	1	2026-01-31 17:45:20.693695-04
+1656	2026-01-29 18:45:20.684528-04	FCC-201	TEMP_REACTOR	129.18	1	2026-01-31 17:45:20.696251-04
+1657	2026-01-29 18:45:20.684528-04	FCC-201	CATALYST_ACT	100.53	1	2026-01-31 17:45:20.697893-04
+1702	2026-01-30 19:45:20.799946-04	HT-301	H2_PRESS	30.78	1	2026-01-31 17:45:20.812636-04
+1703	2026-01-30 19:45:20.799946-04	HT-301	TEMP_HYDRO	157.28	1	2026-01-31 17:45:20.815803-04
+1704	2026-01-30 18:45:20.815576-04	HT-301	H2_PRESS	36.09	1	2026-01-31 17:45:20.818412-04
+1705	2026-01-30 18:45:20.815576-04	HT-301	TEMP_HYDRO	97.1	1	2026-01-31 17:45:20.820857-04
+1706	2026-01-30 17:45:20.815576-04	HT-301	H2_PRESS	32.78	1	2026-01-31 17:45:20.822973-04
+1707	2026-01-30 17:45:20.815576-04	HT-301	TEMP_HYDRO	125.54	1	2026-01-31 17:45:20.824633-04
+1708	2026-01-30 16:45:20.815576-04	HT-301	H2_PRESS	31.51	1	2026-01-31 17:45:20.826324-04
+1709	2026-01-30 16:45:20.815576-04	HT-301	TEMP_HYDRO	142.48	1	2026-01-31 17:45:20.82781-04
+1710	2026-01-30 15:45:20.815576-04	HT-301	H2_PRESS	48.38	1	2026-01-31 17:45:20.829798-04
+1711	2026-01-30 15:45:20.815576-04	HT-301	TEMP_HYDRO	53.71	1	2026-01-31 17:45:20.833683-04
+1712	2026-01-30 14:45:20.831206-04	HT-301	H2_PRESS	44.45	1	2026-01-31 17:45:20.835855-04
+1713	2026-01-30 14:45:20.831206-04	HT-301	TEMP_HYDRO	150.72	1	2026-01-31 17:45:20.837506-04
+1714	2026-01-30 13:45:20.831206-04	HT-301	H2_PRESS	31.44	1	2026-01-31 17:45:20.839123-04
+1715	2026-01-30 13:45:20.831206-04	HT-301	TEMP_HYDRO	131.43	1	2026-01-31 17:45:20.841917-04
+1716	2026-01-30 12:45:20.831206-04	HT-301	H2_PRESS	49.06	1	2026-01-31 17:45:20.847717-04
+1717	2026-01-30 12:45:20.831206-04	HT-301	TEMP_HYDRO	161.57	1	2026-01-31 17:45:20.850064-04
+1718	2026-01-30 11:45:20.846837-04	HT-301	H2_PRESS	51.26	1	2026-01-31 17:45:20.851534-04
+1719	2026-01-30 11:45:20.846837-04	HT-301	TEMP_HYDRO	103.28	1	2026-01-31 17:45:20.85295-04
+1720	2026-01-30 10:45:20.846837-04	HT-301	H2_PRESS	36.88	1	2026-01-31 17:45:20.854362-04
+1721	2026-01-30 10:45:20.846837-04	HT-301	TEMP_HYDRO	59.81	1	2026-01-31 17:45:20.855754-04
+1722	2026-01-30 09:45:20.846837-04	HT-301	H2_PRESS	37.93	1	2026-01-31 17:45:20.857173-04
+1723	2026-01-30 09:45:20.846837-04	HT-301	TEMP_HYDRO	137.71	1	2026-01-31 17:45:20.858589-04
+1724	2026-01-30 08:45:20.846837-04	HT-301	H2_PRESS	38.09	1	2026-01-31 17:45:20.860032-04
+1725	2026-01-30 08:45:20.846837-04	HT-301	TEMP_HYDRO	83.93	1	2026-01-31 17:45:20.862213-04
+1726	2026-01-30 07:45:20.862452-04	HT-301	H2_PRESS	41.83	1	2026-01-31 17:45:20.864389-04
+1727	2026-01-30 07:45:20.862452-04	HT-301	TEMP_HYDRO	65.67	1	2026-01-31 17:45:20.866542-04
+1728	2026-01-30 06:45:20.867874-04	HT-301	H2_PRESS	43.87	1	2026-01-31 17:45:20.869177-04
+1729	2026-01-30 06:45:20.867874-04	HT-301	TEMP_HYDRO	138.37	1	2026-01-31 17:45:20.871629-04
+1730	2026-01-30 05:45:20.870382-04	HT-301	H2_PRESS	54.11	1	2026-01-31 17:45:20.873476-04
+1731	2026-01-30 05:45:20.870382-04	HT-301	TEMP_HYDRO	112.38	1	2026-01-31 17:45:20.874929-04
+1732	2026-01-30 04:45:20.870382-04	HT-301	H2_PRESS	37.54	1	2026-01-31 17:45:20.876624-04
+1733	2026-01-30 04:45:20.870382-04	HT-301	TEMP_HYDRO	138.66	1	2026-01-31 17:45:20.878011-04
+1734	2026-01-30 03:45:20.870382-04	HT-301	H2_PRESS	49.74	1	2026-01-31 17:45:20.880244-04
+1735	2026-01-30 03:45:20.870382-04	HT-301	TEMP_HYDRO	92.26	1	2026-01-31 17:45:20.882677-04
+1736	2026-01-30 02:45:20.870382-04	HT-301	H2_PRESS	42.29	1	2026-01-31 17:45:20.885147-04
+1737	2026-01-30 02:45:20.870382-04	HT-301	TEMP_HYDRO	213.92	1	2026-01-31 17:45:20.886754-04
+1738	2026-01-30 01:45:20.885996-04	HT-301	H2_PRESS	35.5	1	2026-01-31 17:45:20.888504-04
+1739	2026-01-30 01:45:20.885996-04	HT-301	TEMP_HYDRO	62.73	1	2026-01-31 17:45:20.889866-04
+1740	2026-01-30 00:45:20.885996-04	HT-301	H2_PRESS	41.97	1	2026-01-31 17:45:20.891396-04
+1741	2026-01-30 00:45:20.885996-04	HT-301	TEMP_HYDRO	122.58	1	2026-01-31 17:45:20.892775-04
+1742	2026-01-29 23:45:20.885996-04	HT-301	H2_PRESS	45.24	1	2026-01-31 17:45:20.894156-04
+1743	2026-01-29 23:45:20.885996-04	HT-301	TEMP_HYDRO	91.77	1	2026-01-31 17:45:20.89566-04
+1744	2026-01-29 22:45:20.885996-04	HT-301	H2_PRESS	44.22	1	2026-01-31 17:45:20.897097-04
+1745	2026-01-29 22:45:20.885996-04	HT-301	TEMP_HYDRO	92.59	1	2026-01-31 17:45:20.898468-04
+1746	2026-01-29 21:45:20.885996-04	HT-301	H2_PRESS	35.9	1	2026-01-31 17:45:20.899869-04
+1747	2026-01-29 21:45:20.885996-04	HT-301	TEMP_HYDRO	84.61	1	2026-01-31 17:45:20.90126-04
+1748	2026-01-29 20:45:20.901618-04	HT-301	H2_PRESS	33.86	1	2026-01-31 17:45:20.902787-04
+1749	2026-01-29 20:45:20.901618-04	HT-301	TEMP_HYDRO	151.48	1	2026-01-31 17:45:20.904173-04
+1750	2026-01-29 19:45:20.901618-04	HT-301	H2_PRESS	30.36	1	2026-01-31 17:45:20.905556-04
+1751	2026-01-29 19:45:20.901618-04	HT-301	TEMP_HYDRO	71.45	1	2026-01-31 17:45:20.906931-04
+1752	2026-01-29 18:45:20.901618-04	HT-301	H2_PRESS	41.42	1	2026-01-31 17:45:20.908316-04
+1753	2026-01-29 18:45:20.901618-04	HT-301	TEMP_HYDRO	195.53	1	2026-01-31 17:45:20.909697-04
+1820	2026-01-30 19:45:21.012825-04	CDU-101	PRESS_TOWER	8.33	1	2026-01-31 17:45:21.027415-04
+1821	2026-01-30 19:45:21.012825-04	CDU-101	TEMP_TOWER	94.51	1	2026-01-31 17:45:21.028946-04
+1822	2026-01-30 19:45:21.012825-04	CDU-101	FLOW_FEED	435.65	1	2026-01-31 17:45:21.030358-04
+1823	2026-01-30 18:45:21.028455-04	CDU-101	PRESS_TOWER	3.79	1	2026-01-31 17:45:21.031782-04
+1824	2026-01-30 18:45:21.028455-04	CDU-101	TEMP_TOWER	122.8	1	2026-01-31 17:45:21.033174-04
+1825	2026-01-30 18:45:21.028455-04	CDU-101	FLOW_FEED	487.58	1	2026-01-31 17:45:21.034561-04
+1826	2026-01-30 17:45:21.028455-04	CDU-101	PRESS_TOWER	8.75	1	2026-01-31 17:45:21.036142-04
+1827	2026-01-30 17:45:21.028455-04	CDU-101	TEMP_TOWER	64.59	1	2026-01-31 17:45:21.037571-04
+1828	2026-01-30 17:45:21.028455-04	CDU-101	FLOW_FEED	271.78	1	2026-01-31 17:45:21.038964-04
+1829	2026-01-30 16:45:21.028455-04	CDU-101	PRESS_TOWER	1.17	1	2026-01-31 17:45:21.040387-04
+1830	2026-01-30 16:45:21.028455-04	CDU-101	TEMP_TOWER	123.14	1	2026-01-31 17:45:21.041791-04
+1831	2026-01-30 16:45:21.028455-04	CDU-101	FLOW_FEED	374.29	1	2026-01-31 17:45:21.04319-04
+1832	2026-01-30 15:45:21.044078-04	CDU-101	PRESS_TOWER	5.17	1	2026-01-31 17:45:21.044739-04
+1833	2026-01-30 15:45:21.044078-04	CDU-101	TEMP_TOWER	121.71	1	2026-01-31 17:45:21.046145-04
+1834	2026-01-30 15:45:21.044078-04	CDU-101	FLOW_FEED	362.86	1	2026-01-31 17:45:21.047543-04
+1835	2026-01-30 14:45:21.044078-04	CDU-101	PRESS_TOWER	5.5	1	2026-01-31 17:45:21.048958-04
+1836	2026-01-30 14:45:21.044078-04	CDU-101	TEMP_TOWER	102.02	1	2026-01-31 17:45:21.050354-04
+1837	2026-01-30 14:45:21.044078-04	CDU-101	FLOW_FEED	297	1	2026-01-31 17:45:21.051746-04
+1838	2026-01-30 13:45:21.044078-04	CDU-101	PRESS_TOWER	2.84	1	2026-01-31 17:45:21.053168-04
+1839	2026-01-30 13:45:21.044078-04	CDU-101	TEMP_TOWER	67.47	1	2026-01-31 17:45:21.054577-04
+1840	2026-01-30 13:45:21.044078-04	CDU-101	FLOW_FEED	252.7	1	2026-01-31 17:45:21.05615-04
+1841	2026-01-30 12:45:21.044078-04	CDU-101	PRESS_TOWER	1.48	1	2026-01-31 17:45:21.057592-04
+1842	2026-01-30 12:45:21.044078-04	CDU-101	TEMP_TOWER	91.69	1	2026-01-31 17:45:21.059033-04
+1843	2026-01-30 12:45:21.044078-04	CDU-101	FLOW_FEED	257.96	1	2026-01-31 17:45:21.060457-04
+1844	2026-01-30 11:45:21.059699-04	CDU-101	PRESS_TOWER	1.41	1	2026-01-31 17:45:21.061837-04
+1845	2026-01-30 11:45:21.059699-04	CDU-101	TEMP_TOWER	63.95	1	2026-01-31 17:45:21.063243-04
+1846	2026-01-30 11:45:21.059699-04	CDU-101	FLOW_FEED	160.8	1	2026-01-31 17:45:21.064648-04
+1847	2026-01-30 10:45:21.059699-04	CDU-101	PRESS_TOWER	4.65	1	2026-01-31 17:45:21.066076-04
+1848	2026-01-30 10:45:21.059699-04	CDU-101	TEMP_TOWER	148.07	1	2026-01-31 17:45:21.067482-04
+1849	2026-01-30 10:45:21.059699-04	CDU-101	FLOW_FEED	451.33	1	2026-01-31 17:45:21.068894-04
+1850	2026-01-30 09:45:21.059699-04	CDU-101	PRESS_TOWER	4.53	1	2026-01-31 17:45:21.070358-04
+1851	2026-01-30 09:45:21.059699-04	CDU-101	TEMP_TOWER	99	1	2026-01-31 17:45:21.071807-04
+1852	2026-01-30 09:45:21.059699-04	CDU-101	FLOW_FEED	336.44	1	2026-01-31 17:45:21.073906-04
+1853	2026-01-30 08:45:21.059699-04	CDU-101	PRESS_TOWER	3.49	1	2026-01-31 17:45:21.075414-04
+1854	2026-01-30 08:45:21.059699-04	CDU-101	TEMP_TOWER	138	1	2026-01-31 17:45:21.077092-04
+1855	2026-01-30 08:45:21.059699-04	CDU-101	FLOW_FEED	453.15	1	2026-01-31 17:45:21.078597-04
+1856	2026-01-30 07:45:21.075323-04	CDU-101	PRESS_TOWER	1.18	1	2026-01-31 17:45:21.080035-04
+1857	2026-01-30 07:45:21.075323-04	CDU-101	TEMP_TOWER	121.75	1	2026-01-31 17:45:21.081424-04
+1858	2026-01-30 07:45:21.075323-04	CDU-101	FLOW_FEED	234.64	1	2026-01-31 17:45:21.082822-04
+1859	2026-01-30 06:45:21.075323-04	CDU-101	PRESS_TOWER	1.82	1	2026-01-31 17:45:21.084261-04
+1860	2026-01-30 06:45:21.075323-04	CDU-101	TEMP_TOWER	117.3	1	2026-01-31 17:45:21.085656-04
+1861	2026-01-30 06:45:21.075323-04	CDU-101	FLOW_FEED	223.82	1	2026-01-31 17:45:21.08705-04
+1862	2026-01-30 05:45:21.075323-04	CDU-101	PRESS_TOWER	7.89	1	2026-01-31 17:45:21.089653-04
+1863	2026-01-30 05:45:21.075323-04	CDU-101	TEMP_TOWER	192.27	1	2026-01-31 17:45:21.091188-04
+1864	2026-01-30 05:45:21.075323-04	CDU-101	FLOW_FEED	552.77	1	2026-01-31 17:45:21.092717-04
+1865	2026-01-30 04:45:21.090952-04	CDU-101	PRESS_TOWER	2.12	1	2026-01-31 17:45:21.094142-04
+1866	2026-01-30 04:45:21.090952-04	CDU-101	TEMP_TOWER	119.78	1	2026-01-31 17:45:21.096728-04
+1867	2026-01-30 04:45:21.090952-04	CDU-101	FLOW_FEED	254.5	1	2026-01-31 17:45:21.099335-04
+1868	2026-01-30 03:45:21.090952-04	CDU-101	PRESS_TOWER	9.8	1	2026-01-31 17:45:21.100938-04
+1869	2026-01-30 03:45:21.090952-04	CDU-101	TEMP_TOWER	115	1	2026-01-31 17:45:21.103237-04
+1870	2026-01-30 03:45:21.090952-04	CDU-101	FLOW_FEED	282.92	1	2026-01-31 17:45:21.104832-04
+1871	2026-01-30 02:45:21.090952-04	CDU-101	PRESS_TOWER	10.33	1	2026-01-31 17:45:21.106268-04
+1872	2026-01-30 02:45:21.090952-04	CDU-101	TEMP_TOWER	87.51	1	2026-01-31 17:45:21.10804-04
+1873	2026-01-30 02:45:21.090952-04	CDU-101	FLOW_FEED	396.96	1	2026-01-31 17:45:21.111475-04
+1874	2026-01-30 01:45:21.106574-04	CDU-101	PRESS_TOWER	6.91	1	2026-01-31 17:45:21.113308-04
+1875	2026-01-30 01:45:21.106574-04	CDU-101	TEMP_TOWER	131.51	1	2026-01-31 17:45:21.114818-04
+1876	2026-01-30 01:45:21.106574-04	CDU-101	FLOW_FEED	149.43	1	2026-01-31 17:45:21.11633-04
+1877	2026-01-30 00:45:21.106574-04	CDU-101	PRESS_TOWER	2.43	1	2026-01-31 17:45:21.11784-04
+1878	2026-01-30 00:45:21.106574-04	CDU-101	TEMP_TOWER	108.95	1	2026-01-31 17:45:21.119359-04
+1879	2026-01-30 00:45:21.106574-04	CDU-101	FLOW_FEED	184.19	1	2026-01-31 17:45:21.120926-04
+1880	2026-01-29 23:45:21.121661-04	CDU-101	PRESS_TOWER	8.06	1	2026-01-31 17:45:21.122402-04
+1881	2026-01-29 23:45:21.121661-04	CDU-101	TEMP_TOWER	113.78	1	2026-01-31 17:45:21.123843-04
+1882	2026-01-29 23:45:21.121661-04	CDU-101	FLOW_FEED	197.08	1	2026-01-31 17:45:21.125277-04
+1883	2026-01-29 22:45:21.126139-04	CDU-101	PRESS_TOWER	6.02	1	2026-01-31 17:45:21.126871-04
+1884	2026-01-29 22:45:21.126139-04	CDU-101	TEMP_TOWER	119.12	1	2026-01-31 17:45:21.128266-04
+1885	2026-01-29 22:45:21.126139-04	CDU-101	FLOW_FEED	423.52	1	2026-01-31 17:45:21.129684-04
+1886	2026-01-29 21:45:21.130406-04	CDU-101	PRESS_TOWER	2.23	1	2026-01-31 17:45:21.131135-04
+1887	2026-01-29 21:45:21.130406-04	CDU-101	TEMP_TOWER	65.43	1	2026-01-31 17:45:21.132578-04
+1888	2026-01-29 21:45:21.130406-04	CDU-101	FLOW_FEED	317.88	1	2026-01-31 17:45:21.134021-04
+1889	2026-01-29 20:45:21.134757-04	CDU-101	PRESS_TOWER	3.32	1	2026-01-31 17:45:21.135557-04
+1890	2026-01-29 20:45:21.134757-04	CDU-101	TEMP_TOWER	173.77	1	2026-01-31 17:45:21.137019-04
+1891	2026-01-29 20:45:21.134757-04	CDU-101	FLOW_FEED	247.06	1	2026-01-31 17:45:21.138453-04
+1892	2026-01-29 19:45:21.139186-04	CDU-101	PRESS_TOWER	3.85	1	2026-01-31 17:45:21.139915-04
+1893	2026-01-29 19:45:21.139186-04	CDU-101	TEMP_TOWER	191.1	1	2026-01-31 17:45:21.141365-04
+1894	2026-01-29 19:45:21.139186-04	CDU-101	FLOW_FEED	478.08	1	2026-01-31 17:45:21.142848-04
+1895	2026-01-29 18:45:21.143574-04	CDU-101	PRESS_TOWER	4.35	1	2026-01-31 17:45:21.144357-04
+1896	2026-01-29 18:45:21.143574-04	CDU-101	TEMP_TOWER	50.74	1	2026-01-31 17:45:21.145885-04
+1897	2026-01-29 18:45:21.143574-04	CDU-101	FLOW_FEED	346.39	1	2026-01-31 17:45:21.14732-04
+1944	2026-01-30 19:07:58.06706-04	FCC-201	TEMP_REACTOR	71.64	1	2026-01-31 18:07:58.067946-04
+1945	2026-01-30 19:07:58.06706-04	FCC-201	CATALYST_ACT	40.45	1	2026-01-31 18:07:58.093889-04
+1946	2026-01-30 18:07:58.113938-04	FCC-201	TEMP_REACTOR	180.28	1	2026-01-31 18:07:58.124651-04
+1947	2026-01-30 18:07:58.113938-04	FCC-201	CATALYST_ACT	44.73	1	2026-01-31 18:07:58.149354-04
+1948	2026-01-30 17:07:58.170045-04	FCC-201	TEMP_REACTOR	48.27	1	2026-01-31 18:07:58.171159-04
+1949	2026-01-30 17:07:58.170045-04	FCC-201	CATALYST_ACT	33.43	1	2026-01-31 18:07:58.214522-04
+1950	2026-01-30 16:07:58.248187-04	FCC-201	TEMP_REACTOR	149.41	1	2026-01-31 18:07:58.25328-04
+1951	2026-01-30 16:07:58.248187-04	FCC-201	CATALYST_ACT	2.02	1	2026-01-31 18:07:58.297547-04
+1952	2026-01-30 15:07:58.341939-04	FCC-201	TEMP_REACTOR	125.45	1	2026-01-31 18:07:58.355823-04
+1953	2026-01-30 15:07:58.341939-04	FCC-201	CATALYST_ACT	59.03	1	2026-01-31 18:07:58.411323-04
+1954	2026-01-30 14:07:58.498186-04	FCC-201	TEMP_REACTOR	76.57	1	2026-01-31 18:07:58.506825-04
+1955	2026-01-30 14:07:58.498186-04	FCC-201	CATALYST_ACT	73.14	1	2026-01-31 18:07:58.544643-04
+1956	2026-01-30 13:07:58.560688-04	FCC-201	TEMP_REACTOR	98.71	1	2026-01-31 18:07:58.572188-04
+1957	2026-01-30 13:07:58.560688-04	FCC-201	CATALYST_ACT	53.01	1	2026-01-31 18:07:58.605441-04
+1958	2026-01-30 12:07:58.638817-04	FCC-201	TEMP_REACTOR	148.31	1	2026-01-31 18:07:58.640657-04
+1959	2026-01-30 12:07:58.638817-04	FCC-201	CATALYST_ACT	38.02	1	2026-01-31 18:07:58.681687-04
+1960	2026-01-30 11:07:58.712528-04	FCC-201	TEMP_REACTOR	205.12	1	2026-01-31 18:07:58.72186-04
+1961	2026-01-30 11:07:58.712528-04	FCC-201	CATALYST_ACT	22.85	1	2026-01-31 18:07:58.764792-04
+1962	2026-01-30 10:07:58.806281-04	FCC-201	TEMP_REACTOR	54.32	1	2026-01-31 18:07:58.816847-04
+1963	2026-01-30 10:07:58.806281-04	FCC-201	CATALYST_ACT	14.24	1	2026-01-31 18:07:58.840025-04
+1964	2026-01-30 09:07:58.853163-04	FCC-201	TEMP_REACTOR	151.48	1	2026-01-31 18:07:58.861535-04
+1965	2026-01-30 09:07:58.853163-04	FCC-201	CATALYST_ACT	61.68	1	2026-01-31 18:07:58.894287-04
+1966	2026-01-30 08:07:58.931278-04	FCC-201	TEMP_REACTOR	135.9	1	2026-01-31 18:07:58.932021-04
+1967	2026-01-30 08:07:58.931278-04	FCC-201	CATALYST_ACT	52.32	1	2026-01-31 18:07:59.006494-04
+1968	2026-01-30 07:07:59.025025-04	FCC-201	TEMP_REACTOR	200.64	1	2026-01-31 18:07:59.030802-04
+1969	2026-01-30 07:07:59.025025-04	FCC-201	CATALYST_ACT	57.32	1	2026-01-31 18:07:59.049654-04
+1970	2026-01-30 06:07:59.0719-04	FCC-201	TEMP_REACTOR	135.54	1	2026-01-31 18:07:59.075868-04
+1971	2026-01-30 06:07:59.0719-04	FCC-201	CATALYST_ACT	99.64	1	2026-01-31 18:07:59.10111-04
+1972	2026-01-30 05:07:59.118775-04	FCC-201	TEMP_REACTOR	85.8	1	2026-01-31 18:07:59.132443-04
+1973	2026-01-30 05:07:59.118775-04	FCC-201	CATALYST_ACT	30.29	1	2026-01-31 18:07:59.167843-04
+1974	2026-01-30 04:07:59.181277-04	FCC-201	TEMP_REACTOR	169.75	1	2026-01-31 18:07:59.191474-04
+1975	2026-01-30 04:07:59.181277-04	FCC-201	CATALYST_ACT	81.96	1	2026-01-31 18:07:59.256805-04
+1976	2026-01-30 03:07:59.29065-04	FCC-201	TEMP_REACTOR	178.37	1	2026-01-31 18:07:59.300853-04
+1977	2026-01-30 03:07:59.29065-04	FCC-201	CATALYST_ACT	6.64	1	2026-01-31 18:07:59.340231-04
+1978	2026-01-30 02:07:59.353152-04	FCC-201	TEMP_REACTOR	165.42	1	2026-01-31 18:07:59.36609-04
+1979	2026-01-30 02:07:59.353152-04	FCC-201	CATALYST_ACT	11.24	1	2026-01-31 18:07:59.397128-04
+1980	2026-01-30 01:07:59.41565-04	FCC-201	TEMP_REACTOR	177.59	1	2026-01-31 18:07:59.426712-04
+1981	2026-01-30 01:07:59.41565-04	FCC-201	CATALYST_ACT	45.35	1	2026-01-31 18:07:59.462383-04
+1982	2026-01-30 00:07:59.509401-04	FCC-201	TEMP_REACTOR	135.54	1	2026-01-31 18:07:59.519754-04
+1983	2026-01-30 00:07:59.509401-04	FCC-201	CATALYST_ACT	93.42	1	2026-01-31 18:07:59.532092-04
+1984	2026-01-29 23:07:59.540651-04	FCC-201	TEMP_REACTOR	176.38	1	2026-01-31 18:07:59.55385-04
+1985	2026-01-29 23:07:59.540651-04	FCC-201	CATALYST_ACT	44.88	1	2026-01-31 18:07:59.581857-04
+1986	2026-01-29 22:07:59.603151-04	FCC-201	TEMP_REACTOR	84.13	1	2026-01-31 18:07:59.610535-04
+1987	2026-01-29 22:07:59.603151-04	FCC-201	CATALYST_ACT	47.97	1	2026-01-31 18:07:59.633913-04
+1988	2026-01-29 21:07:59.650026-04	FCC-201	TEMP_REACTOR	174	1	2026-01-31 18:07:59.661477-04
+1989	2026-01-29 21:07:59.650026-04	FCC-201	CATALYST_ACT	3.87	1	2026-01-31 18:07:59.696615-04
+1990	2026-01-29 20:07:59.728151-04	FCC-201	TEMP_REACTOR	199.75	1	2026-01-31 18:07:59.732141-04
+1991	2026-01-29 20:07:59.728151-04	FCC-201	CATALYST_ACT	67.45	1	2026-01-31 18:07:59.767166-04
+1992	2026-01-29 19:07:59.775026-04	FCC-201	TEMP_REACTOR	121.21	1	2026-01-31 18:07:59.783398-04
+1993	2026-01-29 19:07:59.775026-04	FCC-201	CATALYST_ACT	8.36	1	2026-01-31 18:07:59.80335-04
+2040	2026-01-30 19:08:00.593633-04	HT-301	H2_PRESS	32.99	1	2026-01-31 18:08:00.602601-04
+2041	2026-01-30 19:08:00.593633-04	HT-301	TEMP_HYDRO	75.43	1	2026-01-31 18:08:00.629725-04
+2042	2026-01-30 18:08:00.640504-04	HT-301	H2_PRESS	40.71	1	2026-01-31 18:08:00.653843-04
+2043	2026-01-30 18:08:00.640504-04	HT-301	TEMP_HYDRO	133.52	1	2026-01-31 18:08:00.687581-04
+2044	2026-01-30 17:08:00.718634-04	HT-301	H2_PRESS	51.86	1	2026-01-31 18:08:00.721149-04
+2045	2026-01-30 17:08:00.718634-04	HT-301	TEMP_HYDRO	116.85	1	2026-01-31 18:08:00.733756-04
+2046	2026-01-30 16:08:00.749882-04	HT-301	H2_PRESS	35.54	1	2026-01-31 18:08:00.753103-04
+2047	2026-01-30 16:08:00.749882-04	HT-301	TEMP_HYDRO	161.79	1	2026-01-31 18:08:00.799635-04
+2048	2026-01-30 15:08:00.796757-04	HT-301	H2_PRESS	41.35	1	2026-01-31 18:08:00.809368-04
+2049	2026-01-30 15:08:00.796757-04	HT-301	TEMP_HYDRO	164.16	1	2026-01-31 18:08:00.819001-04
+2050	2026-01-30 14:08:00.859251-04	HT-301	H2_PRESS	39.7	1	2026-01-31 18:08:00.862626-04
+2051	2026-01-30 14:08:00.859251-04	HT-301	TEMP_HYDRO	121.75	1	2026-01-31 18:08:00.87132-04
+2052	2026-01-30 13:08:00.874878-04	HT-301	H2_PRESS	33.75	1	2026-01-31 18:08:00.885749-04
+2053	2026-01-30 13:08:00.874878-04	HT-301	TEMP_HYDRO	117.65	1	2026-01-31 18:08:00.920936-04
+2054	2026-01-30 12:08:00.937381-04	HT-301	H2_PRESS	37.49	1	2026-01-31 18:08:00.940741-04
+2055	2026-01-30 12:08:00.937381-04	HT-301	TEMP_HYDRO	100.03	1	2026-01-31 18:08:00.959569-04
+2056	2026-01-30 11:08:00.968631-04	HT-301	H2_PRESS	34.22	1	2026-01-31 18:08:00.977138-04
+2057	2026-01-30 11:08:00.968631-04	HT-301	TEMP_HYDRO	123.88	1	2026-01-31 18:08:00.996576-04
+2058	2026-01-30 10:08:01.015502-04	HT-301	H2_PRESS	28.31	1	2026-01-31 18:08:01.01828-04
+2059	2026-01-30 10:08:01.015502-04	HT-301	TEMP_HYDRO	194.56	1	2026-01-31 18:08:01.051972-04
+2060	2026-01-30 09:08:01.06238-04	HT-301	H2_PRESS	44.83	1	2026-01-31 18:08:01.067734-04
+2061	2026-01-30 09:08:01.06238-04	HT-301	TEMP_HYDRO	193.58	1	2026-01-31 18:08:01.069368-04
+2062	2026-01-30 08:08:01.06238-04	HT-301	H2_PRESS	33.77	1	2026-01-31 18:08:01.071524-04
+2063	2026-01-30 08:08:01.06238-04	HT-301	TEMP_HYDRO	86.02	1	2026-01-31 18:08:01.080407-04
+2064	2026-01-30 07:08:01.093632-04	HT-301	H2_PRESS	38.66	1	2026-01-31 18:08:01.107853-04
+2065	2026-01-30 07:08:01.093632-04	HT-301	TEMP_HYDRO	72.09	1	2026-01-31 18:08:01.133425-04
+2066	2026-01-30 06:08:01.140504-04	HT-301	H2_PRESS	50.27	1	2026-01-31 18:08:01.155454-04
+2067	2026-01-30 06:08:01.140504-04	HT-301	TEMP_HYDRO	113.52	1	2026-01-31 18:08:01.171597-04
+2068	2026-01-30 05:08:01.171756-04	HT-301	H2_PRESS	35.59	1	2026-01-31 18:08:01.18598-04
+2069	2026-01-30 05:08:01.171756-04	HT-301	TEMP_HYDRO	65.3	1	2026-01-31 18:08:01.208039-04
+2070	2026-01-30 04:08:01.21863-04	HT-301	H2_PRESS	44.63	1	2026-01-31 18:08:01.225599-04
+2071	2026-01-30 04:08:01.21863-04	HT-301	TEMP_HYDRO	155.38	1	2026-01-31 18:08:01.242958-04
+2072	2026-01-30 03:08:01.254794-04	HT-301	H2_PRESS	38.12	1	2026-01-31 18:08:01.256625-04
+2073	2026-01-30 03:08:01.254794-04	HT-301	TEMP_HYDRO	165.64	1	2026-01-31 18:08:01.282634-04
+2074	2026-01-30 02:08:01.301672-04	HT-301	H2_PRESS	36.49	1	2026-01-31 18:08:01.303709-04
+2075	2026-01-30 02:08:01.301672-04	HT-301	TEMP_HYDRO	170.44	1	2026-01-31 18:08:01.324661-04
+2076	2026-01-30 01:08:01.332924-04	HT-301	H2_PRESS	41.93	1	2026-01-31 18:08:01.342222-04
+2077	2026-01-30 01:08:01.332924-04	HT-301	TEMP_HYDRO	168.14	1	2026-01-31 18:08:01.36968-04
+2078	2026-01-30 00:08:01.379798-04	HT-301	H2_PRESS	34.18	1	2026-01-31 18:08:01.382885-04
+2079	2026-01-30 00:08:01.379798-04	HT-301	TEMP_HYDRO	82.03	1	2026-01-31 18:08:01.403048-04
+2080	2026-01-29 23:08:01.411048-04	HT-301	H2_PRESS	30.49	1	2026-01-31 18:08:01.420483-04
+2081	2026-01-29 23:08:01.411048-04	HT-301	TEMP_HYDRO	45.09	1	2026-01-31 18:08:01.437161-04
+2082	2026-01-29 22:08:01.4423-04	HT-301	H2_PRESS	36.53	1	2026-01-31 18:08:01.457259-04
+2083	2026-01-29 22:08:01.4423-04	HT-301	TEMP_HYDRO	69.28	1	2026-01-31 18:08:01.479269-04
+2084	2026-01-29 21:08:01.504799-04	HT-301	H2_PRESS	48.38	1	2026-01-31 18:08:01.505613-04
+2085	2026-01-29 21:08:01.504799-04	HT-301	TEMP_HYDRO	133.64	1	2026-01-31 18:08:01.524461-04
+2086	2026-01-29 20:08:01.536048-04	HT-301	H2_PRESS	42.57	1	2026-01-31 18:08:01.537838-04
+2087	2026-01-29 20:08:01.536048-04	HT-301	TEMP_HYDRO	136.7	1	2026-01-31 18:08:01.566118-04
+2088	2026-01-29 19:08:01.582921-04	HT-301	H2_PRESS	36.67	1	2026-01-31 18:08:01.584924-04
+2089	2026-01-29 19:08:01.582921-04	HT-301	TEMP_HYDRO	119.55	1	2026-01-31 18:08:01.602238-04
+2159	2026-01-30 19:08:02.707924-04	CDU-101	PRESS_TOWER	2.66	1	2026-01-31 18:08:02.712119-04
+2160	2026-01-30 19:08:02.707924-04	CDU-101	TEMP_TOWER	127.08	1	2026-01-31 18:08:02.743647-04
+2161	2026-01-30 19:08:02.707924-04	CDU-101	FLOW_FEED	260.72	1	2026-01-31 18:08:02.782879-04
+2162	2026-01-30 18:08:02.786051-04	CDU-101	PRESS_TOWER	1.65	1	2026-01-31 18:08:02.799095-04
+2163	2026-01-30 18:08:02.786051-04	CDU-101	TEMP_TOWER	74.5	1	2026-01-31 18:08:02.823348-04
+2164	2026-01-30 18:08:02.786051-04	CDU-101	FLOW_FEED	151.97	1	2026-01-31 18:08:02.847956-04
+2165	2026-01-30 17:08:02.864175-04	CDU-101	PRESS_TOWER	9.83	1	2026-01-31 18:08:02.866341-04
+2166	2026-01-30 17:08:02.864175-04	CDU-101	TEMP_TOWER	112.75	1	2026-01-31 18:08:02.867938-04
+2167	2026-01-30 17:08:02.864175-04	CDU-101	FLOW_FEED	414.26	1	2026-01-31 18:08:02.874996-04
+2168	2026-01-30 16:08:02.879801-04	CDU-101	PRESS_TOWER	8.06	1	2026-01-31 18:08:02.884322-04
+2169	2026-01-30 16:08:02.879801-04	CDU-101	TEMP_TOWER	59.85	1	2026-01-31 18:08:02.905037-04
+2170	2026-01-30 16:08:02.879801-04	CDU-101	FLOW_FEED	374.24	1	2026-01-31 18:08:02.935767-04
+2171	2026-01-30 15:08:02.957922-04	CDU-101	PRESS_TOWER	6.22	1	2026-01-31 18:08:02.969033-04
+2172	2026-01-30 15:08:02.957922-04	CDU-101	TEMP_TOWER	66.51	1	2026-01-31 18:08:02.985754-04
+2173	2026-01-30 15:08:02.957922-04	CDU-101	FLOW_FEED	331.55	1	2026-01-31 18:08:03.010492-04
+2174	2026-01-30 14:08:03.036047-04	CDU-101	PRESS_TOWER	1.9	1	2026-01-31 18:08:03.046335-04
+2175	2026-01-30 14:08:03.036047-04	CDU-101	TEMP_TOWER	55.74	1	2026-01-31 18:08:03.066972-04
+2176	2026-01-30 14:08:03.036047-04	CDU-101	FLOW_FEED	384.65	1	2026-01-31 18:08:03.069195-04
+2177	2026-01-30 13:08:03.082924-04	CDU-101	PRESS_TOWER	7.29	1	2026-01-31 18:08:03.088498-04
+2178	2026-01-30 13:08:03.082924-04	CDU-101	TEMP_TOWER	199.23	1	2026-01-31 18:08:03.118886-04
+2179	2026-01-30 13:08:03.082924-04	CDU-101	FLOW_FEED	230.98	1	2026-01-31 18:08:03.15357-04
+2180	2026-01-30 12:08:03.161049-04	CDU-101	PRESS_TOWER	3.07	1	2026-01-31 18:08:03.177053-04
+2181	2026-01-30 12:08:03.161049-04	CDU-101	TEMP_TOWER	127.68	1	2026-01-31 18:08:03.203108-04
+2182	2026-01-30 12:08:03.161049-04	CDU-101	FLOW_FEED	279.02	1	2026-01-31 18:08:03.230804-04
+2183	2026-01-30 11:08:03.254796-04	CDU-101	PRESS_TOWER	6.99	1	2026-01-31 18:08:03.259864-04
+2184	2026-01-30 11:08:03.254796-04	CDU-101	TEMP_TOWER	187.12	1	2026-01-31 18:08:03.277118-04
+2185	2026-01-30 11:08:03.254796-04	CDU-101	FLOW_FEED	435.72	1	2026-01-31 18:08:03.288464-04
+2186	2026-01-30 10:08:03.286049-04	CDU-101	PRESS_TOWER	2.85	1	2026-01-31 18:08:03.29966-04
+2187	2026-01-30 10:08:03.286049-04	CDU-101	TEMP_TOWER	131.03	1	2026-01-31 18:08:03.313245-04
+2188	2026-01-30 10:08:03.286049-04	CDU-101	FLOW_FEED	198.16	1	2026-01-31 18:08:03.329397-04
+2189	2026-01-30 09:08:03.332928-04	CDU-101	PRESS_TOWER	6.46	1	2026-01-31 18:08:03.343488-04
+2190	2026-01-30 09:08:03.332928-04	CDU-101	TEMP_TOWER	69.63	1	2026-01-31 18:08:03.351781-04
+2191	2026-01-30 09:08:03.332928-04	CDU-101	FLOW_FEED	542.26	1	2026-01-31 18:08:03.368468-04
+2192	2026-01-30 08:08:03.364176-04	CDU-101	PRESS_TOWER	2.33	1	2026-01-31 18:08:03.370843-04
+2193	2026-01-30 08:08:03.364176-04	CDU-101	TEMP_TOWER	106.65	1	2026-01-31 18:08:03.399941-04
+2194	2026-01-30 08:08:03.364176-04	CDU-101	FLOW_FEED	147.04	1	2026-01-31 18:08:03.41956-04
+2195	2026-01-30 07:08:03.426676-04	CDU-101	PRESS_TOWER	8.64	1	2026-01-31 18:08:03.434177-04
+2196	2026-01-30 07:08:03.426676-04	CDU-101	TEMP_TOWER	203.18	1	2026-01-31 18:08:03.449008-04
+2197	2026-01-30 07:08:03.426676-04	CDU-101	FLOW_FEED	367.26	1	2026-01-31 18:08:03.467139-04
+2198	2026-01-30 06:08:03.489172-04	CDU-101	PRESS_TOWER	9.8	1	2026-01-31 18:08:03.493626-04
+2199	2026-01-30 06:08:03.489172-04	CDU-101	TEMP_TOWER	212.82	1	2026-01-31 18:08:03.507407-04
+2200	2026-01-30 06:08:03.489172-04	CDU-101	FLOW_FEED	205.94	1	2026-01-31 18:08:03.532408-04
+2201	2026-01-30 05:08:03.536048-04	CDU-101	PRESS_TOWER	3.87	1	2026-01-31 18:08:03.545993-04
+2202	2026-01-30 05:08:03.536048-04	CDU-101	TEMP_TOWER	151.71	1	2026-01-31 18:08:03.572586-04
+2203	2026-01-30 05:08:03.536048-04	CDU-101	FLOW_FEED	359.1	1	2026-01-31 18:08:03.594043-04
+2204	2026-01-30 04:08:03.614173-04	CDU-101	PRESS_TOWER	9.53	1	2026-01-31 18:08:03.616743-04
+2205	2026-01-30 04:08:03.614173-04	CDU-101	TEMP_TOWER	114.13	1	2026-01-31 18:08:03.618631-04
+2206	2026-01-30 04:08:03.614173-04	CDU-101	FLOW_FEED	236.4	1	2026-01-31 18:08:03.62049-04
+2207	2026-01-30 03:08:03.614173-04	CDU-101	PRESS_TOWER	6.35	1	2026-01-31 18:08:03.62237-04
+2208	2026-01-30 03:08:03.614173-04	CDU-101	TEMP_TOWER	52.39	1	2026-01-31 18:08:03.647001-04
+2209	2026-01-30 03:08:03.614173-04	CDU-101	FLOW_FEED	539.93	1	2026-01-31 18:08:03.677435-04
+2210	2026-01-30 02:08:03.707926-04	CDU-101	PRESS_TOWER	3.38	1	2026-01-31 18:08:03.715337-04
+2211	2026-01-30 02:08:03.707926-04	CDU-101	TEMP_TOWER	63.37	1	2026-01-31 18:08:03.734908-04
+2212	2026-01-30 02:08:03.707926-04	CDU-101	FLOW_FEED	404.35	1	2026-01-31 18:08:03.748822-04
+2213	2026-01-30 01:08:03.754802-04	CDU-101	PRESS_TOWER	3.84	1	2026-01-31 18:08:03.765842-04
+2214	2026-01-30 01:08:03.754802-04	CDU-101	TEMP_TOWER	169.91	1	2026-01-31 18:08:03.785572-04
+2215	2026-01-30 01:08:03.754802-04	CDU-101	FLOW_FEED	316.24	1	2026-01-31 18:08:03.808464-04
+2216	2026-01-30 00:08:03.817301-04	CDU-101	PRESS_TOWER	5.39	1	2026-01-31 18:08:03.828323-04
+2217	2026-01-30 00:08:03.817301-04	CDU-101	TEMP_TOWER	142.07	1	2026-01-31 18:08:03.847988-04
+2218	2026-01-30 00:08:03.817301-04	CDU-101	FLOW_FEED	264.53	1	2026-01-31 18:08:03.86392-04
+2219	2026-01-29 23:08:03.879797-04	CDU-101	PRESS_TOWER	6.52	1	2026-01-31 18:08:03.883656-04
+2220	2026-01-29 23:08:03.879797-04	CDU-101	TEMP_TOWER	90.02	1	2026-01-31 18:08:03.896522-04
+2221	2026-01-29 23:08:03.879797-04	CDU-101	FLOW_FEED	250.79	1	2026-01-31 18:08:03.911969-04
+2222	2026-01-29 22:08:03.926675-04	CDU-101	PRESS_TOWER	3.59	1	2026-01-31 18:08:03.935027-04
+2223	2026-01-29 22:08:03.926675-04	CDU-101	TEMP_TOWER	74.41	1	2026-01-31 18:08:03.951147-04
+2224	2026-01-29 22:08:03.926675-04	CDU-101	FLOW_FEED	281.64	1	2026-01-31 18:08:03.969562-04
+2225	2026-01-29 21:08:03.989173-04	CDU-101	PRESS_TOWER	4.23	1	2026-01-31 18:08:03.989824-04
+2226	2026-01-29 21:08:03.989173-04	CDU-101	TEMP_TOWER	52.11	1	2026-01-31 18:08:04.012032-04
+2227	2026-01-29 21:08:03.989173-04	CDU-101	FLOW_FEED	102.23	1	2026-01-31 18:08:04.036727-04
+2228	2026-01-29 20:08:04.051675-04	CDU-101	PRESS_TOWER	7.16	1	2026-01-31 18:08:04.05745-04
+2229	2026-01-29 20:08:04.051675-04	CDU-101	TEMP_TOWER	63.53	1	2026-01-31 18:08:04.079761-04
+2230	2026-01-29 20:08:04.051675-04	CDU-101	FLOW_FEED	114.82	1	2026-01-31 18:08:04.107601-04
+2231	2026-01-29 19:08:04.114173-04	CDU-101	PRESS_TOWER	4.17	1	2026-01-31 18:08:04.12098-04
+2232	2026-01-29 19:08:04.114173-04	CDU-101	TEMP_TOWER	102.37	1	2026-01-31 18:08:04.165309-04
+2233	2026-01-29 19:08:04.114173-04	CDU-101	FLOW_FEED	321.51	1	2026-01-31 18:08:04.198415-04
+2234	2026-01-29 18:11:38.026841-04	FCC-201	CATALYST_ACT	79.74	1	2026-01-31 18:11:38.030056-04
+2235	2026-01-29 18:11:38.026841-04	FCC-201	TEMP_REACTOR	463.38	1	2026-01-31 18:11:38.18604-04
+2236	2026-01-29 18:11:38.026841-04	CDU-101	TEMP_TOWER	430.33	1	2026-01-31 18:11:38.187965-04
+2237	2026-01-29 18:11:38.026841-04	HT-301	TEMP_HYDRO	422.74	1	2026-01-31 18:11:38.189805-04
+2238	2026-01-29 18:11:38.026841-04	CDU-101	PRESS_TOWER	31.08	1	2026-01-31 18:11:38.203655-04
+2239	2026-01-29 18:11:38.026841-04	HT-301	H2_PRESS	36.66	1	2026-01-31 18:11:38.242844-04
+2240	2026-01-29 18:11:38.026841-04	CDU-101	FLOW_FEED	10152.47	1	2026-01-31 18:11:38.244685-04
+2241	2026-01-29 19:11:38.026841-04	FCC-201	CATALYST_ACT	79.06	1	2026-01-31 18:11:38.24635-04
+2242	2026-01-29 19:11:38.026841-04	FCC-201	TEMP_REACTOR	411	1	2026-01-31 18:11:38.247842-04
+2243	2026-01-29 19:11:38.026841-04	CDU-101	TEMP_TOWER	491.13	1	2026-01-31 18:11:38.249441-04
+2244	2026-01-29 19:11:38.026841-04	HT-301	TEMP_HYDRO	461.46	1	2026-01-31 18:11:38.251681-04
+2245	2026-01-29 19:11:38.026841-04	CDU-101	PRESS_TOWER	28.96	1	2026-01-31 18:11:38.265861-04
+2246	2026-01-29 19:11:38.026841-04	HT-301	H2_PRESS	30.32	1	2026-01-31 18:11:38.267277-04
+2247	2026-01-29 19:11:38.026841-04	CDU-101	FLOW_FEED	9729.88	1	2026-01-31 18:11:38.268669-04
+2248	2026-01-29 20:11:38.026841-04	FCC-201	CATALYST_ACT	92.74	1	2026-01-31 18:11:38.27012-04
+2249	2026-01-29 20:11:38.026841-04	FCC-201	TEMP_REACTOR	473.33	1	2026-01-31 18:11:38.271552-04
+2250	2026-01-29 20:11:38.026841-04	CDU-101	TEMP_TOWER	438.12	1	2026-01-31 18:11:38.272954-04
+2251	2026-01-29 20:11:38.026841-04	HT-301	TEMP_HYDRO	488.12	1	2026-01-31 18:11:38.274391-04
+2252	2026-01-29 20:11:38.026841-04	CDU-101	PRESS_TOWER	31.17	1	2026-01-31 18:11:38.27593-04
+2253	2026-01-29 20:11:38.026841-04	HT-301	H2_PRESS	32.05	1	2026-01-31 18:11:38.277445-04
+2254	2026-01-29 20:11:38.026841-04	CDU-101	FLOW_FEED	9473.72	1	2026-01-31 18:11:38.278853-04
+2255	2026-01-29 21:11:38.026841-04	FCC-201	CATALYST_ACT	93.9	1	2026-01-31 18:11:38.291347-04
+2256	2026-01-29 21:11:38.026841-04	FCC-201	TEMP_REACTOR	480.56	1	2026-01-31 18:11:38.292838-04
+2257	2026-01-29 21:11:38.026841-04	CDU-101	TEMP_TOWER	422.63	1	2026-01-31 18:11:38.294258-04
+2258	2026-01-29 21:11:38.026841-04	HT-301	TEMP_HYDRO	469.83	1	2026-01-31 18:11:38.295816-04
+2259	2026-01-29 21:11:38.026841-04	CDU-101	PRESS_TOWER	41.23	1	2026-01-31 18:11:38.297922-04
+2260	2026-01-29 21:11:38.026841-04	HT-301	H2_PRESS	31.1	1	2026-01-31 18:11:38.299371-04
+2261	2026-01-29 21:11:38.026841-04	CDU-101	FLOW_FEED	9680.18	1	2026-01-31 18:11:38.300768-04
+2262	2026-01-29 22:11:38.026841-04	FCC-201	CATALYST_ACT	86.15	1	2026-01-31 18:11:38.302212-04
+2263	2026-01-29 22:11:38.026841-04	FCC-201	TEMP_REACTOR	481.5	1	2026-01-31 18:11:38.304394-04
+2264	2026-01-29 22:11:38.026841-04	CDU-101	TEMP_TOWER	450.16	1	2026-01-31 18:11:38.315005-04
+2265	2026-01-29 22:11:38.026841-04	HT-301	TEMP_HYDRO	430.35	1	2026-01-31 18:11:38.316439-04
+2266	2026-01-29 22:11:38.026841-04	CDU-101	PRESS_TOWER	28.6	1	2026-01-31 18:11:38.317837-04
+2267	2026-01-29 22:11:38.026841-04	HT-301	H2_PRESS	29.37	1	2026-01-31 18:11:38.31927-04
+2268	2026-01-29 22:11:38.026841-04	CDU-101	FLOW_FEED	9740.23	1	2026-01-31 18:11:38.320714-04
+2269	2026-01-29 23:11:38.026841-04	FCC-201	CATALYST_ACT	61.58	1	2026-01-31 18:11:38.322114-04
+2270	2026-01-29 23:11:38.026841-04	FCC-201	TEMP_REACTOR	427.2	1	2026-01-31 18:11:38.323516-04
+2271	2026-01-29 23:11:38.026841-04	CDU-101	TEMP_TOWER	458.74	1	2026-01-31 18:11:38.33132-04
+2272	2026-01-29 23:11:38.026841-04	HT-301	TEMP_HYDRO	387.95	1	2026-01-31 18:11:38.332908-04
+2273	2026-01-29 23:11:38.026841-04	CDU-101	PRESS_TOWER	29.41	1	2026-01-31 18:11:38.334343-04
+2274	2026-01-29 23:11:38.026841-04	HT-301	H2_PRESS	28.75	1	2026-01-31 18:11:38.335762-04
+2275	2026-01-29 23:11:38.026841-04	CDU-101	FLOW_FEED	10213.32	1	2026-01-31 18:11:38.354594-04
+2276	2026-01-30 00:11:38.026841-04	FCC-201	CATALYST_ACT	83.69	1	2026-01-31 18:11:38.356027-04
+2277	2026-01-30 00:11:38.026841-04	FCC-201	TEMP_REACTOR	444.12	1	2026-01-31 18:11:38.357508-04
+2278	2026-01-30 00:11:38.026841-04	CDU-101	TEMP_TOWER	493.98	1	2026-01-31 18:11:38.358898-04
+2279	2026-01-30 00:11:38.026841-04	HT-301	TEMP_HYDRO	597.87	1	2026-01-31 18:11:38.360307-04
+2280	2026-01-30 00:11:38.026841-04	CDU-101	PRESS_TOWER	29.25	1	2026-01-31 18:11:38.361725-04
+2281	2026-01-30 00:11:38.026841-04	HT-301	H2_PRESS	29.14	1	2026-01-31 18:11:38.363133-04
+2282	2026-01-30 00:11:38.026841-04	CDU-101	FLOW_FEED	13598.05	1	2026-01-31 18:11:38.364523-04
+2283	2026-01-30 01:11:38.026841-04	FCC-201	CATALYST_ACT	95.1	1	2026-01-31 18:11:38.365918-04
+2284	2026-01-30 01:11:38.026841-04	FCC-201	TEMP_REACTOR	434.78	1	2026-01-31 18:11:38.367337-04
+2285	2026-01-30 01:11:38.026841-04	CDU-101	TEMP_TOWER	470.8	1	2026-01-31 18:11:38.36873-04
+2286	2026-01-30 01:11:38.026841-04	HT-301	TEMP_HYDRO	472.33	1	2026-01-31 18:11:38.370132-04
+2287	2026-01-30 01:11:38.026841-04	CDU-101	PRESS_TOWER	33.42	1	2026-01-31 18:11:38.371681-04
+2288	2026-01-30 01:11:38.026841-04	HT-301	H2_PRESS	27.9	1	2026-01-31 18:11:38.373554-04
+2289	2026-01-30 01:11:38.026841-04	CDU-101	FLOW_FEED	10353.01	1	2026-01-31 18:11:38.375185-04
+2290	2026-01-30 02:11:38.026841-04	FCC-201	CATALYST_ACT	123.1	1	2026-01-31 18:11:38.376579-04
+2291	2026-01-30 02:11:38.026841-04	FCC-201	TEMP_REACTOR	448.07	1	2026-01-31 18:11:38.377973-04
+2292	2026-01-30 02:11:38.026841-04	CDU-101	TEMP_TOWER	448.2	1	2026-01-31 18:11:38.379363-04
+2293	2026-01-30 02:11:38.026841-04	HT-301	TEMP_HYDRO	479.02	1	2026-01-31 18:11:38.380768-04
+2294	2026-01-30 02:11:38.026841-04	CDU-101	PRESS_TOWER	32.18	1	2026-01-31 18:11:38.382177-04
+2295	2026-01-30 02:11:38.026841-04	HT-301	H2_PRESS	40.56	1	2026-01-31 18:11:38.383614-04
+2296	2026-01-30 02:11:38.026841-04	CDU-101	FLOW_FEED	8952.75	1	2026-01-31 18:11:38.385008-04
+2297	2026-01-30 03:11:38.026841-04	FCC-201	CATALYST_ACT	81.45	1	2026-01-31 18:11:38.38641-04
+2298	2026-01-30 03:11:38.026841-04	FCC-201	TEMP_REACTOR	410.73	1	2026-01-31 18:11:38.388044-04
+2299	2026-01-30 03:11:38.026841-04	CDU-101	TEMP_TOWER	458.63	1	2026-01-31 18:11:38.389816-04
+2300	2026-01-30 03:11:38.026841-04	HT-301	TEMP_HYDRO	429.92	1	2026-01-31 18:11:38.391618-04
+2301	2026-01-30 03:11:38.026841-04	CDU-101	PRESS_TOWER	28.75	1	2026-01-31 18:11:38.394156-04
+2302	2026-01-30 03:11:38.026841-04	HT-301	H2_PRESS	29.61	1	2026-01-31 18:11:38.39558-04
+2303	2026-01-30 03:11:38.026841-04	CDU-101	FLOW_FEED	10353.53	1	2026-01-31 18:11:38.396968-04
+2304	2026-01-30 04:11:38.026841-04	FCC-201	CATALYST_ACT	91.44	1	2026-01-31 18:11:38.398463-04
+2305	2026-01-30 04:11:38.026841-04	FCC-201	TEMP_REACTOR	466.7	1	2026-01-31 18:11:38.399885-04
+2306	2026-01-30 04:11:38.026841-04	CDU-101	TEMP_TOWER	439.42	1	2026-01-31 18:11:38.401286-04
+2307	2026-01-30 04:11:38.026841-04	HT-301	TEMP_HYDRO	456.83	1	2026-01-31 18:11:38.402683-04
+2308	2026-01-30 04:11:38.026841-04	CDU-101	PRESS_TOWER	26.38	1	2026-01-31 18:11:38.40414-04
+2309	2026-01-30 04:11:38.026841-04	HT-301	H2_PRESS	31.28	1	2026-01-31 18:11:38.405535-04
+2310	2026-01-30 04:11:38.026841-04	CDU-101	FLOW_FEED	10109.49	1	2026-01-31 18:11:38.406923-04
+2311	2026-01-30 05:11:38.026841-04	FCC-201	CATALYST_ACT	99.52	1	2026-01-31 18:11:38.408299-04
+2312	2026-01-30 05:11:38.026841-04	FCC-201	TEMP_REACTOR	440.02	1	2026-01-31 18:11:38.409687-04
+2313	2026-01-30 05:11:38.026841-04	CDU-101	TEMP_TOWER	434.82	1	2026-01-31 18:11:38.411075-04
+2314	2026-01-30 05:11:38.026841-04	HT-301	TEMP_HYDRO	464.45	1	2026-01-31 18:11:38.412466-04
+2315	2026-01-30 05:11:38.026841-04	CDU-101	PRESS_TOWER	27.71	1	2026-01-31 18:11:38.413851-04
+2316	2026-01-30 05:11:38.026841-04	HT-301	H2_PRESS	29.77	1	2026-01-31 18:11:38.415418-04
+2317	2026-01-30 05:11:38.026841-04	CDU-101	FLOW_FEED	10052.99	1	2026-01-31 18:11:38.416845-04
+2318	2026-01-30 06:11:38.026841-04	FCC-201	CATALYST_ACT	78.26	1	2026-01-31 18:11:38.418244-04
+2319	2026-01-30 06:11:38.026841-04	FCC-201	TEMP_REACTOR	462.55	1	2026-01-31 18:11:38.433327-04
+2320	2026-01-30 06:11:38.026841-04	CDU-101	TEMP_TOWER	491.85	1	2026-01-31 18:11:38.434797-04
+2321	2026-01-30 06:11:38.026841-04	HT-301	TEMP_HYDRO	456.95	1	2026-01-31 18:11:38.43622-04
+2322	2026-01-30 06:11:38.026841-04	CDU-101	PRESS_TOWER	30.37	1	2026-01-31 18:11:38.437784-04
+2323	2026-01-30 06:11:38.026841-04	HT-301	H2_PRESS	30.34	1	2026-01-31 18:11:38.439215-04
+2324	2026-01-30 06:11:38.026841-04	CDU-101	FLOW_FEED	9879.61	1	2026-01-31 18:11:38.440641-04
+2325	2026-01-30 07:11:38.026841-04	FCC-201	CATALYST_ACT	78.41	1	2026-01-31 18:11:38.442013-04
+2326	2026-01-30 07:11:38.026841-04	FCC-201	TEMP_REACTOR	475.77	1	2026-01-31 18:11:38.443421-04
+2327	2026-01-30 07:11:38.026841-04	CDU-101	TEMP_TOWER	436.77	1	2026-01-31 18:11:38.445733-04
+2328	2026-01-30 07:11:38.026841-04	HT-301	TEMP_HYDRO	458.59	1	2026-01-31 18:11:38.447173-04
+2329	2026-01-30 07:11:38.026841-04	CDU-101	PRESS_TOWER	32.77	1	2026-01-31 18:11:38.448593-04
+2330	2026-01-30 07:11:38.026841-04	HT-301	H2_PRESS	30.73	1	2026-01-31 18:11:38.450742-04
+2331	2026-01-30 07:11:38.026841-04	CDU-101	FLOW_FEED	9812.48	1	2026-01-31 18:11:38.452188-04
+2332	2026-01-30 08:11:38.026841-04	FCC-201	CATALYST_ACT	53.85	1	2026-01-31 18:11:38.453629-04
+2333	2026-01-30 08:11:38.026841-04	FCC-201	TEMP_REACTOR	381.19	1	2026-01-31 18:11:38.455659-04
+2334	2026-01-30 08:11:38.026841-04	CDU-101	TEMP_TOWER	473.36	1	2026-01-31 18:11:38.45711-04
+2335	2026-01-30 08:11:38.026841-04	HT-301	TEMP_HYDRO	457.69	1	2026-01-31 18:11:38.460405-04
+2336	2026-01-30 08:11:38.026841-04	CDU-101	PRESS_TOWER	29.56	1	2026-01-31 18:11:38.462464-04
+2337	2026-01-30 08:11:38.026841-04	HT-301	H2_PRESS	30.86	1	2026-01-31 18:11:38.463932-04
+2338	2026-01-30 08:11:38.026841-04	CDU-101	FLOW_FEED	10812.8	1	2026-01-31 18:11:38.465374-04
+2339	2026-01-30 09:11:38.026841-04	FCC-201	CATALYST_ACT	81.29	1	2026-01-31 18:11:38.467554-04
+2340	2026-01-30 09:11:38.026841-04	FCC-201	TEMP_REACTOR	533.91	1	2026-01-31 18:11:38.46904-04
+2341	2026-01-30 09:11:38.026841-04	CDU-101	TEMP_TOWER	432.87	1	2026-01-31 18:11:38.470449-04
+2342	2026-01-30 09:11:38.026841-04	HT-301	TEMP_HYDRO	473.45	1	2026-01-31 18:11:38.471866-04
+2343	2026-01-30 09:11:38.026841-04	CDU-101	PRESS_TOWER	29.42	1	2026-01-31 18:11:38.47327-04
+2344	2026-01-30 09:11:38.026841-04	HT-301	H2_PRESS	25.79	1	2026-01-31 18:11:38.474672-04
+2345	2026-01-30 09:11:38.026841-04	CDU-101	FLOW_FEED	9497.96	1	2026-01-31 18:11:38.476079-04
+2346	2026-01-30 10:11:38.026841-04	FCC-201	CATALYST_ACT	79.47	1	2026-01-31 18:11:38.477506-04
+2347	2026-01-30 10:11:38.026841-04	FCC-201	TEMP_REACTOR	484.05	1	2026-01-31 18:11:38.478934-04
+2348	2026-01-30 10:11:38.026841-04	CDU-101	TEMP_TOWER	458.31	1	2026-01-31 18:11:38.480348-04
+2349	2026-01-30 10:11:38.026841-04	HT-301	TEMP_HYDRO	433.9	1	2026-01-31 18:11:38.481759-04
+2350	2026-01-30 10:11:38.026841-04	CDU-101	PRESS_TOWER	31.45	1	2026-01-31 18:11:38.483208-04
+2351	2026-01-30 10:11:38.026841-04	HT-301	H2_PRESS	28.72	1	2026-01-31 18:11:38.484647-04
+2352	2026-01-30 10:11:38.026841-04	CDU-101	FLOW_FEED	10285.32	1	2026-01-31 18:11:38.48607-04
+2353	2026-01-30 11:11:38.026841-04	FCC-201	CATALYST_ACT	93.86	1	2026-01-31 18:11:38.487477-04
+2354	2026-01-30 11:11:38.026841-04	FCC-201	TEMP_REACTOR	454.98	1	2026-01-31 18:11:38.489043-04
+2355	2026-01-30 11:11:38.026841-04	CDU-101	TEMP_TOWER	459.63	1	2026-01-31 18:11:38.490457-04
+2356	2026-01-30 11:11:38.026841-04	HT-301	TEMP_HYDRO	480.8	1	2026-01-31 18:11:38.491825-04
+2357	2026-01-30 11:11:38.026841-04	CDU-101	PRESS_TOWER	30.39	1	2026-01-31 18:11:38.493229-04
+2358	2026-01-30 11:11:38.026841-04	HT-301	H2_PRESS	31.54	1	2026-01-31 18:11:38.494642-04
+2359	2026-01-30 11:11:38.026841-04	CDU-101	FLOW_FEED	9803	1	2026-01-31 18:11:38.496058-04
+2360	2026-01-30 12:11:38.026841-04	FCC-201	CATALYST_ACT	96.15	1	2026-01-31 18:11:38.497475-04
+2361	2026-01-30 12:11:38.026841-04	FCC-201	TEMP_REACTOR	451.35	1	2026-01-31 18:11:38.498902-04
+2362	2026-01-30 12:11:38.026841-04	CDU-101	TEMP_TOWER	453.52	1	2026-01-31 18:11:38.500597-04
+2363	2026-01-30 12:11:38.026841-04	HT-301	TEMP_HYDRO	492.65	1	2026-01-31 18:11:38.502397-04
+2364	2026-01-30 12:11:38.026841-04	CDU-101	PRESS_TOWER	33.41	1	2026-01-31 18:11:38.504152-04
+2365	2026-01-30 12:11:38.026841-04	HT-301	H2_PRESS	31.47	1	2026-01-31 18:11:38.505957-04
+2366	2026-01-30 12:11:38.026841-04	CDU-101	FLOW_FEED	10045.58	1	2026-01-31 18:11:38.507721-04
+2367	2026-01-30 13:11:38.026841-04	FCC-201	CATALYST_ACT	70.49	1	2026-01-31 18:11:38.509459-04
+2368	2026-01-30 13:11:38.026841-04	FCC-201	TEMP_REACTOR	462.27	1	2026-01-31 18:11:38.51151-04
+2369	2026-01-30 13:11:38.026841-04	CDU-101	TEMP_TOWER	451.34	1	2026-01-31 18:11:38.513167-04
+2370	2026-01-30 13:11:38.026841-04	HT-301	TEMP_HYDRO	474.5	1	2026-01-31 18:11:38.514697-04
+2371	2026-01-30 13:11:38.026841-04	CDU-101	PRESS_TOWER	31.5	1	2026-01-31 18:11:38.516258-04
+2372	2026-01-30 13:11:38.026841-04	HT-301	H2_PRESS	30.37	1	2026-01-31 18:11:38.517782-04
+2373	2026-01-30 13:11:38.026841-04	CDU-101	FLOW_FEED	10081.28	1	2026-01-31 18:11:38.519314-04
+2374	2026-01-30 14:11:38.026841-04	FCC-201	CATALYST_ACT	69.63	1	2026-01-31 18:11:38.520828-04
+2375	2026-01-30 14:11:38.026841-04	FCC-201	TEMP_REACTOR	449.05	1	2026-01-31 18:11:38.522569-04
+2376	2026-01-30 14:11:38.026841-04	CDU-101	TEMP_TOWER	431.56	1	2026-01-31 18:11:38.524027-04
+2377	2026-01-30 14:11:38.026841-04	HT-301	TEMP_HYDRO	433.92	1	2026-01-31 18:11:38.525436-04
+2378	2026-01-30 14:11:38.026841-04	CDU-101	PRESS_TOWER	31.54	1	2026-01-31 18:11:38.526861-04
+2379	2026-01-30 14:11:38.026841-04	HT-301	H2_PRESS	33.04	1	2026-01-31 18:11:38.528286-04
+2380	2026-01-30 14:11:38.026841-04	CDU-101	FLOW_FEED	9872.05	1	2026-01-31 18:11:38.529707-04
+2381	2026-01-30 15:11:38.026841-04	FCC-201	CATALYST_ACT	54.02	1	2026-01-31 18:11:38.531231-04
+2382	2026-01-30 15:11:38.026841-04	FCC-201	TEMP_REACTOR	455.89	1	2026-01-31 18:11:38.532667-04
+2383	2026-01-30 15:11:38.026841-04	CDU-101	TEMP_TOWER	454.6	1	2026-01-31 18:11:38.534101-04
+2384	2026-01-30 15:11:38.026841-04	HT-301	TEMP_HYDRO	576.02	1	2026-01-31 18:11:38.535701-04
+2385	2026-01-30 15:11:38.026841-04	CDU-101	PRESS_TOWER	32.51	1	2026-01-31 18:11:38.537125-04
+2386	2026-01-30 15:11:38.026841-04	HT-301	H2_PRESS	27.84	1	2026-01-31 18:11:38.53854-04
+2387	2026-01-30 15:11:38.026841-04	CDU-101	FLOW_FEED	10401.97	1	2026-01-31 18:11:38.539964-04
+2388	2026-01-30 16:11:38.026841-04	FCC-201	CATALYST_ACT	60.75	1	2026-01-31 18:11:38.541377-04
+2389	2026-01-30 16:11:38.026841-04	FCC-201	TEMP_REACTOR	475.87	1	2026-01-31 18:11:38.542777-04
+2390	2026-01-30 16:11:38.026841-04	CDU-101	TEMP_TOWER	451.5	1	2026-01-31 18:11:38.544197-04
+2391	2026-01-30 16:11:38.026841-04	HT-301	TEMP_HYDRO	443.75	1	2026-01-31 18:11:38.545608-04
+2392	2026-01-30 16:11:38.026841-04	CDU-101	PRESS_TOWER	38.8	1	2026-01-31 18:11:38.547268-04
+2393	2026-01-30 16:11:38.026841-04	HT-301	H2_PRESS	33.93	1	2026-01-31 18:11:38.548716-04
+2394	2026-01-30 16:11:38.026841-04	CDU-101	FLOW_FEED	10320.89	1	2026-01-31 18:11:38.550146-04
+2395	2026-01-30 17:11:38.026841-04	FCC-201	CATALYST_ACT	58.48	1	2026-01-31 18:11:38.551563-04
+2396	2026-01-30 17:11:38.026841-04	FCC-201	TEMP_REACTOR	420.66	1	2026-01-31 18:11:38.55299-04
+2397	2026-01-30 17:11:38.026841-04	CDU-101	TEMP_TOWER	454.83	1	2026-01-31 18:11:38.554413-04
+2398	2026-01-30 17:11:38.026841-04	HT-301	TEMP_HYDRO	492.52	1	2026-01-31 18:11:38.555835-04
+2399	2026-01-30 17:11:38.026841-04	CDU-101	PRESS_TOWER	31.31	1	2026-01-31 18:11:38.565153-04
+2400	2026-01-30 17:11:38.026841-04	HT-301	H2_PRESS	29.4	1	2026-01-31 18:11:38.566629-04
+2401	2026-01-30 17:11:38.026841-04	CDU-101	FLOW_FEED	10305.2	1	2026-01-31 18:11:38.568061-04
+2402	2026-01-30 18:11:38.026841-04	FCC-201	CATALYST_ACT	80.42	1	2026-01-31 18:11:38.569535-04
+2403	2026-01-30 18:11:38.026841-04	FCC-201	TEMP_REACTOR	485.81	1	2026-01-31 18:11:38.571014-04
+2404	2026-01-30 18:11:38.026841-04	CDU-101	TEMP_TOWER	479.31	1	2026-01-31 18:11:38.572479-04
+2405	2026-01-30 18:11:38.026841-04	HT-301	TEMP_HYDRO	440.11	1	2026-01-31 18:11:38.57396-04
+2406	2026-01-30 18:11:38.026841-04	CDU-101	PRESS_TOWER	31.91	1	2026-01-31 18:11:38.575378-04
+2407	2026-01-30 18:11:38.026841-04	HT-301	H2_PRESS	33.05	1	2026-01-31 18:11:38.576839-04
+2408	2026-01-30 18:11:38.026841-04	CDU-101	FLOW_FEED	9415.79	1	2026-01-31 18:11:38.578708-04
+2409	2026-01-30 19:11:38.026841-04	FCC-201	CATALYST_ACT	65.32	1	2026-01-31 18:11:38.580489-04
+2410	2026-01-30 19:11:38.026841-04	FCC-201	TEMP_REACTOR	470.81	1	2026-01-31 18:11:38.582315-04
+2411	2026-01-30 19:11:38.026841-04	CDU-101	TEMP_TOWER	427.6	1	2026-01-31 18:11:38.584158-04
+2412	2026-01-30 19:11:38.026841-04	HT-301	TEMP_HYDRO	455.77	1	2026-01-31 18:11:38.585995-04
+2413	2026-01-30 19:11:38.026841-04	CDU-101	PRESS_TOWER	31.49	1	2026-01-31 18:11:38.587858-04
+2414	2026-01-30 19:11:38.026841-04	HT-301	H2_PRESS	28.28	1	2026-01-31 18:11:38.58966-04
+2415	2026-01-30 19:11:38.026841-04	CDU-101	FLOW_FEED	9969.71	1	2026-01-31 18:11:38.59142-04
+2570	2026-01-30 19:50:52.275966-04	FCC-201	CATALYST_ACT	49.862739611553444	1	2026-01-31 19:50:52.27735-04
+2571	2026-01-30 19:50:52.275966-04	FCC-201	TEMP_REACTOR	448.3103347586844	1	2026-01-31 19:50:52.923575-04
+2572	2026-01-30 19:50:52.275966-04	CDU-101	TEMP_TOWER	448.3121127227765	1	2026-01-31 19:50:52.97463-04
+2573	2026-01-30 19:50:52.275966-04	HT-301	TEMP_HYDRO	451.03978249821654	1	2026-01-31 19:50:52.977159-04
+2574	2026-01-30 19:50:52.275966-04	CDU-101	PRESS_TOWER	49.93253190220695	1	2026-01-31 19:50:52.997225-04
+2575	2026-01-30 19:50:52.275966-04	HT-301	H2_PRESS	50.127300379654	1	2026-01-31 19:50:53.009113-04
+2576	2026-01-30 19:50:52.275966-04	CDU-101	FLOW_FEED	10040.774369221168	1	2026-01-31 19:50:53.011479-04
+2577	2026-01-30 20:05:52.275966-04	FCC-201	CATALYST_ACT	50.20572416578622	1	2026-01-31 19:50:53.132588-04
+2578	2026-01-30 20:05:52.275966-04	FCC-201	TEMP_REACTOR	450.6664070238464	1	2026-01-31 19:50:53.134423-04
+2579	2026-01-30 20:05:52.275966-04	CDU-101	TEMP_TOWER	449.96313367419964	1	2026-01-31 19:50:53.152452-04
+2580	2026-01-30 20:05:52.275966-04	HT-301	TEMP_HYDRO	451.7061171369231	1	2026-01-31 19:50:53.171747-04
+2581	2026-01-30 20:05:52.275966-04	CDU-101	PRESS_TOWER	49.83629182744434	1	2026-01-31 19:50:53.173567-04
+2582	2026-01-30 20:05:52.275966-04	HT-301	H2_PRESS	50.09282747445848	1	2026-01-31 19:50:53.183298-04
+2583	2026-01-30 20:05:52.275966-04	CDU-101	FLOW_FEED	9951.999725042462	1	2026-01-31 19:50:53.197749-04
+2584	2026-01-30 20:20:52.275966-04	FCC-201	CATALYST_ACT	50.19793173091567	1	2026-01-31 19:50:53.253155-04
+2585	2026-01-30 20:20:52.275966-04	FCC-201	TEMP_REACTOR	449.26370118638704	1	2026-01-31 19:50:53.254991-04
+2586	2026-01-30 20:20:52.275966-04	CDU-101	TEMP_TOWER	448.6618397890917	1	2026-01-31 19:50:53.367655-04
+2587	2026-01-30 20:20:52.275966-04	HT-301	TEMP_HYDRO	451.898834300794	1	2026-01-31 19:50:53.38374-04
+2588	2026-01-30 20:20:52.275966-04	CDU-101	PRESS_TOWER	50.21549364190202	1	2026-01-31 19:50:53.385529-04
+2589	2026-01-30 20:20:52.275966-04	HT-301	H2_PRESS	50.04800737308519	1	2026-01-31 19:50:53.387331-04
+2590	2026-01-30 20:20:52.275966-04	CDU-101	FLOW_FEED	10003.580373040051	1	2026-01-31 19:50:53.389289-04
+2591	2026-01-30 20:35:52.275966-04	FCC-201	CATALYST_ACT	49.80727784459374	1	2026-01-31 19:50:53.396244-04
+2592	2026-01-30 20:35:52.275966-04	FCC-201	TEMP_REACTOR	450.04919474601326	1	2026-01-31 19:50:53.414215-04
+2593	2026-01-30 20:35:52.275966-04	CDU-101	TEMP_TOWER	451.88523215230276	1	2026-01-31 19:50:53.416093-04
+2594	2026-01-30 20:35:52.275966-04	HT-301	TEMP_HYDRO	450.2271738895698	1	2026-01-31 19:50:53.417943-04
+2595	2026-01-30 20:35:52.275966-04	CDU-101	PRESS_TOWER	50.14335692249594	1	2026-01-31 19:50:53.419767-04
+2596	2026-01-30 20:35:52.275966-04	HT-301	H2_PRESS	49.86130582444143	1	2026-01-31 19:50:53.4216-04
+2597	2026-01-30 20:35:52.275966-04	CDU-101	FLOW_FEED	10038.744216640336	1	2026-01-31 19:50:53.423429-04
+2598	2026-01-30 20:50:52.275966-04	FCC-201	CATALYST_ACT	50.20831958394798	1	2026-01-31 19:50:53.483545-04
+2599	2026-01-30 20:50:52.275966-04	FCC-201	TEMP_REACTOR	448.42188489464553	1	2026-01-31 19:50:53.497787-04
+2600	2026-01-30 20:50:52.275966-04	CDU-101	TEMP_TOWER	449.97336769038344	1	2026-01-31 19:50:53.535039-04
+2601	2026-01-30 20:50:52.275966-04	HT-301	TEMP_HYDRO	451.0829901835162	1	2026-01-31 19:50:53.548901-04
+2602	2026-01-30 20:50:52.275966-04	CDU-101	PRESS_TOWER	49.77815759045384	1	2026-01-31 19:50:53.550792-04
+2603	2026-01-30 20:50:52.275966-04	HT-301	H2_PRESS	50.20765461992054	1	2026-01-31 19:50:53.552555-04
+2604	2026-01-30 20:50:52.275966-04	CDU-101	FLOW_FEED	10040.033537445821	1	2026-01-31 19:50:53.554341-04
+2605	2026-01-30 21:05:52.275966-04	FCC-201	CATALYST_ACT	49.83459451432836	1	2026-01-31 19:50:53.666683-04
+2606	2026-01-30 21:05:52.275966-04	FCC-201	TEMP_REACTOR	448.2061630963256	1	2026-01-31 19:50:53.668516-04
+2607	2026-01-30 21:05:52.275966-04	CDU-101	TEMP_TOWER	450.44264245210593	1	2026-01-31 19:50:53.67035-04
+2608	2026-01-30 21:05:52.275966-04	HT-301	TEMP_HYDRO	448.58305036411986	1	2026-01-31 19:50:53.672202-04
+2609	2026-01-30 21:05:52.275966-04	CDU-101	PRESS_TOWER	49.89761518341304	1	2026-01-31 19:50:53.681764-04
+2610	2026-01-30 21:05:52.275966-04	HT-301	H2_PRESS	49.87560883885229	1	2026-01-31 19:50:53.683544-04
+2611	2026-01-30 21:05:52.275966-04	CDU-101	FLOW_FEED	10017.153055688128	1	2026-01-31 19:50:53.685318-04
+2612	2026-01-30 21:20:52.275966-04	FCC-201	CATALYST_ACT	49.990616101222294	1	2026-01-31 19:50:53.692358-04
+2613	2026-01-30 21:20:52.275966-04	FCC-201	TEMP_REACTOR	451.78669839101525	1	2026-01-31 19:50:53.694122-04
+2614	2026-01-30 21:20:52.275966-04	CDU-101	TEMP_TOWER	449.0601027031075	1	2026-01-31 19:50:53.695904-04
+2615	2026-01-30 21:20:52.275966-04	HT-301	TEMP_HYDRO	451.39775753499697	1	2026-01-31 19:50:53.698134-04
+2616	2026-01-30 21:20:52.275966-04	CDU-101	PRESS_TOWER	50.123609707526725	1	2026-01-31 19:50:53.699979-04
+2617	2026-01-30 21:20:52.275966-04	HT-301	H2_PRESS	50.23293920576559	1	2026-01-31 19:50:53.70144-04
+2618	2026-01-30 21:20:52.275966-04	CDU-101	FLOW_FEED	9961.022985649028	1	2026-01-31 19:50:53.713358-04
+2619	2026-01-30 21:35:52.275966-04	FCC-201	CATALYST_ACT	50.15161743646049	1	2026-01-31 19:50:53.720383-04
+2620	2026-01-30 21:35:52.275966-04	FCC-201	TEMP_REACTOR	448.2827114807097	1	2026-01-31 19:50:53.72191-04
+2621	2026-01-30 21:35:52.275966-04	CDU-101	TEMP_TOWER	450.6684320840204	1	2026-01-31 19:50:53.739507-04
+2622	2026-01-30 21:35:52.275966-04	HT-301	TEMP_HYDRO	451.96302112307245	1	2026-01-31 19:50:53.741218-04
+2623	2026-01-30 21:35:52.275966-04	CDU-101	PRESS_TOWER	50.04399473204616	1	2026-01-31 19:50:53.743157-04
+2624	2026-01-30 21:35:52.275966-04	HT-301	H2_PRESS	50.23896402941644	1	2026-01-31 19:50:53.745023-04
+2625	2026-01-30 21:35:52.275966-04	CDU-101	FLOW_FEED	10027.78105811304	1	2026-01-31 19:50:53.74683-04
+2626	2026-01-30 21:50:52.275966-04	FCC-201	CATALYST_ACT	49.981694358009534	1	2026-01-31 19:50:53.753937-04
+2627	2026-01-30 21:50:52.275966-04	FCC-201	TEMP_REACTOR	448.48469521266094	1	2026-01-31 19:50:53.75572-04
+2628	2026-01-30 21:50:52.275966-04	CDU-101	TEMP_TOWER	451.4275478369949	1	2026-01-31 19:50:53.757481-04
+2629	2026-01-30 21:50:52.275966-04	HT-301	TEMP_HYDRO	447.9915064035879	1	2026-01-31 19:50:53.759057-04
+2630	2026-01-30 21:50:52.275966-04	CDU-101	PRESS_TOWER	49.93707635395408	1	2026-01-31 19:50:53.774466-04
+2631	2026-01-30 21:50:52.275966-04	HT-301	H2_PRESS	50.142457204148016	1	2026-01-31 19:50:53.77606-04
+2632	2026-01-30 21:50:52.275966-04	CDU-101	FLOW_FEED	10029.62600550077	1	2026-01-31 19:50:53.777946-04
+2633	2026-01-30 22:05:52.275966-04	FCC-201	CATALYST_ACT	49.928375630828	1	2026-01-31 19:50:53.806356-04
+2634	2026-01-30 22:05:52.275966-04	FCC-201	TEMP_REACTOR	451.8973971938938	1	2026-01-31 19:50:53.808122-04
+2635	2026-01-30 22:05:52.275966-04	CDU-101	TEMP_TOWER	449.9028770902199	1	2026-01-31 19:50:53.809684-04
+2636	2026-01-30 22:05:52.275966-04	HT-301	TEMP_HYDRO	452.09858423425095	1	2026-01-31 19:50:53.811487-04
+2637	2026-01-30 22:05:52.275966-04	CDU-101	PRESS_TOWER	49.89344418545868	1	2026-01-31 19:50:53.813991-04
+2638	2026-01-30 22:05:52.275966-04	HT-301	H2_PRESS	50.243926227670634	1	2026-01-31 19:50:53.815552-04
+2639	2026-01-30 22:05:52.275966-04	CDU-101	FLOW_FEED	10030.185604013404	1	2026-01-31 19:50:53.817093-04
+2640	2026-01-30 22:20:52.275966-04	FCC-201	CATALYST_ACT	50.17228285285093	1	2026-01-31 19:50:53.840295-04
+2641	2026-01-30 22:20:52.275966-04	FCC-201	TEMP_REACTOR	452.0854615459993	1	2026-01-31 19:50:53.842078-04
+2642	2026-01-30 22:20:52.275966-04	CDU-101	TEMP_TOWER	451.97118956404177	1	2026-01-31 19:50:53.843821-04
+2643	2026-01-30 22:20:52.275966-04	HT-301	TEMP_HYDRO	449.3119511713603	1	2026-01-31 19:50:53.845728-04
+2644	2026-01-30 22:20:52.275966-04	CDU-101	PRESS_TOWER	49.844684087405355	1	2026-01-31 19:50:53.847909-04
+2645	2026-01-30 22:20:52.275966-04	HT-301	H2_PRESS	50.08492130198262	1	2026-01-31 19:50:53.849696-04
+2646	2026-01-30 22:20:52.275966-04	CDU-101	FLOW_FEED	10027.420797668934	1	2026-01-31 19:50:53.851488-04
+2647	2026-01-30 22:35:52.275966-04	FCC-201	CATALYST_ACT	50.094888105647485	1	2026-01-31 19:50:53.858496-04
+2648	2026-01-30 22:35:52.275966-04	FCC-201	TEMP_REACTOR	447.79256637672506	1	2026-01-31 19:50:53.860308-04
+2649	2026-01-30 22:35:52.275966-04	CDU-101	TEMP_TOWER	450.0818244437151	1	2026-01-31 19:50:53.882341-04
+2650	2026-01-30 22:35:52.275966-04	HT-301	TEMP_HYDRO	448.3682161225319	1	2026-01-31 19:50:53.884918-04
+2651	2026-01-30 22:35:52.275966-04	CDU-101	PRESS_TOWER	50.09279015379779	1	2026-01-31 19:50:53.886672-04
+2652	2026-01-30 22:35:52.275966-04	HT-301	H2_PRESS	49.90717129820101	1	2026-01-31 19:50:53.888421-04
+2653	2026-01-30 22:35:52.275966-04	CDU-101	FLOW_FEED	10022.816319680678	1	2026-01-31 19:50:53.890157-04
+2654	2026-01-30 22:50:52.275966-04	FCC-201	CATALYST_ACT	49.88913030929161	1	2026-01-31 19:50:53.906138-04
+2655	2026-01-30 22:50:52.275966-04	FCC-201	TEMP_REACTOR	451.91833894575245	1	2026-01-31 19:50:53.909647-04
+2656	2026-01-30 22:50:52.275966-04	CDU-101	TEMP_TOWER	451.6649491607353	1	2026-01-31 19:50:53.911594-04
+2657	2026-01-30 22:50:52.275966-04	HT-301	TEMP_HYDRO	448.84596472218215	1	2026-01-31 19:50:53.914132-04
+2658	2026-01-30 22:50:52.275966-04	CDU-101	PRESS_TOWER	50.23343409282831	1	2026-01-31 19:50:53.915946-04
+2659	2026-01-30 22:50:52.275966-04	HT-301	H2_PRESS	50.138489705292855	1	2026-01-31 19:50:53.917733-04
+2660	2026-01-30 22:50:52.275966-04	CDU-101	FLOW_FEED	9961.611159971446	1	2026-01-31 19:50:53.919505-04
+2661	2026-01-30 23:05:52.275966-04	FCC-201	CATALYST_ACT	49.96811639670529	1	2026-01-31 19:50:53.926868-04
+2662	2026-01-30 23:05:52.275966-04	FCC-201	TEMP_REACTOR	447.94316717923493	1	2026-01-31 19:50:53.928881-04
+2663	2026-01-30 23:05:52.275966-04	CDU-101	TEMP_TOWER	450.67822173557397	1	2026-01-31 19:50:53.931413-04
+2664	2026-01-30 23:05:52.275966-04	HT-301	TEMP_HYDRO	451.3465252762889	1	2026-01-31 19:50:53.933013-04
+2665	2026-01-30 23:05:52.275966-04	CDU-101	PRESS_TOWER	50.07071502424115	1	2026-01-31 19:50:53.948772-04
+2666	2026-01-30 23:05:52.275966-04	HT-301	H2_PRESS	49.77578622276762	1	2026-01-31 19:50:53.960434-04
+2667	2026-01-30 23:05:52.275966-04	CDU-101	FLOW_FEED	10047.471372368867	1	2026-01-31 19:50:53.962958-04
+2668	2026-01-30 23:20:52.275966-04	FCC-201	CATALYST_ACT	49.785776096226684	1	2026-01-31 19:50:53.98659-04
+2669	2026-01-30 23:20:52.275966-04	FCC-201	TEMP_REACTOR	450.51765668308667	1	2026-01-31 19:50:54.003726-04
+2670	2026-01-30 23:20:52.275966-04	CDU-101	TEMP_TOWER	448.06689067495967	1	2026-01-31 19:50:54.005455-04
+2671	2026-01-30 23:20:52.275966-04	HT-301	TEMP_HYDRO	451.78408381414573	1	2026-01-31 19:50:54.024126-04
+2672	2026-01-30 23:20:52.275966-04	CDU-101	PRESS_TOWER	50.098844518396234	1	2026-01-31 19:50:54.041956-04
+2673	2026-01-30 23:20:52.275966-04	HT-301	H2_PRESS	50.185481207976366	1	2026-01-31 19:50:54.043722-04
+2674	2026-01-30 23:20:52.275966-04	CDU-101	FLOW_FEED	10025.6556820147	1	2026-01-31 19:50:54.046077-04
+2675	2026-01-30 23:35:52.275966-04	FCC-201	CATALYST_ACT	50.058056203846114	1	2026-01-31 19:50:54.053617-04
+2676	2026-01-30 23:35:52.275966-04	FCC-201	TEMP_REACTOR	450.34182472355127	1	2026-01-31 19:50:54.055177-04
+2677	2026-01-30 23:35:52.275966-04	CDU-101	TEMP_TOWER	448.7620851493264	1	2026-01-31 19:50:54.056715-04
+2678	2026-01-30 23:35:52.275966-04	HT-301	TEMP_HYDRO	449.3225883370395	1	2026-01-31 19:50:54.058326-04
+2679	2026-01-30 23:35:52.275966-04	CDU-101	PRESS_TOWER	49.874781026337715	1	2026-01-31 19:50:54.059876-04
+2680	2026-01-30 23:35:52.275966-04	HT-301	H2_PRESS	49.75142159305318	1	2026-01-31 19:50:54.061915-04
+2681	2026-01-30 23:35:52.275966-04	CDU-101	FLOW_FEED	9964.038958027257	1	2026-01-31 19:50:54.064327-04
+2682	2026-01-30 23:50:52.275966-04	FCC-201	CATALYST_ACT	49.88370908861535	1	2026-01-31 19:50:54.084947-04
+2683	2026-01-30 23:50:52.275966-04	FCC-201	TEMP_REACTOR	447.9931786799207	1	2026-01-31 19:50:54.086631-04
+2684	2026-01-30 23:50:52.275966-04	CDU-101	TEMP_TOWER	450.6551172518898	1	2026-01-31 19:50:54.088327-04
+2685	2026-01-30 23:50:52.275966-04	HT-301	TEMP_HYDRO	448.2745801158982	1	2026-01-31 19:50:54.089933-04
+2686	2026-01-30 23:50:52.275966-04	CDU-101	PRESS_TOWER	49.841268092612104	1	2026-01-31 19:50:54.091556-04
+2687	2026-01-30 23:50:52.275966-04	HT-301	H2_PRESS	50.18957120426067	1	2026-01-31 19:50:54.093416-04
+2688	2026-01-30 23:50:52.275966-04	CDU-101	FLOW_FEED	9983.917629352358	1	2026-01-31 19:50:54.095175-04
+2689	2026-01-31 00:05:52.275966-04	FCC-201	CATALYST_ACT	49.80417156508101	1	2026-01-31 19:50:54.11989-04
+2690	2026-01-31 00:05:52.275966-04	FCC-201	TEMP_REACTOR	449.3181943322466	1	2026-01-31 19:50:54.121557-04
+2691	2026-01-31 00:05:52.275966-04	CDU-101	TEMP_TOWER	448.2966178311399	1	2026-01-31 19:50:54.12323-04
+2692	2026-01-31 00:05:52.275966-04	HT-301	TEMP_HYDRO	448.3805236378308	1	2026-01-31 19:50:54.124887-04
+2693	2026-01-31 00:05:52.275966-04	CDU-101	PRESS_TOWER	50.00853780080931	1	2026-01-31 19:50:54.126495-04
+2694	2026-01-31 00:05:52.275966-04	HT-301	H2_PRESS	50.14629945014272	1	2026-01-31 19:50:54.131292-04
+2695	2026-01-31 00:05:52.275966-04	CDU-101	FLOW_FEED	9982.356966674753	1	2026-01-31 19:50:54.133398-04
+2696	2026-01-31 00:20:52.275966-04	FCC-201	CATALYST_ACT	49.8139535676826	1	2026-01-31 19:50:54.140698-04
+2697	2026-01-31 00:20:52.275966-04	FCC-201	TEMP_REACTOR	448.47873375134975	1	2026-01-31 19:50:54.142552-04
+2698	2026-01-31 00:20:52.275966-04	CDU-101	TEMP_TOWER	451.06094915835024	1	2026-01-31 19:50:54.14448-04
+2699	2026-01-31 00:20:52.275966-04	HT-301	TEMP_HYDRO	451.3048371166833	1	2026-01-31 19:50:54.146533-04
+2700	2026-01-31 00:20:52.275966-04	CDU-101	PRESS_TOWER	50.14680690896125	1	2026-01-31 19:50:54.148429-04
+2701	2026-01-31 00:20:52.275966-04	HT-301	H2_PRESS	50.24013390677724	1	2026-01-31 19:50:54.1502-04
+2702	2026-01-31 00:20:52.275966-04	CDU-101	FLOW_FEED	9994.400086801841	1	2026-01-31 19:50:54.152153-04
+2703	2026-01-31 00:35:52.275966-04	FCC-201	CATALYST_ACT	50.01310705597507	1	2026-01-31 19:50:54.158963-04
+2704	2026-01-31 00:35:52.275966-04	FCC-201	TEMP_REACTOR	449.1796205778307	1	2026-01-31 19:50:54.172735-04
+2705	2026-01-31 00:35:52.275966-04	CDU-101	TEMP_TOWER	451.51897396142624	1	2026-01-31 19:50:54.17452-04
+2706	2026-01-31 00:35:52.275966-04	HT-301	TEMP_HYDRO	452.150467503632	1	2026-01-31 19:50:54.176267-04
+2707	2026-01-31 00:35:52.275966-04	CDU-101	PRESS_TOWER	49.97702737417563	1	2026-01-31 19:50:54.178188-04
+2708	2026-01-31 00:35:52.275966-04	HT-301	H2_PRESS	49.99060922593248	1	2026-01-31 19:50:54.180302-04
+2709	2026-01-31 00:35:52.275966-04	CDU-101	FLOW_FEED	10016.043029773964	1	2026-01-31 19:50:54.182479-04
+2710	2026-01-31 00:50:52.275966-04	FCC-201	CATALYST_ACT	49.82288603451866	1	2026-01-31 19:50:54.188793-04
+2711	2026-01-31 00:50:52.275966-04	FCC-201	TEMP_REACTOR	450.32317134181346	1	2026-01-31 19:50:54.190686-04
+2712	2026-01-31 00:50:52.275966-04	CDU-101	TEMP_TOWER	448.45330288708834	1	2026-01-31 19:50:54.192378-04
+2713	2026-01-31 00:50:52.275966-04	HT-301	TEMP_HYDRO	450.95883067040023	1	2026-01-31 19:50:54.1941-04
+2714	2026-01-31 00:50:52.275966-04	CDU-101	PRESS_TOWER	49.812432326932225	1	2026-01-31 19:50:54.195708-04
+2715	2026-01-31 00:50:52.275966-04	HT-301	H2_PRESS	49.77175695587473	1	2026-01-31 19:50:54.198064-04
+2716	2026-01-31 00:50:52.275966-04	CDU-101	FLOW_FEED	10007.93411993347	1	2026-01-31 19:50:54.199727-04
+2717	2026-01-31 01:05:52.275966-04	FCC-201	CATALYST_ACT	50.18219816449477	1	2026-01-31 19:50:54.206131-04
+2718	2026-01-31 01:05:52.275966-04	FCC-201	TEMP_REACTOR	449.3332840340342	1	2026-01-31 19:50:54.207776-04
+2719	2026-01-31 01:05:52.275966-04	CDU-101	TEMP_TOWER	451.24351252289495	1	2026-01-31 19:50:54.209497-04
+2720	2026-01-31 01:05:52.275966-04	HT-301	TEMP_HYDRO	450.01239703732927	1	2026-01-31 19:50:54.211731-04
+2721	2026-01-31 01:05:52.275966-04	CDU-101	PRESS_TOWER	50.19418939264578	1	2026-01-31 19:50:54.213841-04
+2722	2026-01-31 01:05:52.275966-04	HT-301	H2_PRESS	50.04280070261179	1	2026-01-31 19:50:54.215557-04
+2723	2026-01-31 01:05:52.275966-04	CDU-101	FLOW_FEED	9979.414799817014	1	2026-01-31 19:50:54.217193-04
+2724	2026-01-31 01:20:52.275966-04	FCC-201	CATALYST_ACT	50.027240958774634	1	2026-01-31 19:50:54.223527-04
+2725	2026-01-31 01:20:52.275966-04	FCC-201	TEMP_REACTOR	450.536392073212	1	2026-01-31 19:50:54.225149-04
+2726	2026-01-31 01:20:52.275966-04	CDU-101	TEMP_TOWER	451.7270537169856	1	2026-01-31 19:50:54.22732-04
+2727	2026-01-31 01:20:52.275966-04	HT-301	TEMP_HYDRO	450.1703363785904	1	2026-01-31 19:50:54.229645-04
+2728	2026-01-31 01:20:52.275966-04	CDU-101	PRESS_TOWER	50.06651394660224	1	2026-01-31 19:50:54.23167-04
+2729	2026-01-31 01:20:52.275966-04	HT-301	H2_PRESS	50.08474255124633	1	2026-01-31 19:50:54.23347-04
+2730	2026-01-31 01:20:52.275966-04	CDU-101	FLOW_FEED	10016.986017103985	1	2026-01-31 19:50:54.235277-04
+2731	2026-01-31 01:35:52.275966-04	FCC-201	CATALYST_ACT	50.105247078346	1	2026-01-31 19:50:54.241952-04
+2732	2026-01-31 01:35:52.275966-04	FCC-201	TEMP_REACTOR	449.2818275145197	1	2026-01-31 19:50:54.24362-04
+2733	2026-01-31 01:35:52.275966-04	CDU-101	TEMP_TOWER	448.41200732421976	1	2026-01-31 19:50:54.245482-04
+2734	2026-01-31 01:35:52.275966-04	HT-301	TEMP_HYDRO	451.7813687219746	1	2026-01-31 19:50:54.247484-04
+2735	2026-01-31 01:35:52.275966-04	CDU-101	PRESS_TOWER	50.206724336007994	1	2026-01-31 19:50:54.2494-04
+2736	2026-01-31 01:35:52.275966-04	HT-301	H2_PRESS	50.04219538704123	1	2026-01-31 19:50:54.25119-04
+2737	2026-01-31 01:35:52.275966-04	CDU-101	FLOW_FEED	9984.280963198276	1	2026-01-31 19:50:54.252881-04
+2738	2026-01-31 01:50:52.275966-04	FCC-201	CATALYST_ACT	49.79762927501112	1	2026-01-31 19:50:54.261162-04
+2739	2026-01-31 01:50:52.275966-04	FCC-201	TEMP_REACTOR	451.33023786932944	1	2026-01-31 19:50:54.263463-04
+2740	2026-01-31 01:50:52.275966-04	CDU-101	TEMP_TOWER	449.5855984684288	1	2026-01-31 19:50:54.265281-04
+2741	2026-01-31 01:50:52.275966-04	HT-301	TEMP_HYDRO	451.0115562573191	1	2026-01-31 19:50:54.267072-04
+2742	2026-01-31 01:50:52.275966-04	CDU-101	PRESS_TOWER	49.91194878244693	1	2026-01-31 19:50:54.281177-04
+2743	2026-01-31 01:50:52.275966-04	HT-301	H2_PRESS	49.75349900640724	1	2026-01-31 19:50:54.282833-04
+2744	2026-01-31 01:50:52.275966-04	CDU-101	FLOW_FEED	10023.718857395801	1	2026-01-31 19:50:54.284515-04
+2745	2026-01-31 02:05:52.275966-04	FCC-201	CATALYST_ACT	49.89907091742503	1	2026-01-31 19:50:54.291265-04
+2746	2026-01-31 02:05:52.275966-04	FCC-201	TEMP_REACTOR	451.2380239689041	1	2026-01-31 19:50:54.292952-04
+2747	2026-01-31 02:05:52.275966-04	CDU-101	TEMP_TOWER	450.69904032543246	1	2026-01-31 19:50:54.294703-04
+2748	2026-01-31 02:05:52.275966-04	HT-301	TEMP_HYDRO	451.3131485169073	1	2026-01-31 19:50:54.29635-04
+2749	2026-01-31 02:05:52.275966-04	CDU-101	PRESS_TOWER	49.92058871864625	1	2026-01-31 19:50:54.298451-04
+2750	2026-01-31 02:05:52.275966-04	HT-301	H2_PRESS	49.814999435886556	1	2026-01-31 19:50:54.300331-04
+2751	2026-01-31 02:05:52.275966-04	CDU-101	FLOW_FEED	10010.210283175036	1	2026-01-31 19:50:54.301962-04
+2752	2026-01-31 02:20:52.275966-04	FCC-201	CATALYST_ACT	49.89267265181577	1	2026-01-31 19:50:54.308417-04
+2753	2026-01-31 02:20:52.275966-04	FCC-201	TEMP_REACTOR	451.26339982934974	1	2026-01-31 19:50:54.310317-04
+2754	2026-01-31 02:20:52.275966-04	CDU-101	TEMP_TOWER	450.80241105627846	1	2026-01-31 19:50:54.31232-04
+2755	2026-01-31 02:20:52.275966-04	HT-301	TEMP_HYDRO	449.6279298163814	1	2026-01-31 19:50:54.314316-04
+2756	2026-01-31 02:20:52.275966-04	CDU-101	PRESS_TOWER	49.959386458250385	1	2026-01-31 19:50:54.316041-04
+2757	2026-01-31 02:20:52.275966-04	HT-301	H2_PRESS	50.08690021711839	1	2026-01-31 19:50:54.317833-04
+2758	2026-01-31 02:20:52.275966-04	CDU-101	FLOW_FEED	9986.507134400614	1	2026-01-31 19:50:54.319578-04
+2759	2026-01-31 02:35:52.275966-04	FCC-201	CATALYST_ACT	50.05310688331789	1	2026-01-31 19:50:54.327146-04
+2760	2026-01-31 02:35:52.275966-04	FCC-201	TEMP_REACTOR	448.78508306024133	1	2026-01-31 19:50:54.329027-04
+2761	2026-01-31 02:35:52.275966-04	CDU-101	TEMP_TOWER	449.0553934638737	1	2026-01-31 19:50:54.331764-04
+2762	2026-01-31 02:35:52.275966-04	HT-301	TEMP_HYDRO	451.4442931335653	1	2026-01-31 19:50:54.333438-04
+2763	2026-01-31 02:35:52.275966-04	CDU-101	PRESS_TOWER	49.99672074541452	1	2026-01-31 19:50:54.335137-04
+2764	2026-01-31 02:35:52.275966-04	HT-301	H2_PRESS	50.06421956655159	1	2026-01-31 19:50:54.336969-04
+2765	2026-01-31 02:35:52.275966-04	CDU-101	FLOW_FEED	9967.34374256241	1	2026-01-31 19:50:54.338602-04
+2766	2026-01-31 02:50:52.275966-04	FCC-201	CATALYST_ACT	49.83410159600184	1	2026-01-31 19:50:54.345646-04
+2767	2026-01-31 02:50:52.275966-04	FCC-201	TEMP_REACTOR	448.5656933524715	1	2026-01-31 19:50:54.347799-04
+2768	2026-01-31 02:50:52.275966-04	CDU-101	TEMP_TOWER	448.239273351674	1	2026-01-31 19:50:54.364877-04
+2769	2026-01-31 02:50:52.275966-04	HT-301	TEMP_HYDRO	450.25314866360236	1	2026-01-31 19:50:54.366667-04
+2770	2026-01-31 02:50:52.275966-04	CDU-101	PRESS_TOWER	50.15304004419681	1	2026-01-31 19:50:54.381212-04
+2771	2026-01-31 02:50:52.275966-04	HT-301	H2_PRESS	49.90804325589783	1	2026-01-31 19:50:54.38306-04
+2772	2026-01-31 02:50:52.275966-04	CDU-101	FLOW_FEED	10023.681457817665	1	2026-01-31 19:50:54.384886-04
+2773	2026-01-31 03:05:52.275966-04	FCC-201	CATALYST_ACT	50.245357951429796	1	2026-01-31 19:50:54.392267-04
+2774	2026-01-31 03:05:52.275966-04	FCC-201	TEMP_REACTOR	449.5164296481273	1	2026-01-31 19:50:54.394131-04
+2775	2026-01-31 03:05:52.275966-04	CDU-101	TEMP_TOWER	451.68675872537636	1	2026-01-31 19:50:54.395854-04
+2776	2026-01-31 03:05:52.275966-04	HT-301	TEMP_HYDRO	451.06826289897447	1	2026-01-31 19:50:54.397807-04
+2777	2026-01-31 03:05:52.275966-04	CDU-101	PRESS_TOWER	50.24041532846301	1	2026-01-31 19:50:54.399592-04
+2778	2026-01-31 03:05:52.275966-04	HT-301	H2_PRESS	50.10767195504533	1	2026-01-31 19:50:54.401346-04
+2779	2026-01-31 03:05:52.275966-04	CDU-101	FLOW_FEED	10043.427611111154	1	2026-01-31 19:50:54.403079-04
+2780	2026-01-31 03:20:52.275966-04	FCC-201	CATALYST_ACT	49.79494210809359	1	2026-01-31 19:50:54.421827-04
+2781	2026-01-31 03:20:52.275966-04	FCC-201	TEMP_REACTOR	451.2155150639774	1	2026-01-31 19:50:54.432234-04
+2782	2026-01-31 03:20:52.275966-04	CDU-101	TEMP_TOWER	449.5321086975391	1	2026-01-31 19:50:54.434156-04
+2783	2026-01-31 03:20:52.275966-04	HT-301	TEMP_HYDRO	450.0019561130885	1	2026-01-31 19:50:54.436015-04
+2784	2026-01-31 03:20:52.275966-04	CDU-101	PRESS_TOWER	49.93710148317553	1	2026-01-31 19:50:54.437766-04
+2785	2026-01-31 03:20:52.275966-04	HT-301	H2_PRESS	50.05249497225337	1	2026-01-31 19:50:54.439498-04
+2786	2026-01-31 03:20:52.275966-04	CDU-101	FLOW_FEED	9991.734577245583	1	2026-01-31 19:50:54.441298-04
+2787	2026-01-31 03:35:52.275966-04	FCC-201	CATALYST_ACT	49.9572778483243	1	2026-01-31 19:50:54.486866-04
+2788	2026-01-31 03:35:52.275966-04	FCC-201	TEMP_REACTOR	448.0003238528797	1	2026-01-31 19:50:54.488689-04
+2789	2026-01-31 03:35:52.275966-04	CDU-101	TEMP_TOWER	449.1118173041294	1	2026-01-31 19:50:54.490691-04
+2790	2026-01-31 03:35:52.275966-04	HT-301	TEMP_HYDRO	450.1812273564643	1	2026-01-31 19:50:54.492323-04
+2791	2026-01-31 03:35:52.275966-04	CDU-101	PRESS_TOWER	50.24507863633082	1	2026-01-31 19:50:54.493981-04
+2792	2026-01-31 03:35:52.275966-04	HT-301	H2_PRESS	50.179430827141545	1	2026-01-31 19:50:54.495694-04
+2793	2026-01-31 03:35:52.275966-04	CDU-101	FLOW_FEED	10030.086057640765	1	2026-01-31 19:50:54.498272-04
+2794	2026-01-31 03:50:52.275966-04	FCC-201	CATALYST_ACT	49.753854505348365	1	2026-01-31 19:50:54.505654-04
+2795	2026-01-31 03:50:52.275966-04	FCC-201	TEMP_REACTOR	448.71009557147534	1	2026-01-31 19:50:54.507489-04
+2796	2026-01-31 03:50:52.275966-04	CDU-101	TEMP_TOWER	451.0828783984138	1	2026-01-31 19:50:54.509276-04
+2797	2026-01-31 03:50:52.275966-04	HT-301	TEMP_HYDRO	451.9853837693887	1	2026-01-31 19:50:54.511675-04
+2798	2026-01-31 03:50:52.275966-04	CDU-101	PRESS_TOWER	50.07011078510173	1	2026-01-31 19:50:54.513909-04
+2799	2026-01-31 03:50:52.275966-04	HT-301	H2_PRESS	50.10909446152457	1	2026-01-31 19:50:54.515607-04
+2800	2026-01-31 03:50:52.275966-04	CDU-101	FLOW_FEED	10030.428291686992	1	2026-01-31 19:50:54.517338-04
+2801	2026-01-31 04:05:52.275966-04	FCC-201	CATALYST_ACT	50.236431360798406	1	2026-01-31 19:50:54.54279-04
+2802	2026-01-31 04:05:52.275966-04	FCC-201	TEMP_REACTOR	448.6676836297888	1	2026-01-31 19:50:54.54476-04
+2803	2026-01-31 04:05:52.275966-04	CDU-101	TEMP_TOWER	451.8632352026681	1	2026-01-31 19:50:54.546537-04
+2804	2026-01-31 04:05:52.275966-04	HT-301	TEMP_HYDRO	451.35688014777895	1	2026-01-31 19:50:54.548683-04
+2805	2026-01-31 04:05:52.275966-04	CDU-101	PRESS_TOWER	50.14949923843973	1	2026-01-31 19:50:54.550458-04
+2806	2026-01-31 04:05:52.275966-04	HT-301	H2_PRESS	49.78169885675888	1	2026-01-31 19:50:54.552314-04
+2807	2026-01-31 04:05:52.275966-04	CDU-101	FLOW_FEED	10010.254277265007	1	2026-01-31 19:50:54.55405-04
+2808	2026-01-31 04:20:52.275966-04	FCC-201	CATALYST_ACT	50.031694269955196	1	2026-01-31 19:50:54.572057-04
+2809	2026-01-31 04:20:52.275966-04	FCC-201	TEMP_REACTOR	449.9295496861997	1	2026-01-31 19:50:54.573718-04
+2810	2026-01-31 04:20:52.275966-04	CDU-101	TEMP_TOWER	448.80134551959645	1	2026-01-31 19:50:54.575459-04
+2811	2026-01-31 04:20:52.275966-04	HT-301	TEMP_HYDRO	451.9502554955824	1	2026-01-31 19:50:54.577944-04
+2812	2026-01-31 04:20:52.275966-04	CDU-101	PRESS_TOWER	49.78796699084073	1	2026-01-31 19:50:54.580295-04
+2813	2026-01-31 04:20:52.275966-04	HT-301	H2_PRESS	49.80667973369556	1	2026-01-31 19:50:54.582323-04
+2814	2026-01-31 04:20:52.275966-04	CDU-101	FLOW_FEED	9998.473951920689	1	2026-01-31 19:50:54.584102-04
+2815	2026-01-31 04:35:52.275966-04	FCC-201	CATALYST_ACT	49.85313126564249	1	2026-01-31 19:50:54.590805-04
+2816	2026-01-31 04:35:52.275966-04	FCC-201	TEMP_REACTOR	449.4169387069696	1	2026-01-31 19:50:54.607065-04
+2817	2026-01-31 04:35:52.275966-04	CDU-101	TEMP_TOWER	447.79111907264195	1	2026-01-31 19:50:54.608712-04
+2818	2026-01-31 04:35:52.275966-04	HT-301	TEMP_HYDRO	448.2044601123937	1	2026-01-31 19:50:54.610836-04
+2819	2026-01-31 04:35:52.275966-04	CDU-101	PRESS_TOWER	50.12374664031935	1	2026-01-31 19:50:54.612804-04
+2820	2026-01-31 04:35:52.275966-04	HT-301	H2_PRESS	50.11139492383636	1	2026-01-31 19:50:54.614743-04
+2821	2026-01-31 04:35:52.275966-04	CDU-101	FLOW_FEED	9999.647072667785	1	2026-01-31 19:50:54.616473-04
+2822	2026-01-31 04:50:52.275966-04	FCC-201	CATALYST_ACT	50.02299462226822	1	2026-01-31 19:50:54.623498-04
+2823	2026-01-31 04:50:52.275966-04	FCC-201	TEMP_REACTOR	450.6255282769741	1	2026-01-31 19:50:54.625282-04
+2824	2026-01-31 04:50:52.275966-04	CDU-101	TEMP_TOWER	449.1411371847204	1	2026-01-31 19:50:54.627356-04
+2825	2026-01-31 04:50:52.275966-04	HT-301	TEMP_HYDRO	451.1273770495332	1	2026-01-31 19:50:54.62915-04
+2826	2026-01-31 04:50:52.275966-04	CDU-101	PRESS_TOWER	49.965590837450065	1	2026-01-31 19:50:54.631792-04
+2827	2026-01-31 04:50:52.275966-04	HT-301	H2_PRESS	50.24733724322407	1	2026-01-31 19:50:54.633508-04
+2828	2026-01-31 04:50:52.275966-04	CDU-101	FLOW_FEED	10045.015003086615	1	2026-01-31 19:50:54.635245-04
+2829	2026-01-31 05:05:52.275966-04	FCC-201	CATALYST_ACT	50.23974038904064	1	2026-01-31 19:50:54.642127-04
+2830	2026-01-31 05:05:52.275966-04	FCC-201	TEMP_REACTOR	448.5095141664997	1	2026-01-31 19:50:54.643894-04
+2831	2026-01-31 05:05:52.275966-04	CDU-101	TEMP_TOWER	448.1964368929082	1	2026-01-31 19:50:54.645592-04
+2832	2026-01-31 05:05:52.275966-04	HT-301	TEMP_HYDRO	451.94048088195785	1	2026-01-31 19:50:54.648002-04
+2833	2026-01-31 05:05:52.275966-04	CDU-101	PRESS_TOWER	49.767422279380405	1	2026-01-31 19:50:54.649735-04
+2834	2026-01-31 05:05:52.275966-04	HT-301	H2_PRESS	50.10372668487071	1	2026-01-31 19:50:54.651527-04
+2835	2026-01-31 05:05:52.275966-04	CDU-101	FLOW_FEED	9952.736308781965	1	2026-01-31 19:50:54.653474-04
+2836	2026-01-31 05:20:52.275966-04	FCC-201	CATALYST_ACT	49.83165592557609	1	2026-01-31 19:50:54.660782-04
+2837	2026-01-31 05:20:52.275966-04	FCC-201	TEMP_REACTOR	451.8124946648116	1	2026-01-31 19:50:54.662732-04
+2838	2026-01-31 05:20:52.275966-04	CDU-101	TEMP_TOWER	449.4086579386201	1	2026-01-31 19:50:54.664683-04
+2839	2026-01-31 05:20:52.275966-04	HT-301	TEMP_HYDRO	449.2018134181812	1	2026-01-31 19:50:54.666448-04
+2840	2026-01-31 05:20:52.275966-04	CDU-101	PRESS_TOWER	50.04205729095157	1	2026-01-31 19:50:54.668219-04
+2841	2026-01-31 05:20:52.275966-04	HT-301	H2_PRESS	50.05374714687852	1	2026-01-31 19:50:54.669994-04
+2842	2026-01-31 05:20:52.275966-04	CDU-101	FLOW_FEED	9964.741016043725	1	2026-01-31 19:50:54.671888-04
+2843	2026-01-31 05:35:52.275966-04	FCC-201	CATALYST_ACT	50.0890619698423	1	2026-01-31 19:50:54.679235-04
+2844	2026-01-31 05:35:52.275966-04	FCC-201	TEMP_REACTOR	448.60247105147124	1	2026-01-31 19:50:54.696006-04
+2845	2026-01-31 05:35:52.275966-04	CDU-101	TEMP_TOWER	450.9983549168182	1	2026-01-31 19:50:54.698133-04
+2846	2026-01-31 05:35:52.275966-04	HT-301	TEMP_HYDRO	451.0298983844068	1	2026-01-31 19:50:54.700141-04
+2847	2026-01-31 05:35:52.275966-04	CDU-101	PRESS_TOWER	49.964722835628365	1	2026-01-31 19:50:54.702007-04
+2848	2026-01-31 05:35:52.275966-04	HT-301	H2_PRESS	50.062920836793126	1	2026-01-31 19:50:54.703791-04
+2849	2026-01-31 05:35:52.275966-04	CDU-101	FLOW_FEED	9967.354994962925	1	2026-01-31 19:50:54.705511-04
+2850	2026-01-31 05:50:52.275966-04	FCC-201	CATALYST_ACT	49.92543011987552	1	2026-01-31 19:50:54.713171-04
+2851	2026-01-31 05:50:52.275966-04	FCC-201	TEMP_REACTOR	451.0249139534779	1	2026-01-31 19:50:54.715225-04
+2852	2026-01-31 05:50:52.275966-04	CDU-101	TEMP_TOWER	448.3453078496856	1	2026-01-31 19:50:54.717047-04
+2853	2026-01-31 05:50:52.275966-04	HT-301	TEMP_HYDRO	450.0617572955873	1	2026-01-31 19:50:54.725507-04
+2854	2026-01-31 05:50:52.275966-04	CDU-101	PRESS_TOWER	49.78077291314627	1	2026-01-31 19:50:54.727482-04
+2855	2026-01-31 05:50:52.275966-04	HT-301	H2_PRESS	49.7770820582314	1	2026-01-31 19:50:54.729869-04
+2856	2026-01-31 05:50:52.275966-04	CDU-101	FLOW_FEED	9979.223089458097	1	2026-01-31 19:50:54.73218-04
+2857	2026-01-31 06:05:52.275966-04	FCC-201	CATALYST_ACT	49.75382163129402	1	2026-01-31 19:50:54.739355-04
+2858	2026-01-31 06:05:52.275966-04	FCC-201	TEMP_REACTOR	448.8400279068491	1	2026-01-31 19:50:54.741167-04
+2859	2026-01-31 06:05:52.275966-04	CDU-101	TEMP_TOWER	452.21830665471924	1	2026-01-31 19:50:54.743028-04
+2860	2026-01-31 06:05:52.275966-04	HT-301	TEMP_HYDRO	447.80142320897795	1	2026-01-31 19:50:54.749256-04
+2861	2026-01-31 06:05:52.275966-04	CDU-101	PRESS_TOWER	49.963552388042764	1	2026-01-31 19:50:54.750964-04
+2862	2026-01-31 06:05:52.275966-04	HT-301	H2_PRESS	49.87028770171328	1	2026-01-31 19:50:54.752596-04
+2863	2026-01-31 06:05:52.275966-04	CDU-101	FLOW_FEED	10002.90303934656	1	2026-01-31 19:50:54.754431-04
+2864	2026-01-31 06:20:52.275966-04	FCC-201	CATALYST_ACT	50.16565789682447	1	2026-01-31 19:50:54.761904-04
+2865	2026-01-31 06:20:52.275966-04	FCC-201	TEMP_REACTOR	449.4373645004357	1	2026-01-31 19:50:54.764164-04
+2866	2026-01-31 06:20:52.275966-04	CDU-101	TEMP_TOWER	449.7174917427424	1	2026-01-31 19:50:54.765917-04
+2867	2026-01-31 06:20:52.275966-04	HT-301	TEMP_HYDRO	450.10222904445817	1	2026-01-31 19:50:54.767701-04
+2868	2026-01-31 06:20:52.275966-04	CDU-101	PRESS_TOWER	50.004597821965405	1	2026-01-31 19:50:54.769475-04
+2869	2026-01-31 06:20:52.275966-04	HT-301	H2_PRESS	49.95822557996761	1	2026-01-31 19:50:54.771226-04
+2870	2026-01-31 06:20:52.275966-04	CDU-101	FLOW_FEED	10040.4935459984	1	2026-01-31 19:50:54.773227-04
+2871	2026-01-31 06:35:52.275966-04	FCC-201	CATALYST_ACT	50.00875122613384	1	2026-01-31 19:50:54.781371-04
+2872	2026-01-31 06:35:52.275966-04	FCC-201	TEMP_REACTOR	448.93354980620023	1	2026-01-31 19:50:54.7832-04
+2873	2026-01-31 06:35:52.275966-04	CDU-101	TEMP_TOWER	451.6101588429228	1	2026-01-31 19:50:54.785041-04
+2874	2026-01-31 06:35:52.275966-04	HT-301	TEMP_HYDRO	451.76564610767684	1	2026-01-31 19:50:54.786797-04
+2875	2026-01-31 06:35:52.275966-04	CDU-101	PRESS_TOWER	49.843636587350716	1	2026-01-31 19:50:54.788528-04
+2876	2026-01-31 06:35:52.275966-04	HT-301	H2_PRESS	49.98128326113525	1	2026-01-31 19:50:54.790329-04
+2877	2026-01-31 06:35:52.275966-04	CDU-101	FLOW_FEED	9982.398208973782	1	2026-01-31 19:50:54.792117-04
+2878	2026-01-31 06:50:52.275966-04	FCC-201	CATALYST_ACT	49.76999208987394	1	2026-01-31 19:50:54.799597-04
+2879	2026-01-31 06:50:52.275966-04	FCC-201	TEMP_REACTOR	451.6445826515492	1	2026-01-31 19:50:54.801426-04
+2880	2026-01-31 06:50:52.275966-04	CDU-101	TEMP_TOWER	451.04927485201705	1	2026-01-31 19:50:54.8174-04
+2881	2026-01-31 06:50:52.275966-04	HT-301	TEMP_HYDRO	452.21969530798816	1	2026-01-31 19:50:54.819314-04
+2882	2026-01-31 06:50:52.275966-04	CDU-101	PRESS_TOWER	50.16003240887363	1	2026-01-31 19:50:54.821106-04
+2883	2026-01-31 06:50:52.275966-04	HT-301	H2_PRESS	49.85645829548183	1	2026-01-31 19:50:54.822913-04
+2884	2026-01-31 06:50:52.275966-04	CDU-101	FLOW_FEED	9968.30983627019	1	2026-01-31 19:50:54.824622-04
+2885	2026-01-31 07:05:52.275966-04	FCC-201	CATALYST_ACT	49.86083209573102	1	2026-01-31 19:50:54.832654-04
+2886	2026-01-31 07:05:52.275966-04	FCC-201	TEMP_REACTOR	451.6505012635757	1	2026-01-31 19:50:54.834831-04
+2887	2026-01-31 07:05:52.275966-04	CDU-101	TEMP_TOWER	452.0360054681984	1	2026-01-31 19:50:54.836549-04
+2888	2026-01-31 07:05:52.275966-04	HT-301	TEMP_HYDRO	449.92741897970427	1	2026-01-31 19:50:54.838332-04
+2889	2026-01-31 07:05:52.275966-04	CDU-101	PRESS_TOWER	50.03714233864238	1	2026-01-31 19:50:54.84011-04
+2890	2026-01-31 07:05:52.275966-04	HT-301	H2_PRESS	50.09778928448293	1	2026-01-31 19:50:54.84188-04
+2891	2026-01-31 07:05:52.275966-04	CDU-101	FLOW_FEED	10014.448066455776	1	2026-01-31 19:50:54.84369-04
+2892	2026-01-31 07:20:52.275966-04	FCC-201	CATALYST_ACT	49.91201077763755	1	2026-01-31 19:50:54.852059-04
+2893	2026-01-31 07:20:52.275966-04	FCC-201	TEMP_REACTOR	450.72950571789244	1	2026-01-31 19:50:54.856439-04
+2894	2026-01-31 07:20:52.275966-04	CDU-101	TEMP_TOWER	448.74190607994	1	2026-01-31 19:50:54.858349-04
+2895	2026-01-31 07:20:52.275966-04	HT-301	TEMP_HYDRO	451.4556807699184	1	2026-01-31 19:50:54.884696-04
+2896	2026-01-31 07:20:52.275966-04	CDU-101	PRESS_TOWER	49.83688021263736	1	2026-01-31 19:50:54.886398-04
+2897	2026-01-31 07:20:52.275966-04	HT-301	H2_PRESS	50.17629098760008	1	2026-01-31 19:50:54.888215-04
+2898	2026-01-31 07:20:52.275966-04	CDU-101	FLOW_FEED	9994.6081887971	1	2026-01-31 19:50:54.889986-04
+2899	2026-01-31 07:35:52.275966-04	FCC-201	CATALYST_ACT	49.974409906585734	1	2026-01-31 19:50:54.896693-04
+2900	2026-01-31 07:35:52.275966-04	FCC-201	TEMP_REACTOR	449.64348800219983	1	2026-01-31 19:50:54.899025-04
+2901	2026-01-31 07:35:52.275966-04	CDU-101	TEMP_TOWER	449.9486377821716	1	2026-01-31 19:50:54.900761-04
+2902	2026-01-31 07:35:52.275966-04	HT-301	TEMP_HYDRO	448.3760391453826	1	2026-01-31 19:50:54.902524-04
+2903	2026-01-31 07:35:52.275966-04	CDU-101	PRESS_TOWER	50.027124857526296	1	2026-01-31 19:50:54.904476-04
+2904	2026-01-31 07:35:52.275966-04	HT-301	H2_PRESS	49.93268698408377	1	2026-01-31 19:50:54.906724-04
+2905	2026-01-31 07:35:52.275966-04	CDU-101	FLOW_FEED	9973.432098524352	1	2026-01-31 19:50:54.908445-04
+2906	2026-01-31 07:50:52.275966-04	FCC-201	CATALYST_ACT	49.85909196977316	1	2026-01-31 19:50:54.917023-04
+2907	2026-01-31 07:50:52.275966-04	FCC-201	TEMP_REACTOR	451.7625702271978	1	2026-01-31 19:50:54.918764-04
+2908	2026-01-31 07:50:52.275966-04	CDU-101	TEMP_TOWER	451.5331135407653	1	2026-01-31 19:50:54.920758-04
+2909	2026-01-31 07:50:52.275966-04	HT-301	TEMP_HYDRO	448.3462127691551	1	2026-01-31 19:50:54.922717-04
+2910	2026-01-31 07:50:52.275966-04	CDU-101	PRESS_TOWER	50.229081770346816	1	2026-01-31 19:50:54.924468-04
+2911	2026-01-31 07:50:52.275966-04	HT-301	H2_PRESS	49.90616859268844	1	2026-01-31 19:50:54.926557-04
+2912	2026-01-31 07:50:52.275966-04	CDU-101	FLOW_FEED	9966.286529980294	1	2026-01-31 19:50:54.928299-04
+2913	2026-01-31 08:05:52.275966-04	FCC-201	CATALYST_ACT	50.18921093304451	1	2026-01-31 19:50:54.946623-04
+2914	2026-01-31 08:05:52.275966-04	FCC-201	TEMP_REACTOR	450.14996085799555	1	2026-01-31 19:50:54.950771-04
+2915	2026-01-31 08:05:52.275966-04	CDU-101	TEMP_TOWER	450.05637628734365	1	2026-01-31 19:50:54.953282-04
+2916	2026-01-31 08:05:52.275966-04	HT-301	TEMP_HYDRO	450.33585900799653	1	2026-01-31 19:50:54.966418-04
+2917	2026-01-31 08:05:52.275966-04	CDU-101	PRESS_TOWER	50.06830032177923	1	2026-01-31 19:50:54.96811-04
+2918	2026-01-31 08:05:52.275966-04	HT-301	H2_PRESS	50.156970133801174	1	2026-01-31 19:50:54.969888-04
+2919	2026-01-31 08:05:52.275966-04	CDU-101	FLOW_FEED	10033.111894285119	1	2026-01-31 19:50:54.971656-04
+2920	2026-01-31 08:20:52.275966-04	FCC-201	CATALYST_ACT	49.84698315484265	1	2026-01-31 19:50:55.001746-04
+2921	2026-01-31 08:20:52.275966-04	FCC-201	TEMP_REACTOR	448.34776102260406	1	2026-01-31 19:50:55.003674-04
+2922	2026-01-31 08:20:52.275966-04	CDU-101	TEMP_TOWER	448.6474550385715	1	2026-01-31 19:50:55.005537-04
+2923	2026-01-31 08:20:52.275966-04	HT-301	TEMP_HYDRO	448.9120326099958	1	2026-01-31 19:50:55.00739-04
+2924	2026-01-31 08:20:52.275966-04	CDU-101	PRESS_TOWER	49.919225761729166	1	2026-01-31 19:50:55.010538-04
+2925	2026-01-31 08:20:52.275966-04	HT-301	H2_PRESS	50.03186255475006	1	2026-01-31 19:50:55.012238-04
+2926	2026-01-31 08:20:52.275966-04	CDU-101	FLOW_FEED	10024.378659087815	1	2026-01-31 19:50:55.014215-04
+2927	2026-01-31 08:35:52.275966-04	FCC-201	CATALYST_ACT	50.02085495405861	1	2026-01-31 19:50:55.037285-04
+2928	2026-01-31 08:35:52.275966-04	FCC-201	TEMP_REACTOR	451.7298842821249	1	2026-01-31 19:50:55.039039-04
+2929	2026-01-31 08:35:52.275966-04	CDU-101	TEMP_TOWER	448.06033094676314	1	2026-01-31 19:50:55.040809-04
+2930	2026-01-31 08:35:52.275966-04	HT-301	TEMP_HYDRO	450.6859176570945	1	2026-01-31 19:50:55.042591-04
+2931	2026-01-31 08:35:52.275966-04	CDU-101	PRESS_TOWER	49.865759639150845	1	2026-01-31 19:50:55.044328-04
+2932	2026-01-31 08:35:52.275966-04	HT-301	H2_PRESS	49.978731984661486	1	2026-01-31 19:50:55.046138-04
+2933	2026-01-31 08:35:52.275966-04	CDU-101	FLOW_FEED	10047.157426769789	1	2026-01-31 19:50:55.048139-04
+2934	2026-01-31 08:50:52.275966-04	FCC-201	CATALYST_ACT	49.78116600010336	1	2026-01-31 19:50:55.05497-04
+2935	2026-01-31 08:50:52.275966-04	FCC-201	TEMP_REACTOR	450.07690458096494	1	2026-01-31 19:50:55.056773-04
+2936	2026-01-31 08:50:52.275966-04	CDU-101	TEMP_TOWER	450.2707276472974	1	2026-01-31 19:50:55.059354-04
+2937	2026-01-31 08:50:52.275966-04	HT-301	TEMP_HYDRO	450.8660617290288	1	2026-01-31 19:50:55.072633-04
+2938	2026-01-31 08:50:52.275966-04	CDU-101	PRESS_TOWER	50.16677881408555	1	2026-01-31 19:50:55.081057-04
+2939	2026-01-31 08:50:52.275966-04	HT-301	H2_PRESS	50.20329735523876	1	2026-01-31 19:50:55.091427-04
+2940	2026-01-31 08:50:52.275966-04	CDU-101	FLOW_FEED	10041.19873000534	1	2026-01-31 19:50:55.098707-04
+2941	2026-01-31 09:05:52.275966-04	FCC-201	CATALYST_ACT	50.136903949633805	1	2026-01-31 19:50:55.105463-04
+2942	2026-01-31 09:05:52.275966-04	FCC-201	TEMP_REACTOR	449.0800820346005	1	2026-01-31 19:50:55.10743-04
+2943	2026-01-31 09:05:52.275966-04	CDU-101	TEMP_TOWER	449.2239116238905	1	2026-01-31 19:50:55.109574-04
+2944	2026-01-31 09:05:52.275966-04	HT-301	TEMP_HYDRO	449.06260440282597	1	2026-01-31 19:50:55.111595-04
+2945	2026-01-31 09:05:52.275966-04	CDU-101	PRESS_TOWER	49.793010421941155	1	2026-01-31 19:50:55.113681-04
+2946	2026-01-31 09:05:52.275966-04	HT-301	H2_PRESS	49.75578399328662	1	2026-01-31 19:50:55.115455-04
+2947	2026-01-31 09:05:52.275966-04	CDU-101	FLOW_FEED	9964.312649608668	1	2026-01-31 19:50:55.117177-04
+2948	2026-01-31 09:20:52.275966-04	FCC-201	CATALYST_ACT	50.15907737883899	1	2026-01-31 19:50:55.125513-04
+2949	2026-01-31 09:20:52.275966-04	FCC-201	TEMP_REACTOR	448.0849878428084	1	2026-01-31 19:50:55.127392-04
+2950	2026-01-31 09:20:52.275966-04	CDU-101	TEMP_TOWER	449.87793523922534	1	2026-01-31 19:50:55.129649-04
+2951	2026-01-31 09:20:52.275966-04	HT-301	TEMP_HYDRO	448.5529510885992	1	2026-01-31 19:50:55.131886-04
+2952	2026-01-31 09:20:52.275966-04	CDU-101	PRESS_TOWER	49.86443037451511	1	2026-01-31 19:50:55.133612-04
+2953	2026-01-31 09:20:52.275966-04	HT-301	H2_PRESS	49.80524550666654	1	2026-01-31 19:50:55.135454-04
+2954	2026-01-31 09:20:52.275966-04	CDU-101	FLOW_FEED	9966.48861532547	1	2026-01-31 19:50:55.137242-04
+2955	2026-01-31 09:35:52.275966-04	FCC-201	CATALYST_ACT	50.218965054425304	1	2026-01-31 19:50:55.143966-04
+2956	2026-01-31 09:35:52.275966-04	FCC-201	TEMP_REACTOR	449.6974630776402	1	2026-01-31 19:50:55.145511-04
+2957	2026-01-31 09:35:52.275966-04	CDU-101	TEMP_TOWER	451.1571259092756	1	2026-01-31 19:50:55.147649-04
+2958	2026-01-31 09:35:52.275966-04	HT-301	TEMP_HYDRO	449.704487045438	1	2026-01-31 19:50:55.149395-04
+2959	2026-01-31 09:35:52.275966-04	CDU-101	PRESS_TOWER	49.7747367891354	1	2026-01-31 19:50:55.151141-04
+2960	2026-01-31 09:35:52.275966-04	HT-301	H2_PRESS	50.208897243834514	1	2026-01-31 19:50:55.152949-04
+2961	2026-01-31 09:35:52.275966-04	CDU-101	FLOW_FEED	9982.29732429027	1	2026-01-31 19:50:55.154702-04
+2962	2026-01-31 09:50:52.275966-04	FCC-201	CATALYST_ACT	49.88336928154841	1	2026-01-31 19:50:55.199866-04
+2963	2026-01-31 09:50:52.275966-04	FCC-201	TEMP_REACTOR	448.6871358756229	1	2026-01-31 19:50:55.201632-04
+2964	2026-01-31 09:50:52.275966-04	CDU-101	TEMP_TOWER	451.9257727543964	1	2026-01-31 19:50:55.203387-04
+2965	2026-01-31 09:50:52.275966-04	HT-301	TEMP_HYDRO	451.091917116368	1	2026-01-31 19:50:55.205135-04
+2966	2026-01-31 09:50:52.275966-04	CDU-101	PRESS_TOWER	49.97645640062758	1	2026-01-31 19:50:55.206928-04
+2967	2026-01-31 09:50:52.275966-04	HT-301	H2_PRESS	50.216281986254806	1	2026-01-31 19:50:55.208921-04
+2968	2026-01-31 09:50:52.275966-04	CDU-101	FLOW_FEED	10035.290196483302	1	2026-01-31 19:50:55.211181-04
+2969	2026-01-31 10:05:52.275966-04	FCC-201	CATALYST_ACT	50.13037889789016	1	2026-01-31 19:50:55.226723-04
+2970	2026-01-31 10:05:52.275966-04	FCC-201	TEMP_REACTOR	450.74284926229234	1	2026-01-31 19:50:55.228471-04
+2971	2026-01-31 10:05:52.275966-04	CDU-101	TEMP_TOWER	450.2198513278283	1	2026-01-31 19:50:55.231987-04
+2972	2026-01-31 10:05:52.275966-04	HT-301	TEMP_HYDRO	448.39009133208526	1	2026-01-31 19:50:55.233803-04
+2973	2026-01-31 10:05:52.275966-04	CDU-101	PRESS_TOWER	50.23264566978406	1	2026-01-31 19:50:55.235637-04
+2974	2026-01-31 10:05:52.275966-04	HT-301	H2_PRESS	49.84474535826084	1	2026-01-31 19:50:55.237441-04
+2975	2026-01-31 10:05:52.275966-04	CDU-101	FLOW_FEED	10004.58545217875	1	2026-01-31 19:50:55.258997-04
+2976	2026-01-31 10:20:52.275966-04	FCC-201	CATALYST_ACT	50.04842492442839	1	2026-01-31 19:50:55.266867-04
+2977	2026-01-31 10:20:52.275966-04	FCC-201	TEMP_REACTOR	448.0280559612581	1	2026-01-31 19:50:55.268721-04
+2978	2026-01-31 10:20:52.275966-04	CDU-101	TEMP_TOWER	449.0808755400875	1	2026-01-31 19:50:55.270493-04
+2979	2026-01-31 10:20:52.275966-04	HT-301	TEMP_HYDRO	447.9821784360739	1	2026-01-31 19:50:55.35539-04
+2980	2026-01-31 10:20:52.275966-04	CDU-101	PRESS_TOWER	49.790268826592296	1	2026-01-31 19:50:55.357136-04
+2981	2026-01-31 10:20:52.275966-04	HT-301	H2_PRESS	50.077195960860074	1	2026-01-31 19:50:55.369394-04
+2982	2026-01-31 10:20:52.275966-04	CDU-101	FLOW_FEED	10025.203320949691	1	2026-01-31 19:50:55.376062-04
+2983	2026-01-31 10:35:52.275966-04	FCC-201	CATALYST_ACT	50.08537097199635	1	2026-01-31 19:50:55.395114-04
+2984	2026-01-31 10:35:52.275966-04	FCC-201	TEMP_REACTOR	450.13208186588383	1	2026-01-31 19:50:55.397776-04
+2985	2026-01-31 10:35:52.275966-04	CDU-101	TEMP_TOWER	448.5569577069491	1	2026-01-31 19:50:55.399985-04
+2986	2026-01-31 10:35:52.275966-04	HT-301	TEMP_HYDRO	447.85763961636883	1	2026-01-31 19:50:55.401763-04
+2987	2026-01-31 10:35:52.275966-04	CDU-101	PRESS_TOWER	49.90146012003328	1	2026-01-31 19:50:55.403524-04
+2988	2026-01-31 10:35:52.275966-04	HT-301	H2_PRESS	49.99993373131943	1	2026-01-31 19:50:55.405353-04
+2989	2026-01-31 10:35:52.275966-04	CDU-101	FLOW_FEED	9973.657938374154	1	2026-01-31 19:50:55.407123-04
+2990	2026-01-31 10:50:52.275966-04	FCC-201	CATALYST_ACT	50.22340360520392	1	2026-01-31 19:50:55.415601-04
+2991	2026-01-31 10:50:52.275966-04	FCC-201	TEMP_REACTOR	451.33105500058184	1	2026-01-31 19:50:55.417374-04
+2992	2026-01-31 10:50:52.275966-04	CDU-101	TEMP_TOWER	450.0601798478285	1	2026-01-31 19:50:55.434812-04
+2993	2026-01-31 10:50:52.275966-04	HT-301	TEMP_HYDRO	448.5347530404597	1	2026-01-31 19:50:55.436737-04
+2994	2026-01-31 10:50:52.275966-04	CDU-101	PRESS_TOWER	50.232114999224486	1	2026-01-31 19:50:55.438342-04
+2995	2026-01-31 10:50:52.275966-04	HT-301	H2_PRESS	50.19193817586252	1	2026-01-31 19:50:55.454385-04
+2996	2026-01-31 10:50:52.275966-04	CDU-101	FLOW_FEED	9981.873151375015	1	2026-01-31 19:50:55.456092-04
+2997	2026-01-31 11:05:52.275966-04	FCC-201	CATALYST_ACT	49.77307616401447	1	2026-01-31 19:50:55.478261-04
+2998	2026-01-31 11:05:52.275966-04	FCC-201	TEMP_REACTOR	450.9898108828378	1	2026-01-31 19:50:55.481268-04
+2999	2026-01-31 11:05:52.275966-04	CDU-101	TEMP_TOWER	450.40422545471927	1	2026-01-31 19:50:55.483126-04
+3000	2026-01-31 11:05:52.275966-04	HT-301	TEMP_HYDRO	448.48457816556447	1	2026-01-31 19:50:55.485188-04
+3001	2026-01-31 11:05:52.275966-04	CDU-101	PRESS_TOWER	50.0392435724426	1	2026-01-31 19:50:55.487052-04
+3002	2026-01-31 11:05:52.275966-04	HT-301	H2_PRESS	49.887186081045435	1	2026-01-31 19:50:55.48881-04
+3003	2026-01-31 11:05:52.275966-04	CDU-101	FLOW_FEED	10001.484744537032	1	2026-01-31 19:50:55.490597-04
+3004	2026-01-31 11:20:52.275966-04	FCC-201	CATALYST_ACT	49.823612705723235	1	2026-01-31 19:50:55.501672-04
+3005	2026-01-31 11:20:52.275966-04	FCC-201	TEMP_REACTOR	448.97593724603513	1	2026-01-31 19:50:55.50343-04
+3006	2026-01-31 11:20:52.275966-04	CDU-101	TEMP_TOWER	449.18610352918614	1	2026-01-31 19:50:55.505466-04
+3007	2026-01-31 11:20:52.275966-04	HT-301	TEMP_HYDRO	448.06696521750206	1	2026-01-31 19:50:55.507199-04
+3008	2026-01-31 11:20:52.275966-04	CDU-101	PRESS_TOWER	49.82025468869318	1	2026-01-31 19:50:55.51504-04
+3009	2026-01-31 11:20:52.275966-04	HT-301	H2_PRESS	50.19495992351328	1	2026-01-31 19:50:55.531915-04
+3010	2026-01-31 11:20:52.275966-04	CDU-101	FLOW_FEED	10036.25594128548	1	2026-01-31 19:50:55.540054-04
+3011	2026-01-31 11:35:52.275966-04	FCC-201	CATALYST_ACT	49.78258164711245	1	2026-01-31 19:50:55.562527-04
+3012	2026-01-31 11:35:52.275966-04	FCC-201	TEMP_REACTOR	452.1960388793861	1	2026-01-31 19:50:55.564354-04
+3013	2026-01-31 11:35:52.275966-04	CDU-101	TEMP_TOWER	449.68354603196025	1	2026-01-31 19:50:55.568854-04
+3014	2026-01-31 11:35:52.275966-04	HT-301	TEMP_HYDRO	451.70547968580513	1	2026-01-31 19:50:55.573818-04
+3015	2026-01-31 11:35:52.275966-04	CDU-101	PRESS_TOWER	49.76821001585392	1	2026-01-31 19:50:55.581629-04
+3016	2026-01-31 11:35:52.275966-04	HT-301	H2_PRESS	50.207440122039934	1	2026-01-31 19:50:55.586366-04
+3017	2026-01-31 11:35:52.275966-04	CDU-101	FLOW_FEED	10043.093776778913	1	2026-01-31 19:50:55.588125-04
+3018	2026-01-31 11:50:52.275966-04	FCC-201	CATALYST_ACT	50.123110673858726	1	2026-01-31 19:50:55.608857-04
+3019	2026-01-31 11:50:52.275966-04	FCC-201	TEMP_REACTOR	451.8784071272029	1	2026-01-31 19:50:55.610761-04
+3020	2026-01-31 11:50:52.275966-04	CDU-101	TEMP_TOWER	448.1784786425842	1	2026-01-31 19:50:55.612902-04
+3021	2026-01-31 11:50:52.275966-04	HT-301	TEMP_HYDRO	450.0051964540904	1	2026-01-31 19:50:55.614739-04
+3022	2026-01-31 11:50:52.275966-04	CDU-101	PRESS_TOWER	50.00336483889568	1	2026-01-31 19:50:55.646662-04
+3023	2026-01-31 11:50:52.275966-04	HT-301	H2_PRESS	49.797263069374495	1	2026-01-31 19:50:55.675305-04
+3024	2026-01-31 11:50:52.275966-04	CDU-101	FLOW_FEED	9957.215735592777	1	2026-01-31 19:50:55.677093-04
+3025	2026-01-31 12:05:52.275966-04	FCC-201	CATALYST_ACT	50.190460289757574	1	2026-01-31 19:50:55.691858-04
+3026	2026-01-31 12:05:52.275966-04	FCC-201	TEMP_REACTOR	448.10687298238497	1	2026-01-31 19:50:55.693623-04
+3027	2026-01-31 12:05:52.275966-04	CDU-101	TEMP_TOWER	450.78517547256183	1	2026-01-31 19:50:55.695427-04
+3028	2026-01-31 12:05:52.275966-04	HT-301	TEMP_HYDRO	448.4428348163516	1	2026-01-31 19:50:55.697269-04
+3029	2026-01-31 12:05:52.275966-04	CDU-101	PRESS_TOWER	49.83927571322916	1	2026-01-31 19:50:55.699394-04
+3030	2026-01-31 12:05:52.275966-04	HT-301	H2_PRESS	49.76550072424876	1	2026-01-31 19:50:55.701189-04
+3031	2026-01-31 12:05:52.275966-04	CDU-101	FLOW_FEED	10021.333031456823	1	2026-01-31 19:50:55.703168-04
+3032	2026-01-31 12:20:52.275966-04	FCC-201	CATALYST_ACT	50.204071396784265	1	2026-01-31 19:50:55.713518-04
+3033	2026-01-31 12:20:52.275966-04	FCC-201	TEMP_REACTOR	448.9366181635704	1	2026-01-31 19:50:55.715179-04
+3034	2026-01-31 12:20:52.275966-04	CDU-101	TEMP_TOWER	448.58602355465325	1	2026-01-31 19:50:55.72734-04
+3035	2026-01-31 12:20:52.275966-04	HT-301	TEMP_HYDRO	448.3372726506448	1	2026-01-31 19:50:55.746511-04
+3036	2026-01-31 12:20:52.275966-04	CDU-101	PRESS_TOWER	49.77676669815963	1	2026-01-31 19:50:55.748859-04
+3037	2026-01-31 12:20:52.275966-04	HT-301	H2_PRESS	50.15178013576948	1	2026-01-31 19:50:55.750505-04
+3038	2026-01-31 12:20:52.275966-04	CDU-101	FLOW_FEED	9969.52614872145	1	2026-01-31 19:50:55.77135-04
+3039	2026-01-31 12:35:52.275966-04	FCC-201	CATALYST_ACT	50.00896864249966	1	2026-01-31 19:50:55.798457-04
+3040	2026-01-31 12:35:52.275966-04	FCC-201	TEMP_REACTOR	448.7261698456855	1	2026-01-31 19:50:55.812673-04
+3041	2026-01-31 12:35:52.275966-04	CDU-101	TEMP_TOWER	448.03852221847535	1	2026-01-31 19:50:55.814452-04
+3042	2026-01-31 12:35:52.275966-04	HT-301	TEMP_HYDRO	449.99672057434344	1	2026-01-31 19:50:55.816196-04
+3043	2026-01-31 12:35:52.275966-04	CDU-101	PRESS_TOWER	50.19864911181182	1	2026-01-31 19:50:55.817996-04
+3044	2026-01-31 12:35:52.275966-04	HT-301	H2_PRESS	50.030232483379	1	2026-01-31 19:50:55.819803-04
+3045	2026-01-31 12:35:52.275966-04	CDU-101	FLOW_FEED	9990.824829817802	1	2026-01-31 19:50:55.821887-04
+3046	2026-01-31 12:50:52.275966-04	FCC-201	CATALYST_ACT	50.072452437917846	1	2026-01-31 19:50:55.881736-04
+3047	2026-01-31 12:50:52.275966-04	FCC-201	TEMP_REACTOR	448.3875634688826	1	2026-01-31 19:50:55.894906-04
+3048	2026-01-31 12:50:52.275966-04	CDU-101	TEMP_TOWER	449.0153235488983	1	2026-01-31 19:50:55.896738-04
+3049	2026-01-31 12:50:52.275966-04	HT-301	TEMP_HYDRO	449.9455435054957	1	2026-01-31 19:50:55.898943-04
+3050	2026-01-31 12:50:52.275966-04	CDU-101	PRESS_TOWER	50.03343616853485	1	2026-01-31 19:50:55.900753-04
+3051	2026-01-31 12:50:52.275966-04	HT-301	H2_PRESS	50.16605957630994	1	2026-01-31 19:50:55.902595-04
+3052	2026-01-31 12:50:52.275966-04	CDU-101	FLOW_FEED	9991.846834598755	1	2026-01-31 19:50:55.904415-04
+3053	2026-01-31 13:05:52.275966-04	FCC-201	CATALYST_ACT	49.75500918250078	1	2026-01-31 19:50:55.912581-04
+3054	2026-01-31 13:05:52.275966-04	FCC-201	TEMP_REACTOR	451.1780235489535	1	2026-01-31 19:50:55.925283-04
+3055	2026-01-31 13:05:52.275966-04	CDU-101	TEMP_TOWER	448.5893851434507	1	2026-01-31 19:50:55.931206-04
+3056	2026-01-31 13:05:52.275966-04	HT-301	TEMP_HYDRO	451.3193536238625	1	2026-01-31 19:50:55.940548-04
+3057	2026-01-31 13:05:52.275966-04	CDU-101	PRESS_TOWER	49.81260924111194	1	2026-01-31 19:50:55.949976-04
+3058	2026-01-31 13:05:52.275966-04	HT-301	H2_PRESS	49.90126329581266	1	2026-01-31 19:50:55.958813-04
+3059	2026-01-31 13:05:52.275966-04	CDU-101	FLOW_FEED	10042.84764073242	1	2026-01-31 19:50:55.963968-04
+3060	2026-01-31 13:20:52.275966-04	FCC-201	CATALYST_ACT	50.214460612258904	1	2026-01-31 19:50:55.970988-04
+3061	2026-01-31 13:20:52.275966-04	FCC-201	TEMP_REACTOR	447.82826230145065	1	2026-01-31 19:50:55.97266-04
+3062	2026-01-31 13:20:52.275966-04	CDU-101	TEMP_TOWER	448.80038293420665	1	2026-01-31 19:50:55.97464-04
+3063	2026-01-31 13:20:52.275966-04	HT-301	TEMP_HYDRO	451.5431836592579	1	2026-01-31 19:50:55.976446-04
+3064	2026-01-31 13:20:52.275966-04	CDU-101	PRESS_TOWER	49.998196326929516	1	2026-01-31 19:50:55.978273-04
+3065	2026-01-31 13:20:52.275966-04	HT-301	H2_PRESS	49.82347261753798	1	2026-01-31 19:50:55.98131-04
+3066	2026-01-31 13:20:52.275966-04	CDU-101	FLOW_FEED	9984.578700619824	1	2026-01-31 19:50:55.983115-04
+3067	2026-01-31 13:35:52.275966-04	FCC-201	CATALYST_ACT	50.1540425275115	1	2026-01-31 19:50:55.990496-04
+3068	2026-01-31 13:35:52.275966-04	FCC-201	TEMP_REACTOR	448.19672347625095	1	2026-01-31 19:50:55.992321-04
+3069	2026-01-31 13:35:52.275966-04	CDU-101	TEMP_TOWER	448.174005223954	1	2026-01-31 19:50:55.994155-04
+3070	2026-01-31 13:35:52.275966-04	HT-301	TEMP_HYDRO	451.0644080369652	1	2026-01-31 19:50:55.995975-04
+3071	2026-01-31 13:35:52.275966-04	CDU-101	PRESS_TOWER	49.8175010704214	1	2026-01-31 19:50:55.998242-04
+3072	2026-01-31 13:35:52.275966-04	HT-301	H2_PRESS	49.76380078599505	1	2026-01-31 19:50:56.000082-04
+3073	2026-01-31 13:35:52.275966-04	CDU-101	FLOW_FEED	9957.4700715055	1	2026-01-31 19:50:56.001873-04
+3074	2026-01-31 13:50:52.275966-04	FCC-201	CATALYST_ACT	49.84374457120333	1	2026-01-31 19:50:56.032664-04
+3075	2026-01-31 13:50:52.275966-04	FCC-201	TEMP_REACTOR	449.3754086144922	1	2026-01-31 19:50:56.040136-04
+3076	2026-01-31 13:50:52.275966-04	CDU-101	TEMP_TOWER	449.8848463926737	1	2026-01-31 19:50:56.043235-04
+3077	2026-01-31 13:50:52.275966-04	HT-301	TEMP_HYDRO	451.980650304975	1	2026-01-31 19:50:56.049913-04
+3078	2026-01-31 13:50:52.275966-04	CDU-101	PRESS_TOWER	49.958349628570325	1	2026-01-31 19:50:56.057207-04
+3079	2026-01-31 13:50:52.275966-04	HT-301	H2_PRESS	49.77885652832501	1	2026-01-31 19:50:56.061837-04
+3080	2026-01-31 13:50:52.275966-04	CDU-101	FLOW_FEED	10003.130778037073	1	2026-01-31 19:50:56.074431-04
+3081	2026-01-31 14:05:52.275966-04	FCC-201	CATALYST_ACT	50.14940778146445	1	2026-01-31 19:50:56.082457-04
+3082	2026-01-31 14:05:52.275966-04	FCC-201	TEMP_REACTOR	449.599985534606	1	2026-01-31 19:50:56.103258-04
+3083	2026-01-31 14:05:52.275966-04	CDU-101	TEMP_TOWER	450.2758931886958	1	2026-01-31 19:50:56.104986-04
+3084	2026-01-31 14:05:52.275966-04	HT-301	TEMP_HYDRO	450.79364755855215	1	2026-01-31 19:50:56.107049-04
+3085	2026-01-31 14:05:52.275966-04	CDU-101	PRESS_TOWER	50.243294652672155	1	2026-01-31 19:50:56.109031-04
+3086	2026-01-31 14:05:52.275966-04	HT-301	H2_PRESS	50.0441140504558	1	2026-01-31 19:50:56.110889-04
+3087	2026-01-31 14:05:52.275966-04	CDU-101	FLOW_FEED	9983.009925671484	1	2026-01-31 19:50:56.113059-04
+3088	2026-01-31 14:20:52.275966-04	FCC-201	CATALYST_ACT	50.23109866098111	1	2026-01-31 19:50:56.134011-04
+3089	2026-01-31 14:20:52.275966-04	FCC-201	TEMP_REACTOR	450.8688943162898	1	2026-01-31 19:50:56.155468-04
+3090	2026-01-31 14:20:52.275966-04	CDU-101	TEMP_TOWER	449.2067056396865	1	2026-01-31 19:50:56.17407-04
+3091	2026-01-31 14:20:52.275966-04	HT-301	TEMP_HYDRO	452.1582944050155	1	2026-01-31 19:50:56.177092-04
+3092	2026-01-31 14:20:52.275966-04	CDU-101	PRESS_TOWER	49.831327099391196	1	2026-01-31 19:50:56.185224-04
+3093	2026-01-31 14:20:52.275966-04	HT-301	H2_PRESS	50.17958643085044	1	2026-01-31 19:50:56.190762-04
+3094	2026-01-31 14:20:52.275966-04	CDU-101	FLOW_FEED	10009.268603323766	1	2026-01-31 19:50:56.192552-04
+3095	2026-01-31 14:35:52.275966-04	FCC-201	CATALYST_ACT	50.10731566553041	1	2026-01-31 19:50:56.208809-04
+3096	2026-01-31 14:35:52.275966-04	FCC-201	TEMP_REACTOR	452.008834819512	1	2026-01-31 19:50:56.210966-04
+3097	2026-01-31 14:35:52.275966-04	CDU-101	TEMP_TOWER	447.8998495580326	1	2026-01-31 19:50:56.245349-04
+3098	2026-01-31 14:35:52.275966-04	HT-301	TEMP_HYDRO	447.93992035131515	1	2026-01-31 19:50:56.247288-04
+3099	2026-01-31 14:35:52.275966-04	CDU-101	PRESS_TOWER	49.9975112233595	1	2026-01-31 19:50:56.24922-04
+3100	2026-01-31 14:35:52.275966-04	HT-301	H2_PRESS	50.24759422700663	1	2026-01-31 19:50:56.251024-04
+3101	2026-01-31 14:35:52.275966-04	CDU-101	FLOW_FEED	9989.587332162946	1	2026-01-31 19:50:56.252818-04
+3102	2026-01-31 14:50:52.275966-04	FCC-201	CATALYST_ACT	49.81282502294928	1	2026-01-31 19:50:56.279621-04
+3103	2026-01-31 14:50:52.275966-04	FCC-201	TEMP_REACTOR	448.95340417202067	1	2026-01-31 19:50:56.281985-04
+3104	2026-01-31 14:50:52.275966-04	CDU-101	TEMP_TOWER	449.89942720633377	1	2026-01-31 19:50:56.283813-04
+3105	2026-01-31 14:50:52.275966-04	HT-301	TEMP_HYDRO	451.95501735825917	1	2026-01-31 19:50:56.285681-04
+3106	2026-01-31 14:50:52.275966-04	CDU-101	PRESS_TOWER	50.060314856392885	1	2026-01-31 19:50:56.287521-04
+3107	2026-01-31 14:50:52.275966-04	HT-301	H2_PRESS	49.792403295626094	1	2026-01-31 19:50:56.289336-04
+3108	2026-01-31 14:50:52.275966-04	CDU-101	FLOW_FEED	9953.127804609505	1	2026-01-31 19:50:56.293811-04
+3109	2026-01-31 15:05:52.275966-04	FCC-201	CATALYST_ACT	50.01149974508069	1	2026-01-31 19:50:56.301262-04
+3110	2026-01-31 15:05:52.275966-04	FCC-201	TEMP_REACTOR	448.18084376607817	1	2026-01-31 19:50:56.303142-04
+3111	2026-01-31 15:05:52.275966-04	CDU-101	TEMP_TOWER	448.9446781645875	1	2026-01-31 19:50:56.305157-04
+3112	2026-01-31 15:05:52.275966-04	HT-301	TEMP_HYDRO	450.4932672501586	1	2026-01-31 19:50:56.323305-04
+3113	2026-01-31 15:05:52.275966-04	CDU-101	PRESS_TOWER	49.79797341954038	1	2026-01-31 19:50:56.325079-04
+3114	2026-01-31 15:05:52.275966-04	HT-301	H2_PRESS	50.23848897650469	1	2026-01-31 19:50:56.35234-04
+3115	2026-01-31 15:05:52.275966-04	CDU-101	FLOW_FEED	9966.646132513408	1	2026-01-31 19:50:56.397321-04
+3116	2026-01-31 15:20:52.275966-04	FCC-201	CATALYST_ACT	49.824841231329756	1	2026-01-31 19:50:56.448484-04
+3117	2026-01-31 15:20:52.275966-04	FCC-201	TEMP_REACTOR	450.3456782437717	1	2026-01-31 19:50:56.463738-04
+3118	2026-01-31 15:20:52.275966-04	CDU-101	TEMP_TOWER	448.40002742634437	1	2026-01-31 19:50:56.479818-04
+3119	2026-01-31 15:20:52.275966-04	HT-301	TEMP_HYDRO	448.7577426550531	1	2026-01-31 19:50:56.485298-04
+3120	2026-01-31 15:20:52.275966-04	CDU-101	PRESS_TOWER	49.80515568797915	1	2026-01-31 19:50:56.491632-04
+3121	2026-01-31 15:20:52.275966-04	HT-301	H2_PRESS	50.0039596333934	1	2026-01-31 19:50:56.501935-04
+3122	2026-01-31 15:20:52.275966-04	CDU-101	FLOW_FEED	10010.819551921455	1	2026-01-31 19:50:56.508561-04
+3123	2026-01-31 15:35:52.275966-04	FCC-201	CATALYST_ACT	49.96445077675232	1	2026-01-31 19:50:56.539203-04
+3124	2026-01-31 15:35:52.275966-04	FCC-201	TEMP_REACTOR	450.3536506125912	1	2026-01-31 19:50:56.541162-04
+3125	2026-01-31 15:35:52.275966-04	CDU-101	TEMP_TOWER	450.860546172855	1	2026-01-31 19:50:56.54296-04
+3126	2026-01-31 15:35:52.275966-04	HT-301	TEMP_HYDRO	450.73625714695186	1	2026-01-31 19:50:56.544797-04
+3127	2026-01-31 15:35:52.275966-04	CDU-101	PRESS_TOWER	50.18645690282493	1	2026-01-31 19:50:56.546509-04
+3128	2026-01-31 15:35:52.275966-04	HT-301	H2_PRESS	49.96589029866242	1	2026-01-31 19:50:56.548519-04
+3129	2026-01-31 15:35:52.275966-04	CDU-101	FLOW_FEED	10041.703264750246	1	2026-01-31 19:50:56.550234-04
+3130	2026-01-31 15:50:52.275966-04	FCC-201	CATALYST_ACT	49.79997561562449	1	2026-01-31 19:50:56.576629-04
+3131	2026-01-31 15:50:52.275966-04	FCC-201	TEMP_REACTOR	450.41427457259107	1	2026-01-31 19:50:56.578417-04
+3132	2026-01-31 15:50:52.275966-04	CDU-101	TEMP_TOWER	449.6191581162438	1	2026-01-31 19:50:56.580625-04
+3133	2026-01-31 15:50:52.275966-04	HT-301	TEMP_HYDRO	451.2795732937971	1	2026-01-31 19:50:56.582743-04
+3134	2026-01-31 15:50:52.275966-04	CDU-101	PRESS_TOWER	50.16913360523123	1	2026-01-31 19:50:56.584616-04
+3135	2026-01-31 15:50:52.275966-04	HT-301	H2_PRESS	49.79908036446746	1	2026-01-31 19:50:56.58637-04
+3136	2026-01-31 15:50:52.275966-04	CDU-101	FLOW_FEED	10010.056269511857	1	2026-01-31 19:50:56.588133-04
+3137	2026-01-31 16:05:52.275966-04	FCC-201	CATALYST_ACT	49.86658499834818	1	2026-01-31 19:50:56.595318-04
+3138	2026-01-31 16:05:52.275966-04	FCC-201	TEMP_REACTOR	449.41263059587834	1	2026-01-31 19:50:56.596985-04
+3139	2026-01-31 16:05:52.275966-04	CDU-101	TEMP_TOWER	451.81987092449054	1	2026-01-31 19:50:56.599015-04
+3140	2026-01-31 16:05:52.275966-04	HT-301	TEMP_HYDRO	449.1079070017223	1	2026-01-31 19:50:56.600743-04
+3141	2026-01-31 16:05:52.275966-04	CDU-101	PRESS_TOWER	50.00214532244923	1	2026-01-31 19:50:56.60247-04
+3142	2026-01-31 16:05:52.275966-04	HT-301	H2_PRESS	49.780634327067766	1	2026-01-31 19:50:56.604189-04
+3143	2026-01-31 16:05:52.275966-04	CDU-101	FLOW_FEED	9969.78780557588	1	2026-01-31 19:50:56.606183-04
+3144	2026-01-31 16:20:52.275966-04	FCC-201	CATALYST_ACT	50.20259038312259	1	2026-01-31 19:50:56.613542-04
+3145	2026-01-31 16:20:52.275966-04	FCC-201	TEMP_REACTOR	448.3715576651513	1	2026-01-31 19:50:56.61525-04
+3146	2026-01-31 16:20:52.275966-04	CDU-101	TEMP_TOWER	447.7959026245519	1	2026-01-31 19:50:56.617094-04
+3147	2026-01-31 16:20:52.275966-04	HT-301	TEMP_HYDRO	449.13094129830955	1	2026-01-31 19:50:56.618871-04
+3148	2026-01-31 16:20:52.275966-04	CDU-101	PRESS_TOWER	49.856028665467825	1	2026-01-31 19:50:56.620841-04
+3149	2026-01-31 16:20:52.275966-04	HT-301	H2_PRESS	50.090476397973795	1	2026-01-31 19:50:56.622875-04
+3150	2026-01-31 16:20:52.275966-04	CDU-101	FLOW_FEED	10038.495864266813	1	2026-01-31 19:50:56.624885-04
+3151	2026-01-31 16:35:52.275966-04	FCC-201	CATALYST_ACT	49.974633324616484	1	2026-01-31 19:50:56.632733-04
+3152	2026-01-31 16:35:52.275966-04	FCC-201	TEMP_REACTOR	452.1105103723655	1	2026-01-31 19:50:56.634458-04
+3153	2026-01-31 16:35:52.275966-04	CDU-101	TEMP_TOWER	450.71683454006495	1	2026-01-31 19:50:56.636251-04
+3154	2026-01-31 16:35:52.275966-04	HT-301	TEMP_HYDRO	448.3987640062595	1	2026-01-31 19:50:56.638028-04
+3155	2026-01-31 16:35:52.275966-04	CDU-101	PRESS_TOWER	50.13893508580832	1	2026-01-31 19:50:56.639808-04
+3156	2026-01-31 16:35:52.275966-04	HT-301	H2_PRESS	49.76907090806675	1	2026-01-31 19:50:56.641627-04
+3157	2026-01-31 16:35:52.275966-04	CDU-101	FLOW_FEED	10044.099933014431	1	2026-01-31 19:50:56.643336-04
+3158	2026-01-31 16:50:52.275966-04	FCC-201	CATALYST_ACT	50.204547558818646	1	2026-01-31 19:50:56.650584-04
+3159	2026-01-31 16:50:52.275966-04	FCC-201	TEMP_REACTOR	452.2198147588981	1	2026-01-31 19:50:56.658108-04
+3160	2026-01-31 16:50:52.275966-04	CDU-101	TEMP_TOWER	450.17484194984996	1	2026-01-31 19:50:56.690662-04
+3161	2026-01-31 16:50:52.275966-04	HT-301	TEMP_HYDRO	450.4141521542645	1	2026-01-31 19:50:56.699696-04
+3162	2026-01-31 16:50:52.275966-04	CDU-101	PRESS_TOWER	50.01607626828179	1	2026-01-31 19:50:56.701784-04
+3163	2026-01-31 16:50:52.275966-04	HT-301	H2_PRESS	50.01049184995851	1	2026-01-31 19:50:56.703858-04
+3164	2026-01-31 16:50:52.275966-04	CDU-101	FLOW_FEED	10048.901777184907	1	2026-01-31 19:50:56.705767-04
+3165	2026-01-31 17:05:52.275966-04	FCC-201	CATALYST_ACT	49.76483968577197	1	2026-01-31 19:50:56.72181-04
+3166	2026-01-31 17:05:52.275966-04	FCC-201	TEMP_REACTOR	451.74697717075964	1	2026-01-31 19:50:56.723987-04
+3167	2026-01-31 17:05:52.275966-04	CDU-101	TEMP_TOWER	450.59211308375484	1	2026-01-31 19:50:56.725763-04
+3168	2026-01-31 17:05:52.275966-04	HT-301	TEMP_HYDRO	448.51630641525986	1	2026-01-31 19:50:56.727425-04
+3169	2026-01-31 17:05:52.275966-04	CDU-101	PRESS_TOWER	49.81800818636956	1	2026-01-31 19:50:56.737993-04
+3170	2026-01-31 17:05:52.275966-04	HT-301	H2_PRESS	49.90934293968746	1	2026-01-31 19:50:56.739859-04
+3171	2026-01-31 17:05:52.275966-04	CDU-101	FLOW_FEED	10004.870799938237	1	2026-01-31 19:50:56.741656-04
+3172	2026-01-31 17:20:52.275966-04	FCC-201	CATALYST_ACT	49.82984912159512	1	2026-01-31 19:50:56.749228-04
+3173	2026-01-31 17:20:52.275966-04	FCC-201	TEMP_REACTOR	452.1675949556255	1	2026-01-31 19:50:56.751288-04
+3174	2026-01-31 17:20:52.275966-04	CDU-101	TEMP_TOWER	450.8799747513826	1	2026-01-31 19:50:56.753328-04
+3175	2026-01-31 17:20:52.275966-04	HT-301	TEMP_HYDRO	448.5372275189753	1	2026-01-31 19:50:56.757216-04
+3176	2026-01-31 17:20:52.275966-04	CDU-101	PRESS_TOWER	50.0453834916671	1	2026-01-31 19:50:56.759302-04
+3177	2026-01-31 17:20:52.275966-04	HT-301	H2_PRESS	50.10380393850551	1	2026-01-31 19:50:56.761245-04
+3178	2026-01-31 17:20:52.275966-04	CDU-101	FLOW_FEED	9999.871134883222	1	2026-01-31 19:50:56.763301-04
+3179	2026-01-31 17:35:52.275966-04	FCC-201	CATALYST_ACT	50.136784549730905	1	2026-01-31 19:50:56.799987-04
+3180	2026-01-31 17:35:52.275966-04	FCC-201	TEMP_REACTOR	449.44096475888983	1	2026-01-31 19:50:56.807897-04
+3181	2026-01-31 17:35:52.275966-04	CDU-101	TEMP_TOWER	450.88339006253585	1	2026-01-31 19:50:56.819197-04
+3182	2026-01-31 17:35:52.275966-04	HT-301	TEMP_HYDRO	451.88961415036397	1	2026-01-31 19:50:56.82848-04
+3183	2026-01-31 17:35:52.275966-04	CDU-101	PRESS_TOWER	50.21507630457148	1	2026-01-31 19:50:56.836796-04
+3184	2026-01-31 17:35:52.275966-04	HT-301	H2_PRESS	49.99894650824031	1	2026-01-31 19:50:56.841886-04
+3185	2026-01-31 17:35:52.275966-04	CDU-101	FLOW_FEED	9985.026828649437	1	2026-01-31 19:50:56.853862-04
+3186	2026-01-31 17:50:52.275966-04	FCC-201	CATALYST_ACT	50.222904639944424	1	2026-01-31 19:50:56.889594-04
+3187	2026-01-31 17:50:52.275966-04	FCC-201	TEMP_REACTOR	448.42215650284106	1	2026-01-31 19:50:56.900441-04
+3188	2026-01-31 17:50:52.275966-04	CDU-101	TEMP_TOWER	448.7045180838471	1	2026-01-31 19:50:56.908721-04
+3189	2026-01-31 17:50:52.275966-04	HT-301	TEMP_HYDRO	448.78593183861966	1	2026-01-31 19:50:56.913485-04
+3190	2026-01-31 17:50:52.275966-04	CDU-101	PRESS_TOWER	49.84994844293552	1	2026-01-31 19:50:56.915253-04
+3191	2026-01-31 17:50:52.275966-04	HT-301	H2_PRESS	50.12267929316477	1	2026-01-31 19:50:56.917023-04
+3192	2026-01-31 17:50:52.275966-04	CDU-101	FLOW_FEED	9997.728649941962	1	2026-01-31 19:50:56.91886-04
+3193	2026-01-31 18:05:52.275966-04	FCC-201	CATALYST_ACT	49.787107589919216	1	2026-01-31 19:50:56.944068-04
+3194	2026-01-31 18:05:52.275966-04	FCC-201	TEMP_REACTOR	449.02293902577605	1	2026-01-31 19:50:56.951902-04
+3195	2026-01-31 18:05:52.275966-04	CDU-101	TEMP_TOWER	448.9175638998351	1	2026-01-31 19:50:56.966822-04
+3196	2026-01-31 18:05:52.275966-04	HT-301	TEMP_HYDRO	452.15005173014424	1	2026-01-31 19:50:56.968656-04
+3197	2026-01-31 18:05:52.275966-04	CDU-101	PRESS_TOWER	49.77358514267202	1	2026-01-31 19:50:56.970623-04
+3198	2026-01-31 18:05:52.275966-04	HT-301	H2_PRESS	50.16911207800811	1	2026-01-31 19:50:57.012172-04
+3199	2026-01-31 18:05:52.275966-04	CDU-101	FLOW_FEED	10029.121582037658	1	2026-01-31 19:50:57.025299-04
+3200	2026-01-31 18:20:52.275966-04	FCC-201	CATALYST_ACT	50.177485017840205	1	2026-01-31 19:50:57.044156-04
+3201	2026-01-31 18:20:52.275966-04	FCC-201	TEMP_REACTOR	448.0645036436855	1	2026-01-31 19:50:57.045953-04
+3202	2026-01-31 18:20:52.275966-04	CDU-101	TEMP_TOWER	447.9034239474606	1	2026-01-31 19:50:57.048024-04
+3203	2026-01-31 18:20:52.275966-04	HT-301	TEMP_HYDRO	448.3031317315102	1	2026-01-31 19:50:57.049801-04
+3204	2026-01-31 18:20:52.275966-04	CDU-101	PRESS_TOWER	49.97921662455397	1	2026-01-31 19:50:57.051527-04
+3205	2026-01-31 18:20:52.275966-04	HT-301	H2_PRESS	49.86024702379298	1	2026-01-31 19:50:57.070674-04
+3206	2026-01-31 18:20:52.275966-04	CDU-101	FLOW_FEED	9957.356966323021	1	2026-01-31 19:50:57.07278-04
+3207	2026-01-31 18:35:52.275966-04	FCC-201	CATALYST_ACT	49.88639617927079	1	2026-01-31 19:50:57.080633-04
+3208	2026-01-31 18:35:52.275966-04	FCC-201	TEMP_REACTOR	448.3771711918596	1	2026-01-31 19:50:57.082382-04
+3209	2026-01-31 18:35:52.275966-04	CDU-101	TEMP_TOWER	448.3477162518214	1	2026-01-31 19:50:57.084847-04
+3210	2026-01-31 18:35:52.275966-04	HT-301	TEMP_HYDRO	450.29681450053084	1	2026-01-31 19:50:57.087771-04
+3211	2026-01-31 18:35:52.275966-04	CDU-101	PRESS_TOWER	49.82088570986723	1	2026-01-31 19:50:57.089948-04
+3212	2026-01-31 18:35:52.275966-04	HT-301	H2_PRESS	50.06022340336822	1	2026-01-31 19:50:57.091945-04
+3213	2026-01-31 18:35:52.275966-04	CDU-101	FLOW_FEED	9953.93032809535	1	2026-01-31 19:50:57.093783-04
+3214	2026-01-31 18:50:52.275966-04	FCC-201	CATALYST_ACT	49.76739580586019	1	2026-01-31 19:50:57.101131-04
+3215	2026-01-31 18:50:52.275966-04	FCC-201	TEMP_REACTOR	451.07553671266135	1	2026-01-31 19:50:57.117978-04
+3216	2026-01-31 18:50:52.275966-04	CDU-101	TEMP_TOWER	448.52722035775776	1	2026-01-31 19:50:57.12682-04
+3217	2026-01-31 18:50:52.275966-04	HT-301	TEMP_HYDRO	451.8155328237326	1	2026-01-31 19:50:57.13171-04
+3218	2026-01-31 18:50:52.275966-04	CDU-101	PRESS_TOWER	49.86193213961505	1	2026-01-31 19:50:57.138798-04
+3219	2026-01-31 18:50:52.275966-04	HT-301	H2_PRESS	49.86676926296825	1	2026-01-31 19:50:57.148893-04
+3220	2026-01-31 18:50:52.275966-04	CDU-101	FLOW_FEED	10019.792864392095	1	2026-01-31 19:50:57.159799-04
+3221	2026-01-31 19:05:52.275966-04	FCC-201	CATALYST_ACT	49.87546255696966	1	2026-01-31 19:50:57.175173-04
+3222	2026-01-31 19:05:52.275966-04	FCC-201	TEMP_REACTOR	450.8639897512881	1	2026-01-31 19:50:57.177002-04
+3223	2026-01-31 19:05:52.275966-04	CDU-101	TEMP_TOWER	450.27977400421787	1	2026-01-31 19:50:57.179004-04
+3224	2026-01-31 19:05:52.275966-04	HT-301	TEMP_HYDRO	451.69058335991315	1	2026-01-31 19:50:57.181886-04
+3225	2026-01-31 19:05:52.275966-04	CDU-101	PRESS_TOWER	49.97178181427662	1	2026-01-31 19:50:57.183675-04
+3226	2026-01-31 19:05:52.275966-04	HT-301	H2_PRESS	50.12103778034975	1	2026-01-31 19:50:57.185292-04
+3227	2026-01-31 19:05:52.275966-04	CDU-101	FLOW_FEED	10018.118208866505	1	2026-01-31 19:50:57.203951-04
+3228	2026-01-31 19:20:52.275966-04	FCC-201	CATALYST_ACT	49.944283640798105	1	2026-01-31 19:50:57.240641-04
+3229	2026-01-31 19:20:52.275966-04	FCC-201	TEMP_REACTOR	452.09042786725485	1	2026-01-31 19:50:57.242261-04
+3230	2026-01-31 19:20:52.275966-04	CDU-101	TEMP_TOWER	450.78666880385833	1	2026-01-31 19:50:57.260206-04
+3231	2026-01-31 19:20:52.275966-04	HT-301	TEMP_HYDRO	450.5830086145223	1	2026-01-31 19:50:57.261957-04
+3232	2026-01-31 19:20:52.275966-04	CDU-101	PRESS_TOWER	49.949312673214074	1	2026-01-31 19:50:57.264035-04
+3233	2026-01-31 19:20:52.275966-04	HT-301	H2_PRESS	49.969370399922894	1	2026-01-31 19:50:57.265856-04
+3234	2026-01-31 19:20:52.275966-04	CDU-101	FLOW_FEED	9985.245994758481	1	2026-01-31 19:50:57.267683-04
+3235	2026-01-31 19:35:52.275966-04	FCC-201	CATALYST_ACT	49.824259665486395	1	2026-01-31 19:50:57.275009-04
+3236	2026-01-31 19:35:52.275966-04	FCC-201	TEMP_REACTOR	449.30646821667966	1	2026-01-31 19:50:57.276867-04
+3237	2026-01-31 19:35:52.275966-04	CDU-101	TEMP_TOWER	449.39868462052027	1	2026-01-31 19:50:57.279003-04
+3238	2026-01-31 19:35:52.275966-04	HT-301	TEMP_HYDRO	447.7542209796129	1	2026-01-31 19:50:57.289857-04
+3239	2026-01-31 19:35:52.275966-04	CDU-101	PRESS_TOWER	50.22030288106494	1	2026-01-31 19:50:57.295371-04
+3240	2026-01-31 19:35:52.275966-04	HT-301	H2_PRESS	50.1374087856035	1	2026-01-31 19:50:57.304888-04
+3241	2026-01-31 19:35:52.275966-04	CDU-101	FLOW_FEED	10013.321025483074	1	2026-01-31 19:50:57.306979-04
+\.
+
+
+--
+-- Data for Name: process_tags; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_tags (tag_id, tag_name, description, unit_id, tag_type, engineering_units, data_type, min_value, max_value, normal_range_min, normal_range_max, critical_threshold, is_critical, sampling_rate, created_at, updated_at) FROM stdin;
+CATALYST_ACT	CATALYST_ACT	\N	FCC-201	PERCENTAGE	%	FLOAT	\N	\N	\N	\N	\N	f	1	2026-01-22 17:52:25.926906-04	2026-01-31 14:26:29.49082-04
+TEMP_REACTOR	Temperatura	\N	FCC-201	TEMPERATURE	°C	FLOAT	\N	\N	300	600	650	f	1	2026-01-22 17:52:26.02312-04	2026-01-31 14:26:29.472947-04
+TEMP_TOWER	Temperatura	\N	CDU-101	TEMPERATURE	°C	FLOAT	\N	\N	300	600	650	f	1	2026-01-22 17:52:26.024746-04	2026-01-31 14:26:29.484076-04
+TEMP_HYDRO	Temperatura	\N	HT-301	TEMPERATURE	°C	FLOAT	\N	\N	300	600	650	f	1	2026-01-22 17:52:26.021491-04	2026-01-31 14:26:29.487687-04
+PRESS_TOWER	Presión	\N	CDU-101	PRESSURE	bar	FLOAT	\N	\N	10	50	60	f	1	2026-01-22 17:52:26.019867-04	2026-01-31 14:26:29.469689-04
+H2_PRESS	H2_PRESS	\N	HT-301	PRESSURE	bar	FLOAT	\N	\N	10	50	60	f	1	2026-01-22 17:52:26.018229-04	2026-01-31 14:26:29.480565-04
+FLOW_FEED	Flujo	\N	CDU-101	FLOW	m³/h	FLOAT	\N	\N	8000	12000	\N	f	1	2026-01-22 17:52:26.015934-04	2026-01-31 14:26:29.486201-04
+\.
+
+
+--
+-- Data for Name: process_units; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.process_units (unit_id, unit_name, unit_type, description, capacity, location, status, created_at, updated_at, metadata) FROM stdin;
+FCC-201	Craqueo Catalítico	FCC	Conversión de fracciones pesadas a productos ligeros	7500	\N	ACTIVE	2026-01-22 17:48:33.340737-04	2026-01-31 14:26:29.441258-04	{}
+HT-301	Hidrotratamiento	HT	Remoción de contaminantes mediante hidrógeno	5200	\N	ACTIVE	2026-01-22 17:48:33.477758-04	2026-01-31 14:26:29.453108-04	{}
+CDU-101	Destilación Atmosférica	CDU	Unidad de destilación primaria para separación de crudo	10000	\N	ACTIVE	2026-01-22 17:48:33.4795-04	2026-01-31 14:26:29.45565-04	{}
+\.
+
+
+--
+-- Data for Name: tanks; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.tanks (id, name, product, current_level, capacity, status) FROM stdin;
+1	TK-101	Crudo Pesado	85000	100000	FILLING
+2	TK-102	Diesel	78000	80000	STATIC
+3	TK-201	Gasolina	45000	80000	DRAINING
+\.
+
+
+--
+-- Name: alerts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.alerts_id_seq', 14, true);
+
+
+--
+-- Name: energy_analysis_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.energy_analysis_id_seq', 3, true);
+
+
+--
+-- Name: inventory_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.inventory_id_seq', 3, true);
+
+
+--
+-- Name: kpis_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.kpis_id_seq', 294, true);
+
+
+--
+-- Name: maintenance_predictions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.maintenance_predictions_id_seq', 15, true);
+
+
+--
+-- Name: process_data_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.process_data_id_seq', 3241, true);
+
+
+--
+-- Name: tanks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.tanks_id_seq', 3, true);
+
+
+--
+-- Name: alert_severity alert_severity_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.alert_severity
+    ADD CONSTRAINT alert_severity_pkey PRIMARY KEY (severity_code);
+
+
+--
+-- Name: alerts alerts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT alerts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: efficiency_status efficiency_status_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.efficiency_status
+    ADD CONSTRAINT efficiency_status_pkey PRIMARY KEY (status_code);
+
+
+--
+-- Name: energy_analysis energy_analysis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.energy_analysis
+    ADD CONSTRAINT energy_analysis_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: equipment equipment_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.equipment
+    ADD CONSTRAINT equipment_pkey PRIMARY KEY (equipment_id);
+
+
+--
+-- Name: inventory inventory_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory
+    ADD CONSTRAINT inventory_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: kpis kpis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kpis
+    ADD CONSTRAINT kpis_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: maintenance_predictions maintenance_predictions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.maintenance_predictions
+    ADD CONSTRAINT maintenance_predictions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: process_data process_data_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_data
+    ADD CONSTRAINT process_data_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: process_tags process_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_tags
+    ADD CONSTRAINT process_tags_pkey PRIMARY KEY (tag_id);
+
+
+--
+-- Name: process_units process_units_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_units
+    ADD CONSTRAINT process_units_pkey PRIMARY KEY (unit_id);
+
+
+--
+-- Name: tanks tanks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tanks
+    ADD CONSTRAINT tanks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_alerts_acknowledged; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_alerts_acknowledged ON public.alerts USING btree (acknowledged, "timestamp" DESC);
+
+
+--
+-- Name: idx_alerts_severity; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_alerts_severity ON public.alerts USING btree (severity, "timestamp" DESC);
+
+
+--
+-- Name: idx_alerts_unacknowledged; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_alerts_unacknowledged ON public.alerts USING btree ("timestamp" DESC) WHERE (acknowledged = false);
+
+
+--
+-- Name: idx_kpis_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_kpis_timestamp ON public.kpis USING btree ("timestamp" DESC);
+
+
+--
+-- Name: idx_process_data_time; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_data_time ON public.process_data USING btree ("timestamp" DESC);
+
+
+--
+-- Name: idx_process_data_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_data_timestamp ON public.process_data USING btree ("timestamp" DESC);
+
+
+--
+-- Name: idx_process_data_unit; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_data_unit ON public.process_data USING btree (unit_id);
+
+
+--
+-- Name: idx_process_data_unit_tag_time; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_process_data_unit_tag_time ON public.process_data USING btree (unit_id, tag_id, "timestamp" DESC);
+
+
+--
+-- Name: equipment equipment_unit_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.equipment
+    ADD CONSTRAINT equipment_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.process_units(unit_id);
+
+
+--
+-- Name: alerts fk_alerts_severity; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT fk_alerts_severity FOREIGN KEY (severity) REFERENCES public.alert_severity(severity_code) ON UPDATE CASCADE;
+
+
+--
+-- Name: energy_analysis fk_energy_status; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.energy_analysis
+    ADD CONSTRAINT fk_energy_status FOREIGN KEY (status) REFERENCES public.efficiency_status(status_code) ON UPDATE CASCADE;
+
+
+--
+-- Name: kpis fk_kpis_unit; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kpis
+    ADD CONSTRAINT fk_kpis_unit FOREIGN KEY (unit_id) REFERENCES public.process_units(unit_id);
+
+
+--
+-- Name: maintenance_predictions fk_maintenance_equipment; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.maintenance_predictions
+    ADD CONSTRAINT fk_maintenance_equipment FOREIGN KEY (equipment_id) REFERENCES public.equipment(equipment_id) ON UPDATE CASCADE;
+
+
+--
+-- Name: process_data fk_process_data_unit; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_data
+    ADD CONSTRAINT fk_process_data_unit FOREIGN KEY (unit_id) REFERENCES public.process_units(unit_id) ON UPDATE CASCADE;
+
+
+--
+-- Name: process_tags process_tags_unit_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.process_tags
+    ADD CONSTRAINT process_tags_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.process_units(unit_id);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict jV8INA0A5pVZLwfQQXdLuKwIjp2ZS0sIdnA3iqHLplyeOF0BzTozhfUNN21DILe
+

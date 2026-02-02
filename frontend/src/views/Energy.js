@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { FiZap, FiTarget } from 'react-icons/fi';
-
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 const Energy = () => {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    axios.get('http://192.168.1.108:8000/api/energy/analysis')
+    axios.get(`${API_URL}/api/energy/analysis`)
       .then(res => setData(res.data))
       .catch(err => console.error(err));
-  }, []);
+}, []);
 
   // Función para abreviar nombres largos automáticamente en el gráfico
   const formatXAxis = (name) => {

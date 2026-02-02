@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { FiCpu, FiAlertTriangle } from 'react-icons/fi';
-
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 const Maintenance = () => {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    axios.get('http://192.168.1.108:8000/api/maintenance/predictions')
+    // Usar comillas invertidas ` `
+    axios.get(`${API_URL}/api/maintenance/predictions`)
       .then(res => setData(res.data))
       .catch(err => console.error(err));
-  }, []);
+}, []);
 
   const getRiskColor = (prob) => prob > 80 ? '#ef4444' : prob > 40 ? '#f59e0b' : '#10b981';
 
