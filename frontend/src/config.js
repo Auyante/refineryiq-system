@@ -1,9 +1,17 @@
-// Detectamos si estamos corriendo en localhost (tu PC)
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+// ==========================================
+// CONFIGURACIÓN CENTRAL DE CONEXIÓN
+// ==========================================
 
-// Si es local, usa el puerto 8000. Si es nube, usa la URL de Render SIN PUERTO.
-export const API_URL = isLocal 
-  ? "http://localhost:8000" 
-  : "https://refineryiq-system.onrender.com"; // <--- TU BACKEND EN RENDER
+// Detectamos si estamos en un entorno seguro (HTTPS)
+const isSecure = window.location.protocol === 'https:';
 
-console.log("🌐 Conectando a:", API_URL); // Para depurar en consola
+// MODO NUBE FORZADA:
+// Usamos siempre la URL de Render para evitar errores de "localhost" sin backend.
+// Si algún día quieres trabajar 100% local, cambia esta URL a "http://localhost:8000"
+export const API_URL = "https://refineryiq-system.onrender.com";
+
+// Exportamos el HOST para mostrarlo en el Dashboard (solo visual)
+export const APP_HOST = window.location.hostname;
+
+console.log("🚀 SISTEMA INICIADO");
+console.log("🌐 Conectando a Backend:", API_URL);

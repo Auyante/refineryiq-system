@@ -1,44 +1,57 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { FiUser, FiLock, FiEye, FiEyeOff, FiCpu, FiActivity } from 'react-icons/fi';
+import { FiUser, FiLock, FiEye, FiEyeOff, FiCpu, FiActivity, FiWifiOff } from 'react-icons/fi';
+import { API_URL } from '../config'; // <--- IMPORTACIÓN CENTRALIZADA
 import '../App.css';
 
 const Login = ({ onLogin }) => {
-  // --- CONFIGURACIÓN DE RED ---
-  // ✅ PEGA ESTO (Usa la variable de entorno como los demás)
-// Si estamos en localhost, usa el 8000. Si no, usa la URL de Render.
-  const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-   ? "http://localhost:8000"
-   : "https://refineryiq-system.onrender.com";
-
   // --- ESTADOS ---
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isNetworkError, setIsNetworkError] = useState(false);
 
   // --- MANEJO DE LOGIN ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsNetworkError(false);
     setLoading(true);
 
-    // Simulamos un pequeño delay artificial (800ms) para que se vea la animación de carga
-    // Esto da sensación de seguridad y procesamiento robusto.
-    setTimeout(async () => {
-      try {
-        const res = await axios.post(`${API_URL}/api/auth/login`, { username, password });
-        if (res.data.token) {
-          onLogin(res.data); // Éxito: Pasamos datos al App.js
-        }
-      } catch (err) {
-        setLoading(false);
-        setError('Credenciales no válidas. Verifique sus datos.');
-        // Vibración en móviles si falla
-        if (navigator.vibrate) navigator.vibrate(200);
+    try {
+      console.log(`🔐 Intentando login en: ${API_URL}/api/auth/login`);
+      
+      // Aumentamos el timeout a 30 segundos porque Render versión gratuita se "duerme"
+      const res = await axios.post(`${API_URL}/api/auth/login`, 
+        { username, password },
+        { timeout: 30000 } 
+      );
+
+      if (res.data.token) {
+        console.log("✅ Login exitoso");
+        onLogin(res.data);
       }
-    }, 800);
+    } catch (err) {
+      console.error("❌ Error de Login:", err);
+      setLoading(false);
+
+      // DIAGNÓSTICO EXACTO DEL ERROR
+      if (err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED') {
+        // Error de conexión (Backend apagado o sin internet)
+        setError('No se pudo conectar con el servidor. El sistema podría estar iniciándose (espere 30s).');
+        setIsNetworkError(true);
+      } else if (err.response && err.response.status === 401) {
+        // Credenciales malas real
+        setError('Usuario o contraseña incorrectos.');
+      } else {
+        // Otro error
+        setError('Error del sistema. Intente nuevamente.');
+      }
+
+      if (navigator.vibrate) navigator.vibrate(200);
+    }
   };
 
   return (
@@ -46,151 +59,56 @@ const Login = ({ onLogin }) => {
       {/* FONDO ANIMADO CSS */}
       <style>{`
         .login-container {
-          height: 100vh;
-          width: 100vw;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center;
           background: linear-gradient(-45deg, #0f172a, #1e3a8a, #020617, #1e40af);
-          background-size: 400% 400%;
-          animation: gradientBG 15s ease infinite;
-          position: relative;
-          overflow: hidden;
+          background-size: 400% 400%; animation: gradientBG 15s ease infinite;
+          position: relative; overflow: hidden;
         }
-
         @keyframes gradientBG {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
-
-        /* Efecto de partículas (Grid) */
         .grid-overlay {
-          position: absolute;
-          width: 100%; height: 100%;
-          background-image: 
-            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-          background-size: 40px 40px;
-          pointer-events: none;
+          position: absolute; width: 100%; height: 100%;
+          background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 40px 40px; pointer-events: none;
         }
-
-        /* Glassmorphism Card */
         .login-card {
-          background: rgba(255, 255, 255, 0.05);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          padding: 3rem 2.5rem;
-          border-radius: 20px;
-          width: 100%;
-          max-width: 420px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-          text-align: center;
+          background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1);
+          padding: 3rem 2.5rem; border-radius: 20px; width: 100%; max-width: 420px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); text-align: center;
           animation: fadeInUp 0.6s ease-out;
         }
-
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .input-group {
-          position: relative;
-          margin-bottom: 1.25rem;
-          text-align: left;
-        }
-
-        .input-icon {
-          position: absolute;
-          left: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #94a3b8;
-          font-size: 1.2rem;
-          transition: color 0.3s;
-        }
-
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .input-group { position: relative; margin-bottom: 1.25rem; text-align: left; }
+        .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 1.2rem; }
         .input-field {
-          width: 100%;
-          padding: 14px 14px 14px 45px; /* Espacio para el icono */
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-          color: white;
-          font-size: 1rem;
-          outline: none;
+          width: 100%; padding: 14px 14px 14px 45px; background: rgba(15, 23, 42, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: white; font-size: 1rem; outline: none;
           transition: all 0.3s ease;
         }
-
-        .input-field:focus {
-          border-color: #3b82f6;
-          background: rgba(15, 23, 42, 0.8);
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-        }
-
-        .input-field:focus + .input-icon {
-          color: #3b82f6;
-        }
-
-        .password-toggle {
-          position: absolute;
-          right: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #64748b;
-          cursor: pointer;
-        }
-
+        .input-field:focus { border-color: #3b82f6; background: rgba(15, 23, 42, 0.8); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
+        .password-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #64748b; cursor: pointer; }
         .login-btn {
-          width: 100%;
-          padding: 14px;
-          background: linear-gradient(to right, #2563eb, #3b82f6);
-          color: white;
-          border: none;
-          border-radius: 10px;
-          font-size: 1rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          margin-top: 1rem;
+          width: 100%; padding: 14px; background: linear-gradient(to right, #2563eb, #3b82f6);
+          color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer;
+          transition: transform 0.2s; display: flex; align-items: center; justify-content: center; margin-top: 1rem;
         }
-
-        .login-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
-        }
-
-        .login-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-          transform: none;
-        }
-
+        .login-btn:hover { transform: translateY(-2px); }
+        .login-btn:disabled { opacity: 0.7; cursor: wait; }
         .spinner {
-          width: 18px; height: 18px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-radius: 50%;
-          border-top-color: white;
-          animation: spin 1s linear infinite;
+          width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
+          border-top-color: white; animation: spin 1s linear infinite;
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-
-        .hint-text {
-          margin-top: 2rem;
-          font-size: 0.8rem;
-          color: #64748b;
-        }
       `}</style>
 
       <div className="grid-overlay"></div>
 
       <div className="login-card">
-        {/* LOGO ANIMADO */}
         <div style={{
           width: 64, height: 64, margin: '0 auto 1.5rem',
           background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
@@ -204,58 +122,38 @@ const Login = ({ onLogin }) => {
         <p style={{color: '#94a3b8', marginBottom: '2.5rem', fontSize: '0.95rem'}}>Acceso Seguro de Planta v3.0</p>
 
         <form onSubmit={handleSubmit}>
-          {/* USUARIO */}
           <div className="input-group">
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Usuario ID"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
+            <input type="text" className="input-field" placeholder="Usuario ID" value={username} onChange={(e) => setUsername(e.target.value)} required />
             <FiUser className="input-icon" />
           </div>
 
-          {/* CONTRASEÑA */}
           <div className="input-group">
-            <input 
-              type={showPassword ? "text" : "password"} 
-              className="input-field" 
-              placeholder="Contraseña de Acceso"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <input type={showPassword ? "text" : "password"} className="input-field" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
             <FiLock className="input-icon" />
-            <div 
-              className="password-toggle"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <FiEyeOff /> : <FiEye />}
-            </div>
+            <div className="password-toggle" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <FiEyeOff /> : <FiEye />}</div>
           </div>
 
-          {/* MENSAJE DE ERROR */}
           {error && (
             <div style={{
-              background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', 
-              color: '#fca5a5', padding: '10px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem',
-              display: 'flex', alignItems: 'center', gap: '8px'
+              background: isNetworkError ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${isNetworkError ? 'rgba(234, 179, 8, 0.3)' : 'rgba(239, 68, 68, 0.2)'}`,
+              color: isNetworkError ? '#fde047' : '#fca5a5',
+              padding: '12px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem',
+              display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left'
             }}>
-              <FiActivity /> {error}
+              {isNetworkError ? <FiWifiOff size={24} /> : <FiActivity size={20} />} 
+              <span>{error}</span>
             </div>
           )}
 
-          {/* BOTÓN DE LOGIN */}
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? <div className="spinner"></div> : 'Iniciar Sesión'}
           </button>
         </form>
 
-        <div className="hint-text">
-          <p>Credenciales de prueba: <strong>admin</strong> / <strong>admin123</strong></p>
-          <p style={{marginTop: '5px'}}>RefineryIQ Technologies © 2026</p>
+        <div style={{marginTop: '2rem', fontSize: '0.8rem', color: '#64748b'}}>
+          <p>Credenciales: <strong>admin</strong> / <strong>admin123</strong></p>
+          <p style={{marginTop:'5px', fontSize:'0.7rem', opacity:0.5}}>Conectando a: {API_URL.replace('https://', '')}</p>
         </div>
       </div>
     </div>
