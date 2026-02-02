@@ -352,10 +352,12 @@ app = FastAPI(
 
 # Configuración CORS EXTREMADAMENTE PERMISIVA para Render
 # Configuración CORS para dominio personalizado
+# Configuración CORS para todos los dominios
 origins = [
     # Desarrollo local
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:8000",
     
     # Render URLs
     "https://refineryiq-frontend.onrender.com",
@@ -366,6 +368,9 @@ origins = [
     "https://www.refineryiq.dev",
     "https://api.refineryiq.dev",
     "https://system.refineryiq.dev",
+    
+    # Para permitir desde cualquier origen en desarrollo
+    "*"  # Solo para desarrollo, en producción es mejor especificar
 ]
 
 app.add_middleware(
@@ -374,8 +379,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
-
 # Middleware de Logging y Manejo de Errores Global
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

@@ -182,7 +182,28 @@ def validate_and_repair_schema():
             # Confirmar cambios de estructura
             transaction.commit()
             logger.info("✅ Esquema de base de datos validado y reparado.")
-
+             # --- 5. REPARACIÓN: TANKS (Error: column "last_updated" does not exist) ---
+        try:
+            conn.execute(text("SELECT last_updated FROM tanks LIMIT 1"))
+        except (ProgrammingError, OperationalError) as e:
+            logger.warning(f"⚠️ Tabla 'tanks' corrupta. Reconstruyendo... Error: {e}")
+            transaction.rollback()
+            transaction = conn.begin()
+            conn.execute(text("DROP TABLE IF EXISTS tanks CASCADE"))
+            conn.execute(text("""
+                CREATE TABLE tanks (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT,
+                    product TEXT,
+                    capacity FLOAT,
+                    current_level FLOAT,
+                    status TEXT,
+                    last_updated TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            logger.info("✅ Tabla 'tanks' reconstruida exitosamente.")
+            
+            transaction.commit()
         except Exception as e:
             logger.error(f"❌ Error crítico durante la reparación del esquema: {e}")
             transaction.rollback()
@@ -256,7 +277,7 @@ def simulate_process_dynamics(conn):
     """Genera datos de sensores, KPIs y movimiento de tanques."""
     logger.info("⚡ Simulando dinámica de planta...")
     
-    # A. Sensores (Process Data) - CORREGIDO: usar min_val y max_val
+    # A. Sensores (Process Data)
     for tag in TAGS_CONFIG:
         # Generar valor con ruido gaussiano
         center = (tag["min_val"] + tag["max_val"]) / 2
@@ -290,13 +311,18 @@ def simulate_process_dynamics(conn):
         })
 
     # C. Dinámica de Tanques (Suben y bajan suavemente)
+    # Primero verifica si hay tanques, si no, créalos
     tanks = conn.execute(text("SELECT id, name, capacity, current_level, status FROM tanks")).fetchall()
     if not tanks:
         # Inicializar si vacío
         for name, info in TANK_PRODUCTS.items():
             conn.execute(text("""
-                INSERT INTO tanks (name, product, capacity, current_level, status)
-                VALUES (:n, :p, :c, :l, 'STABLE')
+                INSERT INTO tanks (name, product, capacity, current_level, status, last_updated)
+                VALUES (:n, :p, :c, :l, 'STABLE', NOW())
+                ON CONFLICT (name) DO UPDATE SET
+                    current_level = EXCLUDED.current_level,
+                    status = EXCLUDED.status,
+                    last_updated = EXCLUDED.last_updated
             """), {
                 "n": name, 
                 "p": info['prod'], 
@@ -332,7 +358,6 @@ def simulate_process_dynamics(conn):
                 "s": new_status, 
                 "id": tid
             })
-
 def manage_alerts_lifecycle(conn):
     """
     Ciclo de vida de alertas:

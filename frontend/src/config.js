@@ -1,14 +1,19 @@
 // ============================================================================
-// CONFIGURACIÓN DEFINITIVA CON DOMINIO PERSONALIZADO
+// CONFIGURACIÓN DEFINITIVA - CORREGIDA PARA CORS
 // ============================================================================
 
-// DETECCIÓN AUTOMÁTICA DEL ENTORNO
+// DETECCIÓN AUTOMÁTICA DEL BACKEND
 const getBackendUrl = () => {
   const host = window.location.hostname;
   
-  // PRODUCCIÓN - Dominio personalizado
+  // PRODUCCIÓN - Dominio personalizado (usa api.subdominio)
   if (host === 'refineryiq.dev' || host === 'www.refineryiq.dev') {
     return 'https://api.refineryiq.dev';
+  }
+  
+  // Si estás en el dominio del backend (por si acaso)
+  if (host === 'api.refineryiq.dev' || host === 'system.refineryiq.dev') {
+    return `https://${host}`;
   }
   
   // DESARROLLO LOCAL
@@ -23,7 +28,7 @@ const getBackendUrl = () => {
 export const API_URL = getBackendUrl();
 export const APP_HOST = window.location.hostname;
 
-// Logs para depuración
+// Logs para depuración (siempre visibles para debug)
 console.log("🌍 REFINERYIQ - CONFIGURACIÓN ACTIVA");
 console.log(`📱 Dominio: ${APP_HOST}`);
 console.log(`🔗 Backend: ${API_URL}`);
