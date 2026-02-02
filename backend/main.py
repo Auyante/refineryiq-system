@@ -538,8 +538,8 @@ async def get_dashboard_history():
     finally: 
         await conn.close()
 
+
 @app.get("/api/stats/advanced")
-a@app.get("/api/stats/advanced")
 async def get_advanced_stats():
     """Estadísticas avanzadas para OEE y Radar Chart."""
     conn = await get_db_conn()
