@@ -10,7 +10,8 @@ class EnergyOptimizationSystem:
         self.benchmarks = {
             'CDU-101': {'energy_per_barrel': 45, 'target': 42},
             'FCC-201': {'energy_per_barrel': 65, 'target': 60},
-            'HT-301': {'energy_per_barrel': 35, 'target': 32}
+            'HT-305': {'energy_per_barrel': 35, 'target': 32},
+            'ALK-400': {'energy_per_barrel': 40, 'target': 38}
         }
     
     async def analyze_unit_energy(self, db_conn, unit_id: str, hours: int = 24):
@@ -92,52 +93,37 @@ class EnergyOptimizationSystem:
         try:
             await db_conn.execute('''
                 INSERT INTO energy_analysis 
-                (unit_id, analysis_date, avg_energy_consumption, benchmark, target,
-                 efficiency_score, status, inefficiencies, recommendations, estimated_savings, timestamp)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                (unit_id, efficiency_score, consumption_kwh, savings_potential, recommendation, analysis_date, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
             ''',
                 analysis['unit_id'],
-                analysis['analysis_date'],
-                analysis['avg_energy_consumption'],
-                analysis['benchmark'],
-                analysis['target'],
                 analysis['efficiency_score'],
-                analysis['status'],
-                json.dumps(analysis['inefficiencies']),
-                json.dumps(analysis['recommendations']),
+                analysis['avg_energy_consumption'],
                 analysis['estimated_savings'],
-                analysis['timestamp']
+                json.dumps(analysis['recommendations']),
+                analysis['analysis_date'],
+                analysis['status']
             )
         except Exception as e:
             print(f"⚠️ Error guardando análisis energético: {e}")
             # Si la tabla no existe, crearla
             if 'relation "energy_analysis" does not exist' in str(e):
-                await self.create_energy_analysis_table(db_conn)
+                await db_conn.execute('''
+                    CREATE TABLE IF NOT EXISTS energy_analysis (
+                        id SERIAL PRIMARY KEY,
+                        unit_id VARCHAR(20),
+                        efficiency_score FLOAT,
+                        consumption_kwh FLOAT,
+                        savings_potential FLOAT,
+                        recommendation TEXT,
+                        analysis_date DATE,
+                        status VARCHAR(20),
+                        timestamp TIMESTAMPTZ DEFAULT NOW()
+                    )
+                ''')
+                print("✅ Tabla 'energy_analysis' creada")
                 # Intentar de nuevo
                 await self.save_energy_analysis(db_conn, analysis)
-    
-    async def create_energy_analysis_table(self, db_conn):
-        """Crea la tabla energy_analysis si no existe"""
-        try:
-            await db_conn.execute('''
-                CREATE TABLE IF NOT EXISTS energy_analysis (
-                    id SERIAL PRIMARY KEY,
-                    unit_id VARCHAR(20),
-                    analysis_date DATE,
-                    avg_energy_consumption FLOAT,
-                    benchmark FLOAT,
-                    target FLOAT,
-                    efficiency_score FLOAT,
-                    status VARCHAR(20),
-                    inefficiencies JSONB,
-                    recommendations JSONB,
-                    estimated_savings FLOAT,
-                    timestamp TIMESTAMPTZ DEFAULT NOW()
-                )
-            ''')
-            print("✅ Tabla 'energy_analysis' creada")
-        except Exception as e:
-            print(f"❌ Error creando tabla energy_analysis: {e}")
     
     async def get_recent_analysis(self, db_conn, unit_id: str = None, limit: int = 5):
         """Obtiene análisis energéticos recientes"""

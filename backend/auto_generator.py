@@ -104,7 +104,6 @@ def validate_and_repair_schema():
         try:
             # --- 1. REPARACIÓN: INVENTORY (Error: column "item" does not exist) ---
             try:
-                # Intentamos leer la columna conflictiva
                 conn.execute(text("SELECT item FROM inventory LIMIT 1"))
             except (ProgrammingError, OperationalError) as e:
                 logger.warning(f"⚠️ Tabla 'inventory' corrupta (Falta columna 'item'). Reconstruyendo... Error: {e}")
@@ -153,7 +152,6 @@ def validate_and_repair_schema():
                 logger.warning(f"⚠️ Tabla 'process_units' obsoleta. Migrando... Error: {e}")
                 transaction.rollback()
                 transaction = conn.begin()
-                # Aquí podemos usar ALTER TABLE en lugar de DROP
                 conn.execute(text("ALTER TABLE process_units ADD COLUMN IF NOT EXISTS description TEXT"))
                 logger.info("✅ Tabla 'process_units' migrada.")
 
@@ -182,6 +180,12 @@ def validate_and_repair_schema():
             # --- 5. REPARACIÓN: TANKS (Error: column "last_updated" does not exist) ---
             try:
                 conn.execute(text("SELECT last_updated FROM tanks LIMIT 1"))
+                # Intentar agregar restricción UNIQUE si no existe
+                try:
+                    conn.execute(text("ALTER TABLE tanks ADD CONSTRAINT IF NOT EXISTS tanks_name_unique UNIQUE (name)"))
+                    logger.info("✅ Restricción UNIQUE agregada a 'tanks.name'.")
+                except Exception as e:
+                    logger.warning(f"⚠️ No se pudo agregar restricción UNIQUE a tanks: {e}")
             except (ProgrammingError, OperationalError) as e:
                 logger.warning(f"⚠️ Tabla 'tanks' corrupta. Reconstruyendo... Error: {e}")
                 transaction.rollback()
@@ -200,7 +204,6 @@ def validate_and_repair_schema():
                 """))
                 logger.info("✅ Tabla 'tanks' reconstruida exitosamente.")
             
-            # Confirmar cambios de estructura
             transaction.commit()
             logger.info("✅ Esquema de base de datos validado y reparado.")
             
@@ -311,28 +314,40 @@ def simulate_process_dynamics(conn):
         })
 
     # C. Dinámica de Tanques (Suben y bajan suavemente)
-    # Primero verifica si hay tanques, si no, créalos
     tanks = conn.execute(text("SELECT id, name, capacity, current_level, status FROM tanks")).fetchall()
+    
     if not tanks:
         # Inicializar si vacío
         for name, info in TANK_PRODUCTS.items():
-            conn.execute(text("""
-                INSERT INTO tanks (name, product, capacity, current_level, status, last_updated)
-                VALUES (:n, :p, :c, :l, 'STABLE', NOW())
-                ON CONFLICT (name) DO UPDATE SET
-                    current_level = EXCLUDED.current_level,
-                    status = EXCLUDED.status,
-                    last_updated = EXCLUDED.last_updated
-            """), {
-                "n": name, 
-                "p": info['prod'], 
-                "c": info['cap'], 
-                "l": info['cap']*0.6
-            })
+            # Primero verificar si ya existe
+            existing = conn.execute(text("SELECT id FROM tanks WHERE name = :name"), {"name": name}).fetchone()
+            if existing:
+                # Actualizar si existe
+                conn.execute(text("""
+                    UPDATE tanks SET product = :p, capacity = :c, current_level = :l, 
+                    status = 'STABLE', last_updated = NOW() 
+                    WHERE id = :id
+                """), {
+                    "id": existing[0],
+                    "p": info['prod'], 
+                    "c": info['cap'], 
+                    "l": info['cap'] * 0.6
+                })
+            else:
+                # Insertar si no existe
+                conn.execute(text("""
+                    INSERT INTO tanks (name, product, capacity, current_level, status, last_updated)
+                    VALUES (:n, :p, :c, :l, 'STABLE', NOW())
+                """), {
+                    "n": name, 
+                    "p": info['prod'], 
+                    "c": info['cap'], 
+                    "l": info['cap'] * 0.6
+                })
     else:
         for t in tanks:
             tid, tname, cap, level, status = t
-            delta = cap * 0.015 # 1.5% de cambio
+            delta = cap * 0.015  # 1.5% de cambio
             
             new_lvl = level
             new_status = status
@@ -405,7 +420,7 @@ def backfill_missing_history(conn):
     logger.info("🕰️ Verificando historial de 24h...")
     count = conn.execute(text("SELECT COUNT(*) FROM kpis WHERE timestamp > NOW() - INTERVAL '24 hours'")).scalar()
     
-    if count < 20: # Si hay muy pocos datos
+    if count < 20:  # Si hay muy pocos datos
         logger.info("   ↳ Generando historial retroactivo...")
         now = datetime.now()
         for i in range(24):

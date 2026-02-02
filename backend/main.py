@@ -555,6 +555,7 @@ async def get_supplies_data():
 # ==============================================================================
 
 @app.get("/api/assets/overview", response_model=List[EquipmentResponse])
+@app.get("/api/assets/overview", response_model=List[EquipmentResponse])
 async def get_assets_overview():
     """Endpoint masivo: Equipos + Unidades + Sensores + Valores."""
     conn = await get_db_conn()
@@ -563,13 +564,33 @@ async def get_assets_overview():
     
     try:
         query = """
-            SELECT e.equipment_id, e.equipment_name, e.equipment_type, e.status, e.unit_id, pu.name as unit_name,
-            COALESCE(json_agg(json_build_object('tag_name', pt.tag_name, 'value', pd.value, 'units', pt.engineering_units)) 
-            FILTER (WHERE pt.tag_id IS NOT NULL), '[]') as sensors
+            SELECT 
+                e.equipment_id, 
+                e.equipment_name, 
+                e.equipment_type, 
+                e.status, 
+                e.unit_id, 
+                pu.name as unit_name,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'tag_name', pt.tag_name, 
+                            'value', pd.value, 
+                            'units', pt.engineering_units
+                        ) 
+                    ) FILTER (WHERE pt.tag_id IS NOT NULL), 
+                    '[]'
+                ) as sensors
             FROM equipment e
             LEFT JOIN process_units pu ON e.unit_id = pu.unit_id
             LEFT JOIN process_tags pt ON pt.unit_id = e.unit_id 
-            LEFT JOIN LATERAL (SELECT value FROM process_data WHERE tag_id = pt.tag_id ORDER BY timestamp DESC LIMIT 1) pd ON true
+            LEFT JOIN LATERAL (
+                SELECT value 
+                FROM process_data 
+                WHERE tag_id = pt.tag_id 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            ) pd ON true
             GROUP BY e.equipment_id, e.equipment_name, e.equipment_type, e.status, e.unit_id, pu.name
             ORDER BY e.unit_id, e.equipment_name
         """
@@ -577,11 +598,13 @@ async def get_assets_overview():
         results = []
         for row in rows:
             data = dict(row)
-            if isinstance(data['sensors'], str):
+            if isinstance(data.get('sensors'), str):
                 try:
                     data['sensors'] = json.loads(data['sensors'])
                 except:
                     data['sensors'] = []
+            elif data.get('sensors') is None:
+                data['sensors'] = []
             results.append(data)
         return results
     except Exception as e:

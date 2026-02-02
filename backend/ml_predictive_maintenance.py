@@ -14,21 +14,30 @@ class PredictiveMaintenanceSystem:
     def __init__(self):
         self.models = {}
         self.scalers = {}
-        self.model_path = "backend/ml_models/"
+        self.model_path = "ml_models/"
         os.makedirs(self.model_path, exist_ok=True)
         
     async def initialize_models(self, db_conn):
         """Inicializa o carga modelos existentes"""
-        equipment_types = ['PUMP', 'COMPRESSOR', 'VALVE', 'HEAT_EXCHANGER']
+        equipment_types = ['PUMP', 'COMPRESSOR', 'VALVE', 'EXCHANGER', 'FURNACE', 'TOWER', 'REACTOR', 'VESSEL']
         
         for eq_type in equipment_types:
             model_file = f"{self.model_path}{eq_type}_model.pkl"
             scaler_file = f"{self.model_path}{eq_type}_scaler.pkl"
             
             if os.path.exists(model_file):
-                self.models[eq_type] = joblib.load(model_file)
-                self.scalers[eq_type] = joblib.load(scaler_file)
-                print(f"✅ Modelo cargado para {eq_type}")
+                try:
+                    self.models[eq_type] = joblib.load(model_file)
+                    self.scalers[eq_type] = joblib.load(scaler_file)
+                    print(f"✅ Modelo cargado para {eq_type}")
+                except:
+                    print(f"⚠️ Error cargando modelo para {eq_type}, creando nuevo...")
+                    self.models[eq_type] = RandomForestClassifier(
+                        n_estimators=100,
+                        max_depth=10,
+                        random_state=42
+                    )
+                    self.scalers[eq_type] = StandardScaler()
             else:
                 # Crear nuevo modelo
                 self.models[eq_type] = RandomForestClassifier(
@@ -141,13 +150,19 @@ class PredictiveMaintenanceSystem:
                 np.random.normal(3.2, 0.3),
                 np.random.normal(78, 5)
             ]
-        else:  # VALVE
+        elif equipment_type == 'VALVE':
             return [
                 np.random.normal(0.5, 0.2),
                 np.random.normal(2.0, 0.5),
                 np.random.normal(0.1, 0.05),
-                np.random.normal(95, 3),
-                np.random.normal(25, 5)
+                np.random.normal(95, 3)
+            ]
+        else:
+            return [
+                np.random.normal(50, 10),
+                np.random.normal(25, 5),
+                np.random.normal(100, 15),
+                np.random.normal(75, 10)
             ]
     
     def generate_recommendation(self, equipment_type: str, probability: float):
@@ -163,40 +178,58 @@ class PredictiveMaintenanceSystem:
     
     async def save_prediction(self, db_conn, prediction: Dict):
         """Guarda predicción en la base de datos"""
-        await db_conn.execute('''
-            INSERT INTO maintenance_predictions 
-            (equipment_id, equipment_type, unit_id, failure_probability, 
-             prediction, confidence, recommendation, timestamp, features)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ''',
-            prediction['equipment_id'],
-            prediction['equipment_type'],
-            prediction['unit_id'],
-            prediction['failure_probability'],
-            prediction['prediction'],
-            prediction['confidence'],
-            prediction['recommendation'],
-            prediction['timestamp'],
-            json.dumps(prediction['features'])
-        )
+        try:
+            await db_conn.execute('''
+                INSERT INTO maintenance_predictions 
+                (equipment_id, failure_probability, prediction, recommendation, timestamp, confidence)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            ''',
+                prediction['equipment_id'],
+                prediction['failure_probability'],
+                prediction['prediction'],
+                prediction['recommendation'],
+                prediction['timestamp'],
+                prediction['confidence']
+            )
+        except Exception as e:
+            print(f"⚠️ Error guardando predicción: {e}")
+            # Crear tabla si no existe
+            if 'relation "maintenance_predictions" does not exist' in str(e):
+                await db_conn.execute('''
+                    CREATE TABLE IF NOT EXISTS maintenance_predictions (
+                        id SERIAL PRIMARY KEY,
+                        equipment_id TEXT,
+                        failure_probability FLOAT,
+                        prediction TEXT,
+                        recommendation TEXT,
+                        timestamp TIMESTAMPTZ,
+                        confidence FLOAT
+                    )
+                ''')
+                # Reintentar
+                await self.save_prediction(db_conn, prediction)
     
     async def get_recent_predictions(self, db_conn, limit: int = 10):
         """Obtiene predicciones recientes"""
-        rows = await db_conn.fetch('''
-            SELECT * FROM maintenance_predictions 
-            ORDER BY timestamp DESC 
-            LIMIT $1
-        ''', limit)
-        
-        return [dict(row) for row in rows]
+        try:
+            rows = await db_conn.fetch('''
+                SELECT * FROM maintenance_predictions 
+                ORDER BY timestamp DESC 
+                LIMIT $1
+            ''', limit)
+            
+            return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"❌ Error obteniendo predicciones: {e}")
+            return []
     
     async def analyze_all_equipment(self, db_conn):
         """Analiza todos los equipos críticos"""
         equipment_list = [
-            {"id": "PUMP-CDU-101", "type": "PUMP", "unit": "CDU-101"},
-            {"id": "PUMP-CDU-102", "type": "PUMP", "unit": "CDU-101"},
-            {"id": "COMP-FCC-201", "type": "COMPRESSOR", "unit": "FCC-201"},
-            {"id": "VALVE-HT-301", "type": "VALVE", "unit": "HT-301"},
+            {"id": "PUMP-101", "type": "PUMP", "unit": "CDU-101"},
+            {"id": "PUMP-305", "type": "PUMP", "unit": "HT-305"},
+            {"id": "COMP-201", "type": "COMPRESSOR", "unit": "FCC-201"},
+            {"id": "VALVE-401", "type": "VALVE", "unit": "ALK-400"},
         ]
         
         results = []
