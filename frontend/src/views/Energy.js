@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { FiZap, FiTarget } from 'react-icons/fi';
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+import { API_URL } from '../config';
+import axios from 'axios';
+// (Borra la línea vieja const API_URL = ...)
 const Energy = () => {
   const [data, setData] = useState([]);
 

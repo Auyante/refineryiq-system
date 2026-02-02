@@ -6,7 +6,8 @@ import {
   FiCheck, FiX, FiAlertCircle, FiThermometer, FiDroplet,
   FiClock, FiActivity
 } from 'react-icons/fi';
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+import { API_URL } from '../config'; // Asegúrate que la ruta sea correcta
+import axios from 'axios';
 const NormalizedDataViewer = () => {
   const [activeTab, setActiveTab] = useState('units');
   const [units, setUnits] = useState([]);

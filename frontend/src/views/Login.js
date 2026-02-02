@@ -5,9 +5,11 @@ import '../App.css';
 
 const Login = ({ onLogin }) => {
   // --- CONFIGURACIÓN DE RED ---
-  const PROTOCOL = window.location.protocol;
-  const HOST = window.location.hostname;
-  const API_URL = `${PROTOCOL}//${HOST}:8000`;
+  // ✅ PEGA ESTO (Usa la variable de entorno como los demás)
+// Si estamos en localhost, usa el 8000. Si no, usa la URL de Render.
+  const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+   ? "http://localhost:8000"
+   : "https://refineryiq-system.onrender.com";
 
   // --- ESTADOS ---
   const [username, setUsername] = useState('');

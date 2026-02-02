@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { FiCpu, FiAlertTriangle } from 'react-icons/fi';
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+import { API_URL } from '../config';
+import axios from 'axios';
+// (Borra la línea vieja const API_URL = ...)
 const Maintenance = () => {
   const [data, setData] = useState([]);
 
