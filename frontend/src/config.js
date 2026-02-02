@@ -1,17 +1,20 @@
 // ==========================================
-// CONFIGURACIÓN CENTRAL DE CONEXIÓN
+// CONFIGURACIÓN CENTRAL DE CONEXIÓN (V4.0)
 // ==========================================
 
-// Detectamos si estamos en un entorno seguro (HTTPS)
+// 1. Detectamos si estamos corriendo en la Nube (HTTPS) o en Local
 const isSecure = window.location.protocol === 'https:';
 
-// MODO NUBE FORZADA:
-// Usamos siempre la URL de Render para evitar errores de "localhost" sin backend.
-// Si algún día quieres trabajar 100% local, cambia esta URL a "http://localhost:8000"
-export const API_URL = "https://refineryiq-system.onrender.com";
+// 2. Definimos la URL del Backend
+// - Si es Nube (Render): Usa la dirección oficial https://refineryiq-system.onrender.com
+// - Si es Local (Tu PC): Usa http://localhost:8000
+export const API_URL = isSecure
+  ? "https://refineryiq-system.onrender.com" 
+  : "http://localhost:8000";
 
-// Exportamos el HOST para mostrarlo en el Dashboard (solo visual)
+// 3. Exportamos el Host para mostrarlo en la UI (ej: "Conectado a Render")
 export const APP_HOST = window.location.hostname;
 
 console.log("🚀 SISTEMA INICIADO");
-console.log("🌐 Conectando a Backend:", API_URL);
+console.log("🌐 Modo:", isSecure ? "NUBE (Producción)" : "LOCAL (Desarrollo)");
+console.log("🔗 Backend:", API_URL);
