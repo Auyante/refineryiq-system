@@ -8,63 +8,60 @@ import {
   FiTrendingUp, FiCheckCircle, FiPieChart, FiAlertCircle, 
   FiPrinter, FiCpu, FiServer, FiWifi, FiRefreshCw, FiActivity, FiArrowUp, FiArrowDown
 } from 'react-icons/fi';
-import { API_URL, APP_HOST } from '../config'; // <--- CONEXIÓN INTELIGENTE
+import { API_URL, APP_HOST } from '../config'; // <--- IMPORTACIÓN VITAL PARA LA NUBE
 import '../App.css'; 
 
 /**
- * ============================================================================
- * COMPONENTE DASHBOARD PRINCIPAL (V3.5 ULTIMATE)
- * ============================================================================
- * Características: 
- * - Auto-conexión Cloud/Local.
- * - Refresco silencioso de datos en segundo plano.
- * - Gráficos avanzados con Recharts.
- * - Interfaz ejecutiva con KPIs financieros y operativos.
+ * COMPONENTE DASHBOARD PRINCIPAL
+ * Versión: 3.5 Ultimate (Cloud Adapted)
+ * Características: Auto-IP, Silent Refresh, Custom Tooltips, Full UI
  */
 const Dashboard = () => {
   // ==========================================
-  // 1. CONFIGURACIÓN DE UI
+  // 1. CONFIGURACIÓN DE CONEXIÓN
   // ==========================================
-  // Usamos el host detectado automáticamente para mostrar en la barra de estado
+  // Mantenemos la variable HOST para que tu interfaz la muestre igual que antes
   const HOST = APP_HOST; 
 
   // ==========================================
-  // 2. ESTADOS DE DATOS
+  // 2. ESTADOS DE DATOS Y UI
   // ==========================================
   const [stats, setStats] = useState(null);       // KPIs Numéricos (OEE, Perdidas)
-  const [history, setHistory] = useState([]);     // Datos históricos para gráficos
-  const [advanced, setAdvanced] = useState(null); // Datos avanzados (Radar OEE)
+  const [history, setHistory] = useState([]);     // Datos para el gráfico de Área
+  const [advanced, setAdvanced] = useState(null); // Datos para el Radar y Finanzas
   
-  // Estados de carga y error
+  // Estados de carga
   const [loading, setLoading] = useState(true);   // Carga inicial (Pantalla completa)
   const [refreshing, setRefreshing] = useState(false); // Refresco en segundo plano
-  const [error, setError] = useState(null);       // Mensajes de error críticos
+  const [error, setError] = useState(null);       // Mensajes de error
 
   // ==========================================
   // 3. GENERADOR DE REPORTE PDF
   // ==========================================
   const handlePrintReport = () => {
-    // Abre el endpoint de generación de reportes en una nueva pestaña
+    // Usamos la API_URL centralizada para generar el link correcto
     const reportUrl = `${API_URL}/api/reports/daily`;
-    console.log(`🖨️ Iniciando generación de reporte en: ${reportUrl}`);
+    console.log(`🖨️ Generando reporte PDF desde: ${reportUrl}`);
     window.open(reportUrl, '_blank');
   };
 
   // ==========================================
-  // 4. MOTOR DE DATOS (DATA FETCHING ENGINE)
+  // 4. LÓGICA DE CARGA DE DATOS (DATA FETCHING)
   // ==========================================
   const loadData = async (isBackground = false) => {
     try {
-      // Gestión de estados de carga para no interrumpir al usuario
+      // Si es carga inicial, mostramos spinner grande.
+      // Si es actualización de fondo, solo activamos el indicador pequeño.
       if (!isBackground) {
         setLoading(true);
       } else {
         setRefreshing(true);
       }
 
-      console.log(`📡 Sincronizando Dashboard con ${API_URL}... [Modo: ${isBackground ? 'Silencioso' : 'Completo'}]`);
+      console.log(`📡 Sincronizando telemetría con ${API_URL}... [Modo: ${isBackground ? 'Silencioso' : 'Completo'}]`);
       
-      // Ejecución paralela de peticiones para máxima eficiencia
+      // Ejecutamos todas las peticiones en paralelo para máxima velocidad
+      // Nota: El backend v5.0 ya tiene todos estos endpoints listos.
       const [alertsRes, energyRes, maintRes, historyRes, advRes] = await Promise.all([
         axios.get(`${API_URL}/api/alerts`),
         axios.get(`${API_URL}/api/energy/analysis`),
@@ -76,13 +73,14 @@ const Dashboard = () => {
       // --- Procesamiento de Alertas ---
       const activeAlerts = alertsRes.data.filter(a => !a.acknowledged).length;
       
-      // --- Procesamiento de Eficiencia Energética ---
+      // --- Procesamiento de Eficiencia ---
+      // Calculamos el promedio de eficiencia de todas las unidades
       const efficiencyList = energyRes.data.map(item => parseFloat(item.efficiency_score) || 0);
       const avgEff = efficiencyList.length > 0 
         ? efficiencyList.reduce((a, b) => a + b, 0) / efficiencyList.length 
         : 0;
 
-      // Actualización de Estados
+      // Actualizamos estados con datos reales
       setStats({
         active_alerts: activeAlerts,
         efficiency: avgEff.toFixed(1),
@@ -92,55 +90,54 @@ const Dashboard = () => {
       setHistory(historyRes.data);
       setAdvanced(advRes.data);
       
-      // Finalización exitosa
+      // Finalizamos estados de carga
       setLoading(false);
       setRefreshing(false);
-      setError(null);
+      setError(null); // Limpiamos errores si hubo éxito
 
     } catch (err) { 
-      console.error("❌ Error de Sincronización:", err);
-      // Solo mostramos error intrusivo si falla la carga inicial
-      if (!isBackground) setError("No se pudo establecer conexión con el Núcleo de Planta.");
+      console.error("❌ Error de conexión:", err);
+      // Solo mostramos error en pantalla completa si falló la carga inicial
+      // Si falla el refresco silencioso, no molestamos al usuario.
+      if (!isBackground) setError("No se pudo establecer conexión con el servidor de planta.");
       setLoading(false);
       setRefreshing(false);
     }
   };
 
   // ==========================================
-  // 5. CICLO DE VIDA (LIFECYCLE)
+  // 5. EFECTOS (INICIO Y INTERVALO)
   // ==========================================
   useEffect(() => {
     // 1. Carga inicial inmediata
     loadData(false);
 
-    // 2. Programar actualización automática cada 60 segundos
+    // 2. Programar actualización cada 60 segundos (Silenciosa)
     const interval = setInterval(() => {
       loadData(true); 
     }, 60000);
 
-    // Limpieza al desmontar componente
+    // Limpiar intervalo al salir de la pantalla
     return () => clearInterval(interval);
-  }, []);
+  }, []); // Array vacío para que solo corra al montar el componente
 
   // ==========================================
-  // 6. COMPONENTES AUXILIARES (TOOLTIPS)
+  // 6. COMPONENTE: CUSTOM TOOLTIP (Gráficos)
   // ==========================================
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div style={{
-          backgroundColor: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid rgba(59, 130, 246, 0.2)',
+          backgroundColor: 'rgba(17, 24, 39, 0.9)',
+          border: '1px solid rgba(255,255,255,0.1)',
           padding: '12px',
           borderRadius: '8px',
           color: 'white',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+          boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
         }}>
-          <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {label}
-          </p>
-          <p style={{ margin: '4px 0 0', fontWeight: 'bold', fontSize: '1.1rem', color: '#60a5fa' }}>
-            {payload[0].value.toLocaleString()} <span style={{fontSize: '0.8rem', fontWeight: 400}}>BPD</span>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>{label}</p>
+          <p style={{ margin: '4px 0 0', fontWeight: 'bold', fontSize: '1rem', color: '#60a5fa' }}>
+            {payload[0].value.toLocaleString()} bbl
           </p>
         </div>
       );
@@ -149,39 +146,29 @@ const Dashboard = () => {
   };
 
   // ==========================================
-  // 7. RENDERIZADO: CARGA Y ERROR
+  // 7. RENDERIZADO: PANTALLAS DE CARGA / ERROR
   // ==========================================
   if (loading) {
     return (
       <div className="page-container" style={{display:'flex', justifyContent:'center', alignItems:'center', height:'80vh', flexDirection:'column'}}>
-         <div className="brand-logo" style={{
-           width: 64, height: 64, fontSize: '1.8rem', marginBottom: '24px', 
-           background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white',
-           display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px',
-           animation: 'pulse 2s infinite'
-         }}>IQ</div>
-         <h3 style={{color: '#1e293b', marginBottom: '8px', fontWeight: 700}}>Inicializando Dashboard</h3>
-         <p style={{color: '#64748b', fontSize: '0.9rem'}}>Estableciendo enlace seguro con {HOST}...</p>
-         <style>{`@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }`}</style>
+         <div className="brand-logo" style={{width: 64, height: 64, fontSize: '1.8rem', marginBottom: '24px', animation: 'pulse 1.5s infinite'}}>IQ</div>
+         <h3 style={{color: '#1f2937', marginBottom: '8px'}}>Inicializando Sistema...</h3>
+         <p style={{color: '#6b7280', fontSize: '0.9rem'}}>Estableciendo enlace seguro con {HOST}</p>
+         <style>{`@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); transform: scale(1); } 70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); transform: scale(1.05); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); transform: scale(1); } }`}</style>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="page-container" style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', marginTop:'100px'}}>
-        <div style={{background: '#fef2f2', padding: '20px', borderRadius: '50%', marginBottom: '20px'}}>
-          <FiAlertCircle size={48} color="#ef4444" />
-        </div>
-        <h3 style={{color: '#1e293b', fontSize: '1.5rem', fontWeight: 700}}>Conexión Interrumpida</h3>
-        <p style={{color: '#64748b', maxWidth: '450px', textAlign: 'center', margin: '10px 0 25px', lineHeight: '1.6'}}>
-          No se pudo sincronizar con el backend en <strong>{API_URL}</strong>. <br/>
-          Esto puede deberse a que el servidor "dormido" de Render se está despertando.
+      <div className="page-container" style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', marginTop:'80px'}}>
+        <FiAlertCircle size={60} color="#ef4444" style={{marginBottom: '20px'}} />
+        <h3 style={{color: '#ef4444', fontSize: '1.5rem'}}>Error de Conexión</h3>
+        <p style={{color: '#374151', maxWidth: '400px', textAlign: 'center', margin: '10px 0 20px'}}>
+          {error}. Asegúrate de que el Backend está corriendo en <strong>{API_URL}</strong>
         </p>
         <button onClick={() => window.location.reload()} style={{
-          padding: '12px 28px', background: '#2563eb', color: 'white', border: 'none', 
-          borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '1rem',
-          boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)'
+          padding: '12px 24px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '1rem'
         }}>
           Reintentar Conexión
         </button>
@@ -190,104 +177,118 @@ const Dashboard = () => {
   }
 
   // ==========================================
-  // 8. PREPARACIÓN DE DATOS (RADAR CHART)
+  // 8. PREPARACIÓN DE DATOS (RADAR)
   // ==========================================
+  // Transformamos los datos avanzados para que el gráfico Radar los entienda
   const oeeChartData = advanced ? [
     { subject: 'Calidad', A: advanced.oee.quality, fullMark: 100 },
     { subject: 'Disp.', A: advanced.oee.availability, fullMark: 100 },
     { subject: 'Rendim.', A: advanced.oee.performance, fullMark: 100 },
-    { subject: 'Salud', A: stats ? Math.max(0, 100 - (stats.active_alerts * 8)) : 80, fullMark: 100 },
+    // Salud de activos basada inversamente en alertas (Más alertas = Menos salud)
+    { subject: 'Salud Activos', A: stats ? Math.max(0, 100 - (stats.active_alerts * 10)) : 80, fullMark: 100 },
     { subject: 'Energía', A: parseFloat(stats?.efficiency || 0), fullMark: 100 },
   ] : [];
 
   // ==========================================
-  // 9. RENDERIZADO PRINCIPAL
+  // 9. RENDERIZADO PRINCIPAL (DASHBOARD)
   // ==========================================
   return (
     <div className="page-container">
-      {/* HEADER */}
+      {/* HEADER PRINCIPAL */}
       <div className="page-header">
         <div className="page-title">
-          <h1>Panel de Control Ejecutivo</h1>
-          <p>Visión en tiempo real de operaciones, finanzas y mantenimiento</p>
+          <h1>Control Operativo Principal</h1>
+          <p>Visión integral de producción, finanzas y mantenimiento en tiempo real</p>
         </div>
         
-        {/* Badge de Estado del Sistema */}
-        <div className="status-badge status-success" title={`Conectado a ${API_URL}`} style={{display: 'flex', alignItems: 'center', padding: '8px 16px', gap: '10px'}}>
+        {/* Badge de Estado de Conexión */}
+        <div className="status-badge status-success" title={`Conectado a ${API_URL}`} style={{display: 'flex', alignItems: 'center', padding: '8px 16px', gap: '8px'}}>
           {refreshing ? (
-            <FiRefreshCw className="spin-slow" size={18} color="#2563eb"/>
+            <FiRefreshCw className="spin-slow" size={16} />
           ) : (
-            <div style={{position: 'relative'}}>
-              <FiWifi size={18} color="#16a34a"/>
-              <span style={{position:'absolute', top:-2, right:-2, width:6, height:6, background:'#16a34a', borderRadius:'50%'}}></span>
-            </div>
+            <FiWifi size={16} />
           )}
-          <div style={{display: 'flex', flexDirection: 'column', lineHeight: '1.2'}}>
-            <span style={{fontWeight: 700, fontSize: '0.85rem', color: '#0f172a'}}>SISTEMA ONLINE</span>
-            <span style={{fontSize: '0.7rem', color: '#64748b'}}>{HOST}</span>
+          <div style={{display: 'flex', flexDirection: 'column', lineHeight: '1.1'}}>
+            <span style={{fontWeight: 700}}>ONLINE</span>
+            <span style={{fontSize: '0.7rem', opacity: 0.8}}>{HOST}</span>
           </div>
         </div>
         <style>{`.spin-slow { animation: spin 2s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
       </div>
 
-      {/* --- SECCIÓN 1: TARJETAS KPI (4 COLUMNAS) --- */}
+      {/* --- SECCIÓN 1: GRID DE KPIs (4 TARJETAS) --- */}
       <div className="grid-4">
-        
         {/* KPI 1: OEE */}
-        <div className="card" style={{borderLeft: '4px solid #8b5cf6', position: 'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', right:-10, top:-10, opacity:0.05}}><FiActivity size={120}/></div>
-          <div className="kpi-label" style={{color: '#8b5cf6'}}>EFICIENCIA GLOBAL (OEE)</div>
-          <div className="kpi-value" style={{display:'flex', alignItems:'center', gap:'10px'}}>
-            {advanced?.oee.score}%
-            {advanced?.oee.score > 85 ? <FiArrowUp size={24} color="#16a34a"/> : <FiArrowDown size={24} color="#ef4444"/>}
+        <div className="card" style={{borderLeft: '4px solid var(--accent)', position: 'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', right:10, top:10, opacity:0.1}}><FiActivity size={80} color="var(--accent)"/></div>
+          <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px', letterSpacing:'0.05em'}}>
+            OEE DE PLANTA
           </div>
-          <div className="kpi-sub" style={{display:'flex', alignItems:'center', gap:'5px'}}>
-            {advanced?.oee.score > 85 ? <FiCheckCircle color="#16a34a"/> : <FiAlertCircle color="#ef4444"/>}
-            <span style={{color: advanced?.oee.score > 85 ? '#16a34a' : '#ef4444', fontWeight: 600}}>
-              {advanced?.oee.score > 85 ? 'Meta Alcanzada' : 'Debajo de Meta'}
-            </span>
+          <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)', display:'flex', alignItems:'center', gap:'10px'}}>
+            {advanced?.oee.score}%
+            {advanced?.oee.score > 85 ? <FiArrowUp size={20} color="var(--success)"/> : <FiArrowDown size={20} color="var(--warning)"/>}
+          </div>
+          <div style={{fontSize: '0.85rem', marginTop: '4px', fontWeight: 600, color: advanced?.oee.score > 85 ? 'var(--success)' : 'var(--warning)', display: 'flex', alignItems: 'center', gap: '5px'}}>
+            {advanced?.oee.score > 85 ? <FiCheckCircle /> : <FiAlertCircle />}
+            {advanced?.oee.score > 85 ? 'Rendimiento Óptimo' : 'Requiere Optimización'}
           </div>
         </div>
 
         {/* KPI 2: FINANZAS */}
-        <div className="card" style={{borderLeft: '4px solid #ef4444'}}>
-          <div className="kpi-label" style={{color: '#ef4444'}}>IMPACTO FINANCIERO (24H)</div>
-          <div className="kpi-value">${advanced?.financial.daily_loss_usd}</div>
-          <div className="kpi-sub" style={{color: '#64748b'}}>Pérdida estimada por ineficiencia</div>
+        <div className="card" style={{borderLeft: '4px solid var(--danger)'}}>
+          <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px', letterSpacing:'0.05em'}}>
+            IMPACTO FINANCIERO (24H)
+          </div>
+          <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)'}}>
+            ${advanced?.financial.daily_loss_usd}
+          </div>
+          <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px'}}>
+            Pérdida estimada por ineficiencia
+          </div>
         </div>
 
         {/* KPI 3: ESTABILIDAD */}
-        <div className="card" style={{borderLeft: '4px solid #10b981'}}>
-          <div className="kpi-label" style={{color: '#10b981'}}>ÍNDICE DE ESTABILIDAD</div>
-          <div className="kpi-value">{advanced?.stability.index}/100</div>
-          <div className="kpi-sub" style={{color: '#10b981', fontWeight: 600}}>Variabilidad de proceso baja</div>
+        <div className="card" style={{borderLeft: '4px solid var(--success)'}}>
+          <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px', letterSpacing:'0.05em'}}>
+            ÍNDICE DE ESTABILIDAD
+          </div>
+          <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)'}}>
+            {advanced?.stability.index}/100
+          </div>
+          <div style={{fontSize: '0.85rem', color: 'var(--success)', marginTop: '4px', fontWeight: 600}}>
+            Variabilidad de proceso baja
+          </div>
         </div>
 
         {/* KPI 4: PRODUCCIÓN */}
-        <div className="card" style={{borderLeft: '4px solid #3b82f6'}}>
-          <div className="kpi-label" style={{color: '#3b82f6'}}>PRODUCCIÓN VOLUMÉTRICA</div>
-          <div className="kpi-value">
+        <div className="card" style={{borderLeft: '4px solid #6366f1'}}>
+          <div style={{color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px', letterSpacing:'0.05em'}}>
+            PRODUCCIÓN VOLUMÉTRICA
+          </div>
+          <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)'}}>
             {history.length > 0 ? (history[history.length-1].production / 1000).toFixed(1) : 0}k
           </div>
-          <div className="kpi-sub" style={{color: '#64748b'}}>Barriles por día (BPD)</div>
+          <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px'}}>
+            Barriles por día (BPD)
+          </div>
         </div>
       </div>
 
-      {/* --- SECCIÓN 2: GRÁFICOS Y PANELES (2 COLUMNAS) --- */}
+      {/* --- SECCIÓN 2: GRID GRÁFICO (2 COLUMNAS) --- */}
       <div className="grid-2">
         
-        {/* GRÁFICO DE TENDENCIA */}
+        {/* COLUMNA IZQUIERDA: GRÁFICO DE ÁREA */}
         <div className="card">
           <div className="card-header">
             <h3 className="card-title"><FiTrendingUp /> Tendencia Operativa (24h)</h3>
-            <span className="badge-pro" style={{background:'#eff6ff', color:'#2563eb', border:'1px solid #dbeafe'}}>Datos Reales</span>
+            <span className="badge-pro" style={{background:'#eff6ff', color:'#1d4ed8', border:'1px solid #dbeafe'}}>Datos Reales</span>
           </div>
           <div style={{height: '380px', width: '100%'}}>
             <ResponsiveContainer>
               <AreaChart data={history} margin={{top:20, right:10, left:0, bottom:0}}>
                 <defs>
                   <linearGradient id="colorProd" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
@@ -296,34 +297,34 @@ const Dashboard = () => {
                   dataKey="time_label" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fontSize: 11, fill: '#64748b', fontWeight: 500}} 
-                  interval="preserveStartEnd"
-                  minTickGap={30}
+                  tick={{fontSize: 11, fill: '#6b7280', fontWeight: 500}} 
+                  interval={Math.floor(history.length / 6)} 
+                  dy={10}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fontSize: 11, fill: '#64748b', fontWeight: 500}} 
+                  tick={{fontSize: 11, fill: '#6b7280', fontWeight: 500}} 
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Area 
                   type="monotone" 
                   dataKey="production" 
                   stroke="#3b82f6" 
-                  strokeWidth={3}
+                  strokeWidth={3} 
                   fill="url(#colorProd)" 
-                  animationDuration={2000}
-                  activeDot={{r: 6, strokeWidth: 0, fill: '#2563eb'}}
+                  animationDuration={1500} 
+                  activeDot={{r: 6, strokeWidth: 0}}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* PANELES LATERALES (RADAR + ACCIONES) */}
+        {/* COLUMNA DERECHA: RADAR Y ACCIONES */}
         <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
           
-          {/* Gráfico Radar */}
+          {/* GRÁFICO RADAR OEE */}
           <div className="card" style={{flex: 1, minHeight: '340px', display:'flex', flexDirection:'column'}}>
             <div className="card-header">
               <h3 className="card-title"><FiPieChart /> Análisis Multidimensional</h3>
@@ -331,27 +332,26 @@ const Dashboard = () => {
             <div style={{flex: 1, width: '100%', minHeight: '250px'}}>
               <ResponsiveContainer>
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={oeeChartData}>
-                  <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis dataKey="subject" tick={{fill: '#475569', fontSize: 11, fontWeight: 700}} />
+                  <PolarGrid stroke="#e5e7eb" />
+                  <PolarAngleAxis dataKey="subject" tick={{fill: '#4b5563', fontSize: 11, fontWeight: 700}} />
                   <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                   <Radar 
-                    name="Performance" 
+                    name="Performance Planta" 
                     dataKey="A" 
                     stroke="#8b5cf6" 
                     strokeWidth={3} 
                     fill="#8b5cf6" 
-                    fillOpacity={0.4} 
+                    fillOpacity={0.3} 
                   />
                   <Tooltip 
-                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}}
-                    itemStyle={{color: '#4f46e5', fontWeight: 600}}
+                     contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}
                   />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Centro de Control */}
+          {/* PANEL DE CENTRO DE CONTROL */}
           <div className="card">
             <div className="card-header">
               <h3 className="card-title"><FiServer /> Centro de Control</h3>
@@ -359,12 +359,12 @@ const Dashboard = () => {
             
             <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
               
-              {/* Botón de Reporte */}
+              {/* Botón de Reporte (Estilo Premium) */}
               <button 
                 onClick={handlePrintReport}
                 className="action-button"
                 style={{ 
-                  padding: '16px', background: 'white', border: '1px solid #e2e8f0', 
+                  padding: '16px', background: 'white', border: '1px solid #E2E8F0', 
                   borderRadius: '12px', textAlign: 'left', fontWeight: 600, 
                   color: '#334155', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '15px',
                   transition: 'all 0.2s ease', position: 'relative', overflow: 'hidden',
@@ -372,13 +372,13 @@ const Dashboard = () => {
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.05)';
+                  e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
                   e.currentTarget.style.borderColor = '#3b82f6';
                 }}
                 onMouseOut={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
                   e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.02)';
-                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.borderColor = '#E2E8F0';
                 }}
               >
                 <div style={{background: '#eff6ff', padding: '10px', borderRadius: '10px'}}>
@@ -386,11 +386,11 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <div style={{fontSize: '1rem', color: '#1e293b'}}>Generar Reporte Diario</div>
-                  <div style={{fontSize: '0.8rem', color: '#64748b', fontWeight: 400}}>Formato PDF Oficial (ISO-9001)</div>
+                  <div style={{fontSize: '0.8rem', color: '#64748b', fontWeight: 400}}>Formato PDF Oficial A4 (ISO-9001)</div>
                 </div>
               </button>
 
-              {/* Estado de IA */}
+              {/* Estado del ML (Estilo Tarjeta) */}
               <div style={{ 
                 padding: '16px', background: 'linear-gradient(to right, #f0fdf4, #dcfce7)', borderRadius: '12px', 
                 border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '15px'
