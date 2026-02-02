@@ -106,7 +106,7 @@ def create_tables_if_not_exist():
                 );
                 CREATE TABLE IF NOT EXISTS equipment (
                     equipment_id TEXT PRIMARY KEY, equipment_name TEXT, 
-                    equipment_type TEXT, unit_id TEXT, status TEXT, installation_date DATE
+                    equipment_type TEXT, unit_id TEXT, status TEXT, installation_date TIMESTAMP
                 );
                 CREATE TABLE IF NOT EXISTS process_data (
                     id SERIAL PRIMARY KEY, timestamp TIMESTAMP, 
@@ -192,7 +192,7 @@ def scheduled_simulation_job():
 async def lifespan(app: FastAPI):
     # --- INICIO ---
     print("\n" + "="*60)
-    print("🚀 REFINERYIQ SYSTEM V5.0 ULTIMATE (CLOUD NATIVE) - STARTING")
+    print("🚀 REFINERYIQ SYSTEM V6.0 ENTERPRISE (CLOUD NATIVE) - STARTING")
     print(f"📡 Base de Datos Objetivo: {'NUBE (Render)' if 'onrender' in str(DATABASE_URL) else 'LOCAL'}")
     
     # 1. EJECUTAR AUTO-MIGRACIÓN (Vital para Render)
@@ -217,7 +217,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="RefineryIQ Enterprise API",
     description="Backend industrial Full-Stack para monitoreo, mantenimiento predictivo y gestión de activos.",
-    version="5.0.0",
+    version="6.0.0",
     lifespan=lifespan
 )
 
@@ -247,7 +247,7 @@ async def root():
     return {
         "system": "RefineryIQ Enterprise",
         "status": "Operational",
-        "version": "5.0.0-release",
+        "version": "6.0.0-release",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": "Connected" if await get_db_conn() else "Disconnected (Fallback Mode)"
     }
@@ -347,6 +347,7 @@ async def get_dashboard_history():
     conn = await get_db_conn()
     if not conn: return []
     try:
+        # Usamos time_bucket o date_trunc para agrupar por hora
         query = """
             SELECT 
                 to_char(date_trunc('hour', timestamp), 'HH24:00') as time_label,
@@ -442,8 +443,11 @@ async def get_alerts(acknowledged: bool = False):
     conn = await get_db_conn()
     if not conn: return []
     try:
+        # Se agregan nombres de unidad para enriquecer el frontend
         rows = await conn.fetch("""
-            SELECT * FROM alerts 
+            SELECT a.*, pu.name as unit_name 
+            FROM alerts a
+            LEFT JOIN process_units pu ON a.unit_id = pu.unit_id
             WHERE acknowledged = $1 
             ORDER BY timestamp DESC LIMIT 20
         """, acknowledged)
@@ -452,6 +456,7 @@ async def get_alerts(acknowledged: bool = False):
             "id": r['id'],
             "time": r['timestamp'].isoformat(),
             "unit_id": r['unit_id'],
+            "unit_name": r.get('unit_name', r['unit_id']),
             "message": r['message'],
             "severity": r['severity'],
             "acknowledged": r['acknowledged']
@@ -469,8 +474,10 @@ async def get_alerts_history():
     if not conn: return []
     try:
         rows = await conn.fetch("""
-            SELECT *, unit_id as unit_name, tag_id as tag_name 
-            FROM alerts 
+            SELECT a.*, pu.name as unit_name, pt.tag_name
+            FROM alerts a
+            LEFT JOIN process_units pu ON a.unit_id = pu.unit_id
+            LEFT JOIN process_tags pt ON a.tag_id = pt.tag_id
             ORDER BY timestamp DESC LIMIT 50
         """)
         return [dict(r) for r in rows]
@@ -497,8 +504,7 @@ async def acknowledge_alert(alert_id: int):
 async def get_supplies_data():
     """
     Endpoint crucial para Supply.js.
-    Si la base de datos está vacía (común en despliegues nuevos), genera datos simulados
-    para que la interfaz 'Ultimate' se vea espectacular y no en blanco.
+    Recupera tanques e inventario de la DB real.
     """
     conn = await get_db_conn()
     tanks_data = []
@@ -520,22 +526,16 @@ async def get_supplies_data():
     except: pass
 
     # --- DATOS DE RESPALDO (MOCK DATA) ---
-    # Esto asegura que NUNCA veas una pantalla blanca, incluso si la BD falla.
     if not tanks_data:
         tanks_data = [
             {"id": 1, "name": "TK-101", "product": "Crudo Pesado", "capacity": 50000, "current_level": 35000, "status": "FILLING"},
-            {"id": 2, "name": "TK-102", "product": "Gasolina 95", "capacity": 25000, "current_level": 12000, "status": "STABLE"},
-            {"id": 3, "name": "TK-201", "product": "Diesel", "capacity": 30000, "current_level": 28000, "status": "DRAINING"},
-            {"id": 4, "name": "TK-305", "product": "Agua Tratada", "capacity": 10000, "current_level": 8500, "status": "STABLE"}
+            {"id": 2, "name": "TK-102", "product": "Gasolina 95", "capacity": 25000, "current_level": 12000, "status": "STABLE"}
         ]
     
     if not inv_data:
         inv_data = [
             {"item": "Catalizador FCC-A", "sku": "CAT-001", "quantity": 850, "unit": "kg", "status": "LOW"},
-            {"item": "Aditivo Anticorrosivo", "sku": "ADD-X5", "quantity": 1200, "unit": "L", "status": "OK"},
-            {"item": "Reactivo de pH", "sku": "REA-PH2", "quantity": 45, "unit": "L", "status": "CRITICAL"},
-            {"item": "Lubricante Industrial", "sku": "LUB-V8", "quantity": 200, "unit": "bidon", "status": "OK"},
-            {"item": "Válvulas de Repuesto", "sku": "VAL-2X", "quantity": 12, "unit": "pza", "status": "LOW"}
+            {"item": "Aditivo Anticorrosivo", "sku": "ADD-X5", "quantity": 1200, "unit": "L", "status": "OK"}
         ]
         
     return {
@@ -544,41 +544,63 @@ async def get_supplies_data():
     }
 
 # ==============================================================================
-# 12. ENDPOINTS DE NORMALIZACIÓN Y ACTIVOS
+# 12. ENDPOINTS DE NORMALIZACIÓN Y ACTIVOS (INDUSTRIAL)
 # ==============================================================================
 
 @app.get("/api/assets/overview")
 async def get_assets_overview():
-    """Vista combinada de Activos + Sensores."""
+    """
+    Vista combinada de Activos + Sensores.
+    Realiza un JOIN complejo para entregar todo en una sola petición.
+    """
     conn = await get_db_conn()
     if not conn: return []
     try:
-        # Consulta compleja para unir datos. Si falla, usa tabla simple.
+        # Consulta compleja optimizada
         query = """
-            SELECT e.*, 
-            (SELECT json_agg(json_build_object('tag_name', tag_name, 'value', value, 'units', engineering_units)) 
-             FROM process_tags pt 
-             LEFT JOIN process_data pd ON pt.tag_id = pd.tag_id 
-             WHERE pt.unit_id = e.unit_id) as sensors
+            SELECT 
+                e.equipment_id,
+                e.equipment_name,
+                e.equipment_type,
+                e.status,
+                e.unit_id,
+                pu.name as unit_name,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'tag_name', pt.tag_name,
+                            'value', pd.value,
+                            'units', pt.engineering_units
+                        ) 
+                    ) FILTER (WHERE pt.tag_id IS NOT NULL), 
+                    '[]'
+                ) as sensors
             FROM equipment e
+            LEFT JOIN process_units pu ON e.unit_id = pu.unit_id
+            LEFT JOIN process_tags pt ON pt.unit_id = e.unit_id 
+            LEFT JOIN LATERAL (
+                SELECT value FROM process_data 
+                WHERE tag_id = pt.tag_id 
+                ORDER BY timestamp DESC LIMIT 1
+            ) pd ON true
+            GROUP BY e.equipment_id, e.equipment_name, e.equipment_type, e.status, e.unit_id, pu.name
+            ORDER BY e.unit_id, e.equipment_name
         """
-        try:
-            rows = await conn.fetch(query)
-        except:
-            rows = await conn.fetch("SELECT * FROM equipment")
-            
+        rows = await conn.fetch(query)
+        
         results = []
         for row in rows:
             data = dict(row)
-            # Aseguramos que sensors sea una lista válida
-            if 'sensors' in data and not data['sensors']: data['sensors'] = []
+            if isinstance(data['sensors'], str):
+                data['sensors'] = json.loads(data['sensors'])
             results.append(data)
         return results
-    except: return []
+    except Exception as e:
+        print(f"Assets Error: {e}")
+        return []
     finally: await conn.close()
 
 # --- ENDPOINTS NUEVOS PARA CORREGIR EL ERROR DE NORMALIZACIÓN ---
-# Estos endpoints faltaban y por eso el NormalizedDataViewer daba error.
 @app.get("/api/normalized/stats")
 async def get_normalized_stats():
     conn = await get_db_conn()
@@ -586,10 +608,17 @@ async def get_normalized_stats():
     try:
         kpis = await conn.fetchval("SELECT COUNT(*) FROM kpis")
         alerts = await conn.fetchval("SELECT COUNT(*) FROM alerts")
+        units = await conn.fetchval("SELECT COUNT(*) FROM process_units")
+        equip = await conn.fetchval("SELECT COUNT(*) FROM equipment")
+        tags = await conn.fetchval("SELECT COUNT(*) FROM process_tags")
+        
         return {
             "total_process_records": kpis,
             "total_alerts": alerts,
-            "database_normalized": True, # Bandera para el frontend
+            "total_units": units,
+            "total_equipment": equip,
+            "total_tags": tags,
+            "database_normalized": True,
             "last_updated": datetime.now().isoformat()
         }
     except:
@@ -603,7 +632,7 @@ async def get_norm_units():
     conn = await get_db_conn()
     if not conn: return []
     try:
-        rows = await conn.fetch("SELECT * FROM process_units")
+        rows = await conn.fetch("SELECT * FROM process_units ORDER BY unit_id")
         return [dict(r) for r in rows]
     finally: await conn.close()
 
@@ -613,17 +642,26 @@ async def get_norm_equipment():
     conn = await get_db_conn()
     if not conn: return []
     try:
-        rows = await conn.fetch("SELECT * FROM equipment")
+        rows = await conn.fetch("SELECT * FROM equipment ORDER BY unit_id, equipment_name")
         return [dict(r) for r in rows]
     finally: await conn.close()
 
 @app.get("/api/normalized/process-data/enriched")
 async def get_norm_data_enriched(limit: int = 50):
-    """Devuelve datos de proceso enriquecidos"""
+    """Devuelve datos de proceso enriquecidos con nombres de unidad y tag"""
     conn = await get_db_conn()
     if not conn: return []
     try:
-        rows = await conn.fetch("SELECT * FROM process_data ORDER BY timestamp DESC LIMIT $1", limit)
+        query = """
+            SELECT pd.timestamp, pd.value, pd.quality,
+                   pu.name as unit_name, pt.tag_name, pt.engineering_units
+            FROM process_data pd
+            JOIN process_tags pt ON pd.tag_id = pt.tag_id
+            JOIN process_units pu ON pd.unit_id = pu.unit_id
+            ORDER BY pd.timestamp DESC
+            LIMIT $1
+        """
+        rows = await conn.fetch(query, limit)
         return [dict(r) for r in rows]
     finally: await conn.close()
 
@@ -637,7 +675,12 @@ async def get_maintenance_predictions():
     conn = await get_db_conn()
     try:
         if conn:
-            rows = await conn.fetch("SELECT * FROM maintenance_predictions ORDER BY timestamp DESC LIMIT 10")
+            rows = await conn.fetch("""
+                SELECT mp.*, e.equipment_name 
+                FROM maintenance_predictions mp
+                LEFT JOIN equipment e ON mp.equipment_id = e.equipment_id
+                ORDER BY timestamp DESC LIMIT 10
+            """)
             await conn.close()
             if rows: return [dict(r) for r in rows]
     except: pass
@@ -649,7 +692,12 @@ async def get_energy_analysis():
     conn = await get_db_conn()
     try:
         if conn:
-            rows = await conn.fetch("SELECT * FROM energy_analysis ORDER BY analysis_date DESC LIMIT 5")
+            rows = await conn.fetch("""
+                SELECT ea.*, pu.name as unit_name 
+                FROM energy_analysis ea
+                LEFT JOIN process_units pu ON ea.unit_id = pu.unit_id
+                ORDER BY analysis_date DESC LIMIT 5
+            """)
             await conn.close()
             if rows: return [dict(r) for r in rows]
     except: pass
@@ -664,7 +712,7 @@ async def generate_daily_report():
     """Genera reporte HTML formateado profesionalmente para impresión PDF"""
     try:
         conn = await get_db_conn()
-        kpis = await conn.fetch("SELECT * FROM kpis ORDER BY timestamp DESC LIMIT 5")
+        kpis = await conn.fetch("SELECT * FROM kpis ORDER BY timestamp DESC LIMIT 10")
         alerts = await conn.fetch("SELECT * FROM alerts ORDER BY timestamp DESC LIMIT 5")
         tanks = await conn.fetch("SELECT * FROM tanks ORDER BY name")
         await conn.close()
@@ -673,22 +721,23 @@ async def generate_daily_report():
         
         rows_kpi = "".join([f"<tr><td>{r['timestamp'].strftime('%H:%M')}</td><td>{r['unit_id']}</td><td>{r['energy_efficiency']:.1f}%</td><td>{r['throughput']:.0f}</td></tr>" for r in kpis])
         rows_alert = "".join([f"<tr><td>{r['timestamp'].strftime('%H:%M')}</td><td>{r['severity']}</td><td>{r['message']}</td></tr>" for r in alerts])
-        rows_tanks = "".join([f"<tr><td>{t['name']}</td><td>{t['product']}</td><td>{t['current_level']}</td><td>{t['status']}</td></tr>" for t in tanks])
+        rows_tanks = "".join([f"<tr><td>{t['name']}</td><td>{t['product']}</td><td>{t['current_level']:.0f} / {t['capacity']:.0f}</td><td>{t['status']}</td></tr>" for t in tanks])
         
         html = f"""
+        <!DOCTYPE html>
         <html>
         <head>
+            <title>Reporte Diario - RefineryIQ</title>
             <style>
                 @page {{ size: A4; margin: 2cm; }}
-                body {{ font-family: 'Helvetica', sans-serif; color: #333; line-height: 1.4; font-size: 12px; }}
+                body {{ font-family: 'Segoe UI', Helvetica, sans-serif; color: #333; line-height: 1.4; font-size: 12px; }}
                 .header {{ border-bottom: 2px solid #1e3a8a; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; }}
                 .logo {{ font-size: 24px; font-weight: bold; color: #1e3a8a; }}
                 h2 {{ background: #f1f5f9; padding: 8px; border-left: 5px solid #3b82f6; margin-top: 25px; }}
                 table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-                th, td {{ border: 1px solid #e2e8f0; padding: 8px; text-align: left; }}
-                th {{ background-color: #f8fafc; font-weight: bold; }}
-                .badge {{ padding: 2px 6px; border-radius: 4px; font-size: 10px; color: white; }}
-                .HIGH {{ background: #ef4444; }} .MEDIUM {{ background: #f59e0b; }} .LOW {{ background: #3b82f6; }}
+                th {{ background: #f8fafc; text-align: left; padding: 8px; border: 1px solid #e2e8f0; }}
+                td {{ padding: 8px; border: 1px solid #e2e8f0; }}
+                .footer {{ margin-top: 50px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }}
             </style>
         </head>
         <body>
@@ -701,25 +750,28 @@ async def generate_daily_report():
                 </div>
             </div>
 
-            <h2>1. KPI DE PRODUCCIÓN</h2>
+            <h2>1. RENDIMIENTO DE PLANTA (KPIs)</h2>
             <table><thead><tr><th>Hora</th><th>Unidad</th><th>Eficiencia</th><th>Producción (bbl)</th></tr></thead><tbody>{rows_kpi}</tbody></table>
             
             <h2>2. ESTADO DE TANQUES</h2>
-            <table><thead><tr><th>Tanque</th><th>Producto</th><th>Nivel</th><th>Estado</th></tr></thead><tbody>{rows_tanks}</tbody></table>
+            <table><thead><tr><th>Tanque</th><th>Producto</th><th>Nivel Actual / Capacidad</th><th>Estado</th></tr></thead><tbody>{rows_tanks}</tbody></table>
 
-            <h2>3. INCIDENCIAS CRÍTICAS</h2>
+            <h2>3. ALERTAS CRÍTICAS</h2>
             <table><thead><tr><th>Hora</th><th>Severidad</th><th>Mensaje</th></tr></thead><tbody>{rows_alert}</tbody></table>
             
-            <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px; text-align: center; color: #666;">
-                Generado por RefineryIQ System v5.0 Ultimate
+            <div style="margin-top: 60px; display: flex; justify-content: space-between;">
+                <div style="border-top: 1px solid #333; width: 40%; text-align: center; padding-top: 10px;">Gerente de Planta</div>
+                <div style="border-top: 1px solid #333; width: 40%; text-align: center; padding-top: 10px;">Supervisor de Turno</div>
             </div>
-            <script>window.print();</script>
+
+            <div class="footer">Generado automáticamente por RefineryIQ System v6.0 Enterprise | Confidencial</div>
+            <script>window.onload = function() {{ window.print(); }}</script>
         </body>
         </html>
         """
         return html
     except Exception as e:
-        return HTMLResponse(f"Error generando reporte: {e}")
+        return HTMLResponse(f"Error generando reporte: {e}", status_code=500)
 
 # ==============================================================================
 # 15. ARRANQUE LOCAL
