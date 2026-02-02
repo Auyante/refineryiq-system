@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+
 import { FiSearch, FiCheckCircle, FiTool } from 'react-icons/fi';
 import '../App.css'; // Importando estilos globales
 import { API_URL } from '../config';

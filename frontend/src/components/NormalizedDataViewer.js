@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+
 import { 
   FiDatabase, FiPackage, FiTag, FiCpu, FiTrendingUp,
   FiAlertTriangle, FiZap, FiBarChart2, FiList, FiGrid,

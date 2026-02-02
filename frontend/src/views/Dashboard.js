@@ -19,12 +19,16 @@ const Dashboard = () => {
   // ==========================================
   // 1. CONFIGURACIÓN DE CONEXIÓN DINÁMICA
   // ==========================================
-  // ✅ PEGA ESTO (Detecta automáticamente Nube vs Casa)
+  // 1. Detectar si es local (ESTA LÍNEA ES VITAL)
   const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
+  // 2. Definir la URL de conexión (Sin puerto 8000 en la nube)
   const API_URL = isLocal 
-    ? "http://localhost:8000"                     // Si estoy en casa
-    : "https://refineryiq-system.onrender.com";   // Si estoy en la nube (SIN PUERTO) 
+    ? "http://localhost:8000" 
+    : "https://refineryiq-system.onrender.com";
+
+  // 3. Definir HOST (Para que el texto de la pantalla no falle)
+  const HOST = window.location.hostname;
 
   // ==========================================
   // 2. ESTADOS DE DATOS Y UI
