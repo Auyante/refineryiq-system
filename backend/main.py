@@ -10,7 +10,27 @@ import random
 import time
 import sys
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI(...)
+
+# LISTA DE INVITADOS PERMITIDOS
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://refineryiq.dev",            # <--- TU DOMINIO
+    "https://www.refineryiq.dev",        # <--- TU DOMINIO CON WWW
+    "https://refineryiq-system.onrender.com" # <--- EL BACKEND MISMO
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # TRUCO TEMPORAL: Permitir a todos para probar
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Agregar el directorio actual al path para que Python encuentre los módulos
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
