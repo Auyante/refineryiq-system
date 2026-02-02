@@ -1,26 +1,30 @@
 // ============================================================================
-// ARCHIVO DE CONFIGURACIÓN CENTRAL (V4.0)
-// ============================================================================
-// Este archivo detecta automáticamente el entorno y define la ruta del backend.
+// CONFIGURACIÓN DEFINITIVA CON DOMINIO PERSONALIZADO
 // ============================================================================
 
-// 1. Detección de Entorno
-// Si la URL empieza por 'https', asumimos que estamos en la nube (Render).
-const isSecure = window.location.protocol === 'https:';
+// DETECCIÓN AUTOMÁTICA DEL ENTORNO
+const getBackendUrl = () => {
+  const host = window.location.hostname;
+  
+  // PRODUCCIÓN - Dominio personalizado
+  if (host === 'refineryiq.dev' || host === 'www.refineryiq.dev') {
+    return 'https://api.refineryiq.dev';
+  }
+  
+  // DESARROLLO LOCAL
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return 'http://localhost:8000';
+  }
+  
+  // POR DEFECTO (Render temporal)
+  return 'https://refineryiq-system.onrender.com';
+};
 
-// 2. Definición de la URL del Backend
-// - Producción (Nube): Usamos la URL oficial de Render.
-// - Desarrollo (Local): Usamos localhost:8000.
-export const API_URL = isSecure
-  ? "https://refineryiq-system.onrender.com" 
-  : "http://localhost:8000";
-
-// 3. Host para visualización en UI (ej: "Conectado a refineryiq.dev")
+export const API_URL = getBackendUrl();
 export const APP_HOST = window.location.hostname;
 
-// Logs de diagnóstico para consola
-console.log("========================================");
-console.log("🚀 SISTEMA INICIADO: REFINERYIQ CLIENT");
-console.log(`🌍 MODO: ${isSecure ? "NUBE (PRODUCCIÓN)" : "LOCAL (DESARROLLO)"}`);
-console.log(`🔗 BACKEND OBJETIVO: ${API_URL}`);
-console.log("========================================");
+// Logs para depuración
+console.log("🌍 REFINERYIQ - CONFIGURACIÓN ACTIVA");
+console.log(`📱 Dominio: ${APP_HOST}`);
+console.log(`🔗 Backend: ${API_URL}`);
+console.log("======================================");

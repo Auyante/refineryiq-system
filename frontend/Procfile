@@ -1,0 +1,1 @@
+static: npm install && npm run build && nginx -g 'daemon off;' -c nginx.conf

@@ -52,7 +52,6 @@ logger.info(f"🔌 Entorno detectado: {'NUBE (Render)' if 'onrender' in str(DATA
 # ==============================================================================
 # 2. DEFINICIÓN DE MODELOS DE DATOS (PYDANTIC SCHEMAS)
 # ==============================================================================
-# IMPORTANTE: Definidos al inicio para evitar NameError
 
 class UserLogin(BaseModel):
     """Esquema para recepción de credenciales de login."""
@@ -122,6 +121,16 @@ class DBStatsResponse(BaseModel):
     database_normalized: bool
     last_updated: str
 
+class EquipmentResponse(BaseModel):
+    """Response model para equipos."""
+    equipment_id: str
+    equipment_name: str
+    equipment_type: str
+    status: str
+    unit_id: str
+    unit_name: Optional[str] = None
+    sensors: List[Dict[str, Any]] = []
+
 # ==============================================================================
 # 3. GESTIÓN DE BASE DE DATOS (CONEXIÓN Y MIGRACIÓN)
 # ==============================================================================
@@ -179,7 +188,6 @@ def create_tables_if_not_exist():
                     id SERIAL PRIMARY KEY, name TEXT, product TEXT, capacity FLOAT, current_level FLOAT, status TEXT, last_updated TIMESTAMP DEFAULT NOW()
                 );
             """))
-            # NOTA: Inventory se crea aquí, pero auto_generator lo recreará si está corrupto
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS inventory (
                     id SERIAL PRIMARY KEY, item TEXT, sku TEXT UNIQUE, quantity FLOAT, unit TEXT, status TEXT, location TEXT, last_updated TIMESTAMP DEFAULT NOW()
@@ -266,21 +274,22 @@ try:
     from auto_generator import run_simulation_cycle
     SIMULATOR_AVAILABLE = True
     logger.info("✅ Generador V8 detectado.")
-except ImportError:
+except ImportError as e:
     SIMULATOR_AVAILABLE = False
-    logger.warning("⚠️ Generador no encontrado. Modo pasivo.")
-    def run_simulation_cycle(): pass
+    logger.warning(f"⚠️ Generador no encontrado: {e}. Modo pasivo.")
+    
+    def run_simulation_cycle():
+        logger.info("Simulador no disponible - modo dummy")
 
-# Importamos módulos IA Dummy
-try:
-    from ml_predictive_maintenance import pm_system
-    from energy_optimization import energy_system
-except ImportError:
-    class DummyML:
-        async def get_recent_predictions(self, *args, **kwargs): return []
-        async def get_recent_analysis(self, *args, **kwargs): return []
-    pm_system = DummyML()
-    energy_system = DummyML()
+# Módulos IA Dummy
+class DummyML:
+    async def get_recent_predictions(self, *args, **kwargs): 
+        return []
+    async def get_recent_analysis(self, *args, **kwargs): 
+        return []
+
+pm_system = DummyML()
+energy_system = DummyML()
 
 scheduler = AsyncIOScheduler()
 
@@ -341,13 +350,22 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configuración CORS EXTREMADAMENTE PERMISIVA
+# Configuración CORS EXTREMADAMENTE PERMISIVA para Render
+# Configuración CORS para dominio personalizado
 origins = [
+    # Desarrollo local
     "http://localhost:3000",
     "http://localhost:3001",
+    
+    # Render URLs
+    "https://refineryiq-frontend.onrender.com",
+    "https://refineryiq-system.onrender.com",
+    
+    # Dominios personalizados
     "https://refineryiq.dev",
     "https://www.refineryiq.dev",
-    "*" 
+    "https://api.refineryiq.dev",
+    "https://system.refineryiq.dev",
 ]
 
 app.add_middleware(
@@ -362,7 +380,8 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     try:
-        return await call_next(request)
+        response = await call_next(request)
+        return response
     except Exception as e:
         logger.error(f"🔥 UNHANDLED ERROR en {request.url.path}: {e}")
         return JSONResponse(
@@ -389,7 +408,8 @@ async def login(creds: UserLogin):
                 return {"token": "db-token", "user": user['full_name'], "role": user['role']}
         except Exception as e:
             logger.error(f"Auth DB Error: {e}")
-        finally: await conn.close()
+        finally: 
+            await conn.close()
             
     raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
@@ -401,26 +421,35 @@ async def login(creds: UserLogin):
 async def get_kpis():
     """Devuelve los KPIs más recientes. Con Fail-safe."""
     conn = await get_db_conn()
-    if not conn: return get_mock_kpis()
+    if not conn: 
+        return get_mock_kpis()
+    
     try:
         rows = await conn.fetch("SELECT DISTINCT ON (unit_id) * FROM kpis ORDER BY unit_id, timestamp DESC")
-        if not rows: return get_mock_kpis()
+        if not rows: 
+            return get_mock_kpis()
+        
         return [{
-            "unit_id": r['unit_id'], "efficiency": r['energy_efficiency'],
-            "throughput": r['throughput'], "quality": r.get('quality_score', 99.0),
+            "unit_id": r['unit_id'], 
+            "efficiency": r['energy_efficiency'],
+            "throughput": r['throughput'], 
+            "quality": r.get('quality_score', 99.0),
             "status": "normal" if r['energy_efficiency'] > 90 else "warning",
             "last_updated": r['timestamp'].isoformat()
         } for r in rows]
     except Exception as e:
         logger.error(f"KPI Fetch Error: {e}")
         return get_mock_kpis()
-    finally: await conn.close()
+    finally: 
+        await conn.close()
 
 @app.get("/api/dashboard/history")
 async def get_dashboard_history():
     """Devuelve historial 24h para gráficos."""
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         rows = await conn.fetch("""
             SELECT to_char(date_trunc('hour', timestamp), 'HH24:00') as time_label,
@@ -430,26 +459,36 @@ async def get_dashboard_history():
             GROUP BY 1 ORDER BY 1 ASC
         """)
         return [dict(r) for r in rows]
-    except: return []
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"History Fetch Error: {e}")
+        return []
+    finally: 
+        await conn.close()
 
 @app.get("/api/stats/advanced")
 async def get_advanced_stats():
     """Estadísticas avanzadas para OEE y Radar Chart."""
     conn = await get_db_conn()
     default = {"oee": {"score": 85}, "stability": {"index": 90}, "financial": {"daily_loss_usd": 0}}
-    if not conn: return default
+    
+    if not conn: 
+        return default
+    
     try:
         eff = await conn.fetchval("SELECT AVG(energy_efficiency) FROM kpis WHERE timestamp > NOW() - INTERVAL '24h'") or 88.0
         std = await conn.fetchval("SELECT STDDEV(throughput) FROM kpis WHERE timestamp > NOW() - INTERVAL '4h'") or 100.0
         stability = max(0, min(100, 100 - (float(std) / 50)))
+        
         return {
             "oee": {"score": round(float(eff)*0.95, 1), "quality": 99.5, "availability": 98.0, "performance": round(float(eff), 1)},
             "stability": {"index": round(stability, 1), "trend": "stable"},
             "financial": {"daily_loss_usd": round((100-float(eff))*350, 0)}
         }
-    except: return default
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Advanced Stats Error: {e}")
+        return default
+    finally: 
+        await conn.close()
 
 # ==============================================================================
 # 9. ENDPOINTS: SUPPLY & INVENTORY (BLINDAJE TOTAL)
@@ -462,7 +501,8 @@ async def get_supplies_data():
     Protegido contra columnas faltantes ('item', 'sku').
     """
     conn = await get_db_conn()
-    if not conn: return get_mock_supplies()
+    if not conn: 
+        return get_mock_supplies()
     
     try:
         # 1. Tanques
@@ -470,7 +510,8 @@ async def get_supplies_data():
         try:
             tanks_rows = await conn.fetch("SELECT * FROM tanks ORDER BY name")
             tanks = [dict(t) for t in tanks_rows]
-        except Exception:
+        except Exception as e:
+            logger.error(f"Tanks Fetch Error: {e}")
             tanks = get_mock_supplies()['tanks']
 
         # 2. Inventario (Crítico)
@@ -480,20 +521,24 @@ async def get_supplies_data():
             for r in inv_rows:
                 d = dict(r)
                 # Validación manual: Si el diccionario tiene 'item', lo usamos
-                if d.get('item'): inv.append(d)
+                if d.get('item'): 
+                    inv.append(d)
         except Exception as e:
             logger.warning(f"⚠️ Error Inventario: {e}")
             inv = get_mock_supplies()['inventory'] 
 
-        if not tanks: tanks = get_mock_supplies()['tanks']
-        if not inv: inv = get_mock_supplies()['inventory']
+        if not tanks: 
+            tanks = get_mock_supplies()['tanks']
+        if not inv: 
+            inv = get_mock_supplies()['inventory']
 
         return {"tanks": tanks, "inventory": inv}
     
     except Exception as e:
         logger.error(f"❌ Error Supply: {e}")
         return get_mock_supplies()
-    finally: await conn.close()
+    finally: 
+        await conn.close()
 
 # ==============================================================================
 # 10. ENDPOINTS: ASSETS & SENSORS
@@ -503,7 +548,9 @@ async def get_supplies_data():
 async def get_assets_overview():
     """Endpoint masivo: Equipos + Unidades + Sensores + Valores."""
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         query = """
             SELECT e.equipment_id, e.equipment_name, e.equipment_type, e.status, e.unit_id, pu.name as unit_name,
@@ -520,13 +567,18 @@ async def get_assets_overview():
         results = []
         for row in rows:
             data = dict(row)
-            if isinstance(data['sensors'], str): data['sensors'] = json.loads(data['sensors'])
+            if isinstance(data['sensors'], str):
+                try:
+                    data['sensors'] = json.loads(data['sensors'])
+                except:
+                    data['sensors'] = []
             results.append(data)
         return results
     except Exception as e:
         logger.error(f"Error assets: {e}")
         return []
-    finally: await conn.close()
+    finally: 
+        await conn.close()
 
 # ==============================================================================
 # 11. ENDPOINTS: ALERTS & MAINTENANCE
@@ -535,7 +587,9 @@ async def get_assets_overview():
 @app.get("/api/alerts", response_model=List[AlertItem])
 async def get_alerts(acknowledged: bool = False):
     conn = await get_db_conn()
-    if not conn: return get_mock_alerts()
+    if not conn: 
+        return get_mock_alerts()
+    
     try:
         rows = await conn.fetch("""
             SELECT a.*, pu.name as unit_name FROM alerts a
@@ -543,20 +597,30 @@ async def get_alerts(acknowledged: bool = False):
             WHERE acknowledged = $1 ORDER BY timestamp DESC LIMIT 20
         """, acknowledged)
         
-        if not rows and not acknowledged: return get_mock_alerts()
+        if not rows and not acknowledged: 
+            return get_mock_alerts()
         
         return [{
-            "id": r['id'], "time": r['timestamp'].isoformat(),
-            "unit_id": r['unit_id'], "unit_name": r.get('unit_name', r['unit_id']) or "N/A",
-            "message": r['message'], "severity": r['severity'], "acknowledged": r['acknowledged']
+            "id": r['id'], 
+            "time": r['timestamp'].isoformat(),
+            "unit_id": r['unit_id'], 
+            "unit_name": r.get('unit_name', r['unit_id']) or "N/A",
+            "message": r['message'], 
+            "severity": r['severity'], 
+            "acknowledged": r['acknowledged']
         } for r in rows]
-    except: return get_mock_alerts()
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Alerts Fetch Error: {e}")
+        return get_mock_alerts()
+    finally: 
+        await conn.close()
 
 @app.get("/api/alerts/history")
 async def get_alerts_history():
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         rows = await conn.fetch("""
             SELECT a.*, pu.name as unit_name, pt.tag_name FROM alerts a
@@ -565,20 +629,30 @@ async def get_alerts_history():
             ORDER BY timestamp DESC LIMIT 50
         """)
         return [dict(r) for r in rows]
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Alerts History Error: {e}")
+        return []
+    finally: 
+        await conn.close()
 
 @app.post("/api/alerts/{alert_id}/acknowledge")
 async def acknowledge_alert(alert_id: int):
     conn = await get_db_conn()
-    if not conn: raise HTTPException(500, "DB Error")
+    if not conn: 
+        raise HTTPException(500, "DB Error")
+    
     try:
         await conn.execute("UPDATE alerts SET acknowledged = TRUE WHERE id = $1", alert_id)
         return {"status": "success"}
-    finally: await conn.close()
+    except Exception as e:
+        raise HTTPException(500, f"Error acknowledging alert: {e}")
+    finally: 
+        await conn.close()
 
 @app.get("/api/maintenance/predictions")
 async def get_maintenance_predictions():
     conn = await get_db_conn()
+    
     try:
         if conn:
             rows = await conn.fetch("""
@@ -587,13 +661,17 @@ async def get_maintenance_predictions():
                 ORDER BY timestamp DESC LIMIT 10
             """)
             await conn.close()
-            if rows: return [dict(r) for r in rows]
-    except: pass
+            if rows: 
+                return [dict(r) for r in rows]
+    except Exception as e:
+        logger.error(f"Maintenance Predictions Error: {e}")
+    
     return await pm_system.get_recent_predictions(None)
 
 @app.get("/api/energy/analysis")
 async def get_energy_analysis():
     conn = await get_db_conn()
+    
     try:
         if conn:
             rows = await conn.fetch("""
@@ -602,8 +680,11 @@ async def get_energy_analysis():
                 ORDER BY analysis_date DESC LIMIT 5
             """)
             await conn.close()
-            if rows: return [dict(r) for r in rows]
-    except: pass
+            if rows: 
+                return [dict(r) for r in rows]
+    except Exception as e:
+        logger.error(f"Energy Analysis Error: {e}")
+    
     return await energy_system.get_recent_analysis(None)
 
 # ==============================================================================
@@ -613,20 +694,37 @@ async def get_energy_analysis():
 @app.get("/api/normalized/tags")
 async def get_norm_tags():
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         rows = await conn.fetch("""
             SELECT pt.*, pu.name as unit_name FROM process_tags pt 
             LEFT JOIN process_units pu ON pt.unit_id = pu.unit_id ORDER BY pt.tag_id
         """)
         return [dict(r) for r in rows]
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Norm Tags Error: {e}")
+        return []
+    finally: 
+        await conn.close()
 
 @app.get("/api/normalized/stats", response_model=DBStatsResponse)
 async def get_normalized_stats():
     conn = await get_db_conn()
-    empty = {"total_process_records":0, "total_alerts":0, "total_units":0, "total_equipment":0, "total_tags":0, "database_normalized":False, "last_updated": datetime.now().isoformat()}
-    if not conn: return empty
+    empty = {
+        "total_process_records": 0, 
+        "total_alerts": 0, 
+        "total_units": 0, 
+        "total_equipment": 0, 
+        "total_tags": 0, 
+        "database_normalized": False, 
+        "last_updated": datetime.now().isoformat()
+    }
+    
+    if not conn: 
+        return empty
+    
     try:
         return {
             "total_process_records": await conn.fetchval("SELECT COUNT(*) FROM kpis") or 0,
@@ -637,41 +735,76 @@ async def get_normalized_stats():
             "database_normalized": True,
             "last_updated": datetime.now().isoformat()
         }
-    except: return empty
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Norm Stats Error: {e}")
+        return empty
+    finally: 
+        await conn.close()
 
 @app.get("/api/normalized/process-data/enriched")
 async def get_norm_data_enriched(limit: int = 50):
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         rows = await conn.fetch("""
-            SELECT pd.timestamp, pd.value, pd.quality, pu.name as unit_name, pt.tag_name, pt.engineering_units as units
+            SELECT pd.timestamp, pd.value, pd.quality, 
+                   pd.unit_id, pd.tag_id,
+                   pu.name as unit_name, 
+                   pt.tag_name, 
+                   pt.engineering_units
             FROM process_data pd
             JOIN process_tags pt ON pd.tag_id = pt.tag_id
             JOIN process_units pu ON pd.unit_id = pu.unit_id
             ORDER BY pd.timestamp DESC LIMIT $1
         """, limit)
-        return [dict(r) for r in rows]
-    finally: await conn.close()
+        
+        return [{
+            "timestamp": r['timestamp'].isoformat(),
+            "value": r['value'],
+            "quality": r['quality'],
+            "unit_id": r['unit_id'],
+            "tag_id": r['tag_id'],
+            "unit_name": r['unit_name'],
+            "tag_name": r['tag_name'],
+            "engineering_units": r['engineering_units']
+        } for r in rows]
+    except Exception as e:
+        logger.error(f"Norm Data Enriched Error: {e}")
+        return []
+    finally: 
+        await conn.close()
 
 @app.get("/api/normalized/units")
 async def get_norm_units():
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         rows = await conn.fetch("SELECT * FROM process_units ORDER BY unit_id")
         return [dict(r) for r in rows]
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Norm Units Error: {e}")
+        return []
+    finally: 
+        await conn.close()
 
 @app.get("/api/normalized/equipment")
 async def get_norm_equipment():
     conn = await get_db_conn()
-    if not conn: return []
+    if not conn: 
+        return []
+    
     try:
         rows = await conn.fetch("SELECT * FROM equipment ORDER BY unit_id")
         return [dict(r) for r in rows]
-    finally: await conn.close()
+    except Exception as e:
+        logger.error(f"Norm Equipment Error: {e}")
+        return []
+    finally: 
+        await conn.close()
 
 # ==============================================================================
 # 13. GENERADOR DE REPORTES (PDF)
@@ -703,14 +836,34 @@ async def generate_daily_report():
             <script>window.print()</script>
         </body></html>
         """
-    except Exception as e: return HTMLResponse(f"Error generando reporte: {e}", 500)
+    except Exception as e: 
+        return HTMLResponse(f"Error generando reporte: {e}", 500)
 
 # ==============================================================================
-# 14. ARRANQUE LOCAL
+# 14. HEALTH CHECK
+# ==============================================================================
+
+@app.get("/")
+async def root():
+    return {
+        "message": "RefineryIQ API v12.0",
+        "status": "online",
+        "timestamp": datetime.now().isoformat(),
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Render."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+# ==============================================================================
+# 15. ARRANQUE LOCAL
 # ==============================================================================
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8000))
     print("\n" + "="*60)
     print(f"🚀 REFINERYIQ BACKEND V12 - PORT {port}")
     print("="*60)
