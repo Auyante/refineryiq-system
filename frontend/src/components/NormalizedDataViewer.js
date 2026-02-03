@@ -445,6 +445,64 @@ const NormalizedDataViewer = () => {
           asegura integridad referencial y mejora el rendimiento de consultas.
         </p>
       </div>
+      
+      <style>
+        {`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+          
+          .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+          }
+          
+          .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+          }
+          
+          .data-table thead {
+            background: #F9FAFB;
+            position: sticky;
+            top: 0;
+          }
+          
+          .data-table th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #E5E7EB;
+            white-space: nowrap;
+          }
+          
+          .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #F3F4F6;
+            vertical-align: top;
+          }
+          
+          .data-table tr:hover {
+            background: #F8FAFC;
+          }
+          
+          @media (max-width: 768px) {
+            .data-table {
+              font-size: 0.8rem;
+            }
+            
+            .data-table th,
+            .data-table td {
+              padding: 0.5rem;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 };
