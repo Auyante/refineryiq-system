@@ -1012,417 +1012,216 @@ async def get_norm_equipment():
         await conn.close()
 
 # ==============================================================================
-# 13. GENERADOR DE REPORTES (PDF)
+# 13. GENERADOR DE REPORTES (PDF/HTML MEJORADO)
 # ==============================================================================
 
 @app.get("/api/reports/daily", response_class=HTMLResponse)
 async def generate_daily_report():
+    """
+    Genera un reporte operativo diario con formato ejecutivo A4.
+    Personalizado para Planta Maturín, Venezuela.
+    """
     try:
         conn = await get_db_conn()
         
-        # Obtener todos los datos necesarios
-        kpis = await conn.fetch("""
-            SELECT k.*, pu.name as unit_name 
-            FROM kpis k
-            LEFT JOIN process_units pu ON k.unit_id = pu.unit_id
-            WHERE k.timestamp > NOW() - INTERVAL '24 hours'
-            ORDER BY k.timestamp DESC
-            LIMIT 30
-        """)
-        
-        alerts = await conn.fetch("""
-            SELECT a.*, pu.name as unit_name 
-            FROM alerts a
-            LEFT JOIN process_units pu ON a.unit_id = pu.unit_id
-            WHERE a.acknowledged = FALSE 
-            AND a.timestamp > NOW() - INTERVAL '24 hours'
-            ORDER BY a.timestamp DESC
-            LIMIT 15
-        """)
-        
-        tanks = await conn.fetch("SELECT * FROM tanks ORDER BY name")
-        inventory = await conn.fetch("SELECT * FROM inventory WHERE status IN ('LOW', 'CRITICAL') ORDER BY quantity ASC LIMIT 10")
-        
-        await conn.close()
-        
-        date_str = datetime.now().strftime("%d/%m/%Y")
-        time_str = datetime.now().strftime("%H:%M")
-        
-        # Calcular estadísticas
-        total_production = sum([k['throughput'] for k in kpis]) if kpis else 0
-        avg_efficiency = sum([k['energy_efficiency'] for k in kpis])/len(kpis) if kpis else 0
-        critical_alerts = len([a for a in alerts if a['severity'] == 'HIGH'])
-        
-        return f"""
+        # Consultas de datos
+        if conn:
+            kpis = await conn.fetch("SELECT * FROM kpis ORDER BY timestamp DESC LIMIT 15")
+            alerts = await conn.fetch("SELECT * FROM alerts ORDER BY timestamp DESC LIMIT 8")
+            tanks = await conn.fetch("SELECT * FROM tanks ORDER BY name")
+            
+            # Cálculo de promedios para el resumen
+            avg_eff = await conn.fetchval("SELECT AVG(energy_efficiency) FROM kpis WHERE timestamp > NOW() - INTERVAL '24h'") or 0
+            total_prod = await conn.fetchval("SELECT SUM(throughput) FROM kpis WHERE timestamp > NOW() - INTERVAL '24h'") or 0
+            
+            await conn.close()
+        else:
+            # Datos de respaldo si falla la DB
+            kpis, alerts, tanks = [], [], []
+            avg_eff, total_prod = 0, 0
+
+        # Ajuste de Hora para Venezuela (UTC-4)
+        # Los servidores suelen estar en UTC, restamos 4 horas manualmente
+        ve_time = datetime.now(timezone.utc) - timedelta(hours=4)
+        date_str = ve_time.strftime("%d/%m/%Y %H:%M")
+        date_short = ve_time.strftime("%d/%m/%Y")
+
+        # Generación de filas HTML
+        rows_kpi = ""
+        for r in kpis:
+            # Ajustar hora de cada registro también
+            row_time = r['timestamp']
+            if row_time.tzinfo is None: # Si es naive, asumir UTC
+                row_time = row_time.replace(tzinfo=timezone.utc)
+            local_row_time = row_time - timedelta(hours=4)
+            
+            status_color = "#16a34a" if r['energy_efficiency'] > 90 else "#ca8a04" if r['energy_efficiency'] > 80 else "#dc2626"
+            
+            rows_kpi += f"""
+            <tr>
+                <td>{local_row_time.strftime('%H:%M')}</td>
+                <td>{r['unit_id']}</td>
+                <td style="font-weight:bold; color:{status_color}">{r['energy_efficiency']:.1f}%</td>
+                <td>{r['throughput']:.0f} bbl</td>
+                <td>{r['quality_score']:.1f}%</td>
+            </tr>"""
+
+        rows_tanks = ""
+        for t in tanks:
+            percent = (t['current_level'] / t['capacity']) * 100
+            bar_color = "#3b82f6" if percent > 20 else "#dc2626"
+            rows_tanks += f"""
+            <tr>
+                <td><strong>{t['name']}</strong></td>
+                <td>{t['product']}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="flex:1; background:#e2e8f0; height:8px; border-radius:4px; overflow:hidden;">
+                            <div style="width:{percent}%; background:{bar_color}; height:100%;"></div>
+                        </div>
+                        <span style="font-size:0.85em">{t['current_level']:.0f} L</span>
+                    </div>
+                </td>
+                <td><span class="badge">{t['status']}</span></td>
+            </tr>"""
+
+        rows_alert = ""
+        if not alerts:
+            rows_alert = "<tr><td colspan='4' style='text-align:center; color:#16a34a'>Sin incidentes reportados</td></tr>"
+        else:
+            for a in alerts:
+                sev_style = "background:#fee2e2; color:#dc2626;" if a['severity'] == 'HIGH' else "background:#fef3c7; color:#d97706;"
+                rows_alert += f"""
+                <tr>
+                    <td>{a['timestamp'].strftime('%H:%M')}</td>
+                    <td>{a['unit_id']}</td>
+                    <td><span style="padding:2px 6px; border-radius:4px; font-size:0.8em; font-weight:bold; {sev_style}">{a['severity']}</span></td>
+                    <td>{a['message']}</td>
+                </tr>"""
+
+        # Plantilla HTML Completa
+        html = f"""
         <!DOCTYPE html>
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Reporte Diario RefineryIQ</title>
+            <title>Reporte Diario - RefineryIQ</title>
             <style>
-                @page {{
-                    size: A4;
-                    margin: 2cm;
-                }}
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    background: white;
-                }}
-                .header {{
-                    text-align: center;
-                    border-bottom: 3px solid #1e40af;
-                    padding-bottom: 20px;
-                    margin-bottom: 30px;
-                }}
-                .header h1 {{
-                    color: #1e40af;
-                    margin-bottom: 5px;
-                    font-size: 28px;
-                }}
-                .header .subtitle {{
-                    color: #64748b;
-                    font-size: 16px;
-                }}
-                .company-info {{
-                    display: flex;
-                    justify-content: space-between;
-                    margin-bottom: 30px;
-                    padding: 15px;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                }}
-                .summary-cards {{
-                    display: grid;
-                    grid-template-columns: repeat(4, 1fr);
-                    gap: 15px;
-                    margin-bottom: 30px;
-                }}
-                .card {{
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    padding: 15px;
-                    text-align: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                }}
-                .card .value {{
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #1e40af;
-                    margin: 10px 0;
-                }}
-                .card .label {{
-                    font-size: 12px;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                }}
-                .section {{
-                    margin-bottom: 30px;
-                    page-break-inside: avoid;
-                }}
-                .section-title {{
-                    background: #1e40af;
-                    color: white;
-                    padding: 10px 15px;
-                    border-radius: 6px;
-                    font-size: 18px;
-                    margin-bottom: 15px;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 20px;
-                    font-size: 12px;
-                }}
-                th {{
-                    background: #f1f5f9;
-                    padding: 10px;
-                    text-align: left;
-                    border-bottom: 2px solid #e2e8f0;
-                    font-weight: 600;
-                    color: #475569;
-                }}
-                td {{
-                    padding: 10px;
-                    border-bottom: 1px solid #e2e8f0;
-                }}
-                tr:hover {{
-                    background: #f8fafc;
-                }}
-                .signature-section {{
-                    margin-top: 50px;
-                    padding-top: 20px;
-                    border-top: 2px solid #e2e8f0;
-                }}
-                .signature-line {{
-                    width: 300px;
-                    margin: 40px 0 10px;
-                    border-top: 1px solid #333;
-                    text-align: center;
-                    padding-top: 10px;
-                }}
-                .footer {{
-                    margin-top: 50px;
-                    text-align: center;
-                    font-size: 11px;
-                    color: #94a3b8;
-                    border-top: 1px solid #e2e8f0;
-                    padding-top: 20px;
-                }}
-                .status-badge {{
-                    display: inline-block;
-                    padding: 3px 8px;
-                    border-radius: 4px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }}
-                .status-ok {{ background: #d1fae5; color: #065f46; }}
-                .status-warning {{ background: #fef3c7; color: #92400e; }}
-                .status-critical {{ background: #fee2e2; color: #991b1b; }}
-                .watermark {{
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%) rotate(-45deg);
-                    font-size: 100px;
-                    color: rgba(30, 64, 175, 0.1);
-                    font-weight: bold;
-                    z-index: -1;
-                    pointer-events: none;
-                }}
+                @page {{ size: A4; margin: 1.5cm; }}
+                body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.5; font-size: 11px; }}
+                .container {{ max-width: 100%; margin: 0 auto; }}
+                
+                /* Header */
+                .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }}
+                .brand h1 {{ margin: 0; color: #0f172a; font-size: 24px; letter-spacing: -0.5px; }}
+                .brand p {{ margin: 2px 0 0; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }}
+                .meta {{ text-align: right; }}
+                .meta div {{ margin-bottom: 2px; }}
+                
+                /* Summary Cards */
+                .summary {{ display: flex; gap: 15px; margin-bottom: 25px; }}
+                .card {{ flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 15px; border-radius: 6px; }}
+                .card-label {{ font-size: 9px; color: #64748b; text-transform: uppercase; font-weight: bold; }}
+                .card-value {{ font-size: 18px; font-weight: bold; color: #0f172a; margin-top: 5px; }}
+                
+                /* Sections */
+                h2 {{ background: #f1f5f9; padding: 8px 12px; border-left: 4px solid #3b82f6; margin: 20px 0 10px; font-size: 14px; color: #334155; }}
+                
+                /* Tables */
+                table {{ width: 100%; border-collapse: collapse; margin-bottom: 10px; }}
+                th {{ background: #f8fafc; text-align: left; padding: 8px; border-bottom: 1px solid #cbd5e1; color: #475569; font-weight: 600; font-size: 10px; text-transform: uppercase; }}
+                td {{ padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }}
+                tr:last-child td {{ border-bottom: none; }}
+                
+                .badge {{ background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; color: #475569; }}
+                
+                /* Footer / Signatures */
+                .signatures {{ margin-top: 60px; display: flex; justify-content: space-between; page-break-inside: avoid; }}
+                .sig-block {{ width: 40%; text-align: center; }}
+                .sig-line {{ border-top: 1px solid #94a3b8; margin-bottom: 8px; }}
+                .sig-name {{ font-weight: bold; font-size: 12px; }}
+                .sig-title {{ color: #64748b; font-size: 10px; }}
+                
+                .footer {{ margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; color: #94a3b8; font-size: 9px; }}
             </style>
         </head>
         <body>
-            <div class="watermark">CONFIDENCIAL</div>
-            
-            <div class="header">
-                <h1>REPORTE DIARIO DE OPERACIONES</h1>
-                <div class="subtitle">RefineryIQ System v12.0 - {date_str}</div>
-            </div>
-            
-            <div class="company-info">
-                <div>
-                    <strong>Refinería Industrial Mexicana S.A. de C.V.</strong><br>
-                    Carretera Industrial km 8.5<br>
-                    Zona Industrial Norte, Monterrey, N.L.
-                </div>
-                <div>
-                    <strong>Fecha de Generación:</strong> {date_str}<br>
-                    <strong>Hora:</strong> {time_str}<br>
-                    <strong>ID Reporte:</strong> RI-{datetime.now().strftime('%Y%m%d')}
-                </div>
-            </div>
-            
-            <div class="summary-cards">
-                <div class="card">
-                    <div class="value">{avg_efficiency:.1f}%</div>
-                    <div class="label">Eficiencia Global</div>
-                </div>
-                <div class="card">
-                    <div class="value">{total_production:,.0f}</div>
-                    <div class="label">Producción Total (bbl)</div>
-                </div>
-                <div class="card">
-                    <div class="value">{critical_alerts}</div>
-                    <div class="label">Alertas Críticas</div>
-                </div>
-                <div class="card">
-                    <div class="value">{len(inventory)}</div>
-                    <div class="label">Items Bajo Stock</div>
-                </div>
-            </div>
-            
-            <div class="section">
-                <div class="section-title">📊 KPIs POR UNIDAD (Últimas 24h)</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Hora</th>
-                            <th>Unidad</th>
-                            <th>Eficiencia</th>
-                            <th>Producción</th>
-                            <th>Calidad</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {"".join([f'''
-                        <tr>
-                            <td>{k['timestamp'].strftime('%H:%M')}</td>
-                            <td><strong>{k['unit_name'] or k['unit_id']}</strong></td>
-                            <td>{k['energy_efficiency']:.1f}%</td>
-                            <td>{k['throughput']:,.0f}</td>
-                            <td>{k['quality_score']:.1f}%</td>
-                            <td>
-                                <span class="status-badge {'status-ok' if k['energy_efficiency'] > 90 else 'status-warning'}">
-                                    {"ÓPTIMO" if k['energy_efficiency'] > 90 else "REVISAR"}
-                                </span>
-                            </td>
-                        </tr>
-                        ''' for k in kpis])}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="section">
-                <div class="section-title">⚠️ ALERTAS ACTIVAS</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Hora</th>
-                            <th>Unidad</th>
-                            <th>Severidad</th>
-                            <th>Descripción</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {"".join([f'''
-                        <tr>
-                            <td>{a['timestamp'].strftime('%H:%M')}</td>
-                            <td>{a['unit_name'] or a['unit_id']}</td>
-                            <td>
-                                <span class="status-badge {'status-critical' if a['severity'] == 'HIGH' else 'status-warning'}">
-                                    {a['severity']}
-                                </span>
-                            </td>
-                            <td>{a['message']}</td>
-                            <td>{"PENDIENTE" if not a['acknowledged'] else "ATENDIDA"}</td>
-                        </tr>
-                        ''' for a in alerts]) if alerts else '<tr><td colspan="5" style="text-align:center;color:#94a3b8">No hay alertas activas</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="section">
-                <div class="section-title">🛢️ INVENTARIO DE TANQUES</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Tanque</th>
-                            <th>Producto</th>
-                            <th>Capacidad</th>
-                            <th>Nivel Actual</th>
-                            <th>% Lleno</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {"".join([f'''
-                        <tr>
-                            <td><strong>{t['name']}</strong></td>
-                            <td>{t['product']}</td>
-                            <td>{t['capacity']:,.0f} L</td>
-                            <td>{t['current_level']:,.0f} L</td>
-                            <td>{(t['current_level']/t['capacity']*100):.1f}%</td>
-                            <td>
-                                <span class="status-badge {'status-ok' if t['status'] == 'STABLE' else 'status-warning'}">
-                                    {t['status']}
-                                </span>
-                            </td>
-                        </tr>
-                        ''' for t in tanks])}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="section">
-                <div class="section-title">📦 INVENTARIO CRÍTICO</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>SKU</th>
-                            <th>Cantidad</th>
-                            <th>Unidad</th>
-                            <th>Estado</th>
-                            <th>Recomendación</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {"".join([f'''
-                        <tr>
-                            <td>{i['item']}</td>
-                            <td><code>{i['sku']}</code></td>
-                            <td>{i['quantity']}</td>
-                            <td>{i['unit']}</td>
-                            <td>
-                                <span class="status-badge {'status-critical' if i['status'] == 'CRITICAL' else 'status-warning'}">
-                                    {i['status']}
-                                </span>
-                            </td>
-                            <td>{"REORDENAR URGENTE" if i['status'] == 'CRITICAL' else "REVISAR STOCK"}</td>
-                        </tr>
-                        ''' for i in inventory]) if inventory else '<tr><td colspan="6" style="text-align:center;color:#94a3b8">Todos los inventarios en niveles normales</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="section">
-                <div class="section-title">📋 RECOMENDACIONES OPERATIVAS</div>
-                <div style="background: #f0f9ff; padding: 15px; border-radius: 6px; border-left: 4px solid #0ea5e9;">
-                    <ol style="margin: 0; padding-left: 20px;">
-                        <li>Mantener monitoreo continuo en unidad CDU-101 (temperaturas en límite superior)</li>
-                        <li>Programar mantenimiento preventivo para bomba PUMP-305 en próximos 7 días</li>
-                        <li>Revisar niveles de catalizador FCC-ZSM5 (estado: CRÍTICO)</li>
-                        <li>Optimizar intercambiadores de calor en HT-305 para mejorar eficiencia energética</li>
-                        <li>Verificar calibración de sensores de presión en FCC-201</li>
-                    </ol>
-                </div>
-            </div>
-            
-            <div class="signature-section">
-                <div style="display: flex; justify-content: space-between;">
-                    <div>
-                        <div class="signature-line"></div>
-                        <div style="text-align: center; margin-top: 5px;">
-                            <strong>Ing. Carlos Martínez</strong><br>
-                            Supervisor de Operaciones
-                        </div>
+            <div class="container">
+                <div class="header">
+                    <div class="brand">
+                        <h1>REFINERY IQ</h1>
+                        <p>Planta Maturín, Estado Monagas - Venezuela</p>
                     </div>
-                    <div>
-                        <div class="signature-line"></div>
-                        <div style="text-align: center; margin-top: 5px;">
-                            <strong>Lic. Ana Rodríguez</strong><br>
-                            Gerente de Planta
-                        </div>
+                    <div class="meta">
+                        <div style="font-weight:bold; font-size:14px;">REPORTE OPERATIVO</div>
+                        <div>Fecha: {date_str}</div>
+                        <div>ID: RPT-{int(time.time())}</div>
                     </div>
                 </div>
+
+                <div class="summary">
+                    <div class="card">
+                        <div class="card-label">Eficiencia Promedio (24h)</div>
+                        <div class="card-value" style="color: {'#16a34a' if avg_eff > 90 else '#d97706'}">{avg_eff:.1f}%</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Producción Total (24h)</div>
+                        <div class="card-value">{total_prod:,.0f} bbl</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Estado del Sistema</div>
+                        <div class="card-value" style="color:#16a34a">OPERATIVO</div>
+                    </div>
+                </div>
+
+                <h2>1. RENDIMIENTO DE PROCESO (Últimos Registros)</h2>
+                <table>
+                    <thead><tr><th width="15%">Hora</th><th width="25%">Unidad</th><th>Eficiencia</th><th>Throughput</th><th>Calidad</th></tr></thead>
+                    <tbody>{rows_kpi}</tbody>
+                </table>
                 
-                <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #64748b;">
-                    <strong>Este documento es propiedad de Refinería Industrial Mexicana S.A. de C.V.</strong><br>
-                    Su distribución está restringida a personal autorizado.
+                <h2>2. GESTIÓN DE INVENTARIOS Y TANQUES</h2>
+                <table>
+                    <thead><tr><th width="20%">Tanque</th><th width="30%">Producto</th><th width="30%">Nivel / Capacidad</th><th width="20%">Estado</th></tr></thead>
+                    <tbody>{rows_tanks}</tbody>
+                </table>
+
+                <h2>3. INCIDENCIAS Y ALERTAS CRÍTICAS</h2>
+                <table>
+                    <thead><tr><th width="15%">Hora</th><th width="20%">Unidad</th><th width="15%">Severidad</th><th>Mensaje del Sistema</th></tr></thead>
+                    <tbody>{rows_alert}</tbody>
+                </table>
+                
+                <div class="signatures">
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div class="sig-name">Carlos Gómez</div>
+                        <div class="sig-title">GERENTE DE PLANTA</div>
+                    </div>
+                    <div class="sig-block">
+                        <div class="sig-line"></div>
+                        <div class="sig-name">Supervisión de Turno</div>
+                        <div class="sig-title">OPERACIONES</div>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="footer">
-                <p>Reporte generado automáticamente por Sistema RefineryIQ v12.0</p>
-                <p>Documento: RI-{datetime.now().strftime('%Y%m%d-%H%M')} | Página 1 de 1</p>
+
+                <div class="footer">
+                    Documento generado automáticamente por RefineryIQ System v12.0 Enterprise | Confidencial<br>
+                    Ubicación del Servidor: Maturín, VE | Zona Horaria: America/Caracas (UTC-4)
+                </div>
             </div>
             
             <script>
-                // Auto-impresión después de 1 segundo
-                setTimeout(() => {{
-                    window.print();
-                }}, 1000);
+                // Auto-imprimir al cargar
+                window.onload = function() {{ setTimeout(function() {{ window.print(); }}, 500); }}
             </script>
         </body>
         </html>
         """
-    except Exception as e: 
-        return HTMLResponse(f"""
-        <html>
-        <body style="font-family: sans-serif; padding: 40px; color: #991b1b;">
-            <h2>❌ Error generando reporte</h2>
-            <p>{str(e)}</p>
-            <p><small>Verifique la conexión a la base de datos y vuelva a intentar.</small></p>
-        </body>
-        </html>
-        """, 500)
+        return html
+    except Exception as e:
+        logger.error(f"Error generando reporte: {e}")
+        return HTMLResponse(f"Error interno generando el reporte: {str(e)}", status_code=500)
 
 # ==============================================================================
 # 14. HEALTH CHECK
