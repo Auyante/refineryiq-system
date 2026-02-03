@@ -543,49 +543,134 @@ async def get_dashboard_history():
 async def get_advanced_stats():
     """Estadísticas avanzadas para OEE y Radar Chart."""
     conn = await get_db_conn()
+    
+    # Primero, verificar si hay datos
+    check_query = "SELECT COUNT(*) as count FROM kpis WHERE timestamp > NOW() - INTERVAL '24 hours'"
+    
+    try:
+        if conn:
+            count_result = await conn.fetchrow(check_query)
+            record_count = int(count_result['count'] or 0) if count_result else 0
+            
+            # Si no hay datos, generar algunos automáticamente
+            if record_count < 5:
+                logger.info("📊 Generando datos de KPIs iniciales para estadísticas...")
+                await generate_initial_kpis(conn)
+    except Exception as e:
+        logger.error(f"Error verificando datos: {e}")
+    
+    # Valores por defecto más realistas
     default = {
-        "oee": {"score": 85, "quality": 99.5, "availability": 98.0, "performance": 85},
-        "stability": {"index": 90, "trend": "stable"},
-        "financial": {"daily_loss_usd": 3500}  # Cambié de 0 a 3500 para que no sea 0
+        "oee": {
+            "score": 87.5, 
+            "quality": 99.2, 
+            "availability": 96.8, 
+            "performance": 89.3
+        },
+        "stability": {
+            "index": 88.7, 
+            "trend": "stable"
+        },
+        "financial": {
+            "daily_loss_usd": 4350  # Valor fijo por defecto
+        }
     }
     
     if not conn: 
         return default
     
     try:
-        # Obtener la eficiencia promedio
-        eff = await conn.fetchval("SELECT AVG(energy_efficiency) FROM kpis WHERE timestamp > NOW() - INTERVAL '24h'")
+        # 1. Obtener KPIs de las últimas 24 horas
+        kpis_query = """
+            SELECT 
+                AVG(energy_efficiency) as avg_efficiency,
+                AVG(throughput) as avg_throughput,
+                COUNT(*) as record_count
+            FROM kpis 
+            WHERE timestamp > NOW() - INTERVAL '24 hours'
+        """
         
-        # Si no hay datos, usar el valor por defecto de 88.0
-        if eff is None:
-            eff = 88.0
+        kpis_result = await conn.fetchrow(kpis_query)
         
-        # Calcular pérdida diaria: (100 - eficiencia) * 350
-        # Esto simula que cada 1% de ineficiencia cuesta $350 por día
-        daily_loss = max(0, (100 - float(eff)) * 350)
+        if kpis_result and kpis_result['record_count'] > 0:
+            avg_efficiency = float(kpis_result['avg_efficiency'] or 88.0)
+            avg_throughput = float(kpis_result['avg_throughput'] or 12000)
+            record_count = int(kpis_result['record_count'] or 1)
+        else:
+            # Si no hay datos, usar valores simulados
+            avg_efficiency = 88.0
+            avg_throughput = 12000
+            record_count = 1
+            
+        # 2. Obtener alertas activas para calcular estabilidad
+        alerts_query = """
+            SELECT COUNT(*) as active_alerts
+            FROM alerts 
+            WHERE acknowledged = FALSE 
+            AND timestamp > NOW() - INTERVAL '24 hours'
+        """
         
-        # Calcular estabilidad
-        std = await conn.fetchval("SELECT STDDEV(throughput) FROM kpis WHERE timestamp > NOW() - INTERVAL '4h'")
-        if std is None:
-            std = 100.0
+        alerts_result = await conn.fetchrow(alerts_query)
+        active_alerts = int(alerts_result['active_alerts'] or 0) if alerts_result else 0
         
-        stability = max(0, min(100, 100 - (float(std) / 50)))
+        # 3. Calcular OEE (Overall Equipment Effectiveness)
+        # OEE = Disponibilidad × Rendimiento × Calidad
+        availability = max(70, min(100, 100 - (active_alerts * 2)))  # Cada alerta reduce disponibilidad
+        performance = avg_efficiency  # Usamos la eficiencia como rendimiento
+        quality = 99.2  # Valor fijo de calidad (podría venir de quality_score)
         
+        oee_score = round((availability/100) * (performance/100) * (quality/100) * 100, 1)
+        
+        # 4. Calcular estabilidad
+        # Menos alertas = más estabilidad
+        stability_score = max(0, min(100, 100 - (active_alerts * 3)))
+        
+        # 5. Calcular impacto financiero
+        # Pérdida = (100 - eficiencia) × factor de costo
+        efficiency_factor = max(0, 100 - avg_efficiency)
+        
+        # Base de pérdida: $50 por cada 1% de ineficiencia
+        base_loss = efficiency_factor * 50
+        
+        # Penalización por alertas: $100 por cada alerta activa
+        alerts_penalty = active_alerts * 100
+        
+        # Penalización por baja producción: si throughput < 11500
+        throughput_penalty = 0
+        if avg_throughput < 11500:
+            throughput_penalty = (11500 - avg_throughput) * 0.1
+            
+        daily_loss = round(base_loss + alerts_penalty + throughput_penalty, 0)
+        
+        # 6. Determinar tendencia
+        trend = "improving"
+        if active_alerts > 5:
+            trend = "deteriorating"
+        elif active_alerts > 2:
+            trend = "stable"
+            
         return {
             "oee": {
-                "score": round(float(eff) * 0.95, 1), 
-                "quality": 99.5, 
-                "availability": 98.0, 
-                "performance": round(float(eff), 1)
+                "score": oee_score,
+                "quality": round(quality, 1),
+                "availability": round(availability, 1),
+                "performance": round(performance, 1)
             },
-            "stability": {"index": round(stability, 1), "trend": "stable"},
-            "financial": {"daily_loss_usd": round(daily_loss, 0)}
+            "stability": {
+                "index": round(stability_score, 1),
+                "trend": trend
+            },
+            "financial": {
+                "daily_loss_usd": int(daily_loss)
+            }
         }
+        
     except Exception as e:
         logger.error(f"Advanced Stats Error: {e}")
         return default
     finally: 
-        await conn.close()
+        if conn:
+            await conn.close()
 
 # ==============================================================================
 # 9. ENDPOINTS: SUPPLY & INVENTORY (BLINDAJE TOTAL)
