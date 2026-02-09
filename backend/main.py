@@ -52,7 +52,48 @@ logger.info(f"🔌 Entorno detectado: {'NUBE (Render)' if 'onrender' in str(DATA
 # ==============================================================================
 # 2. DEFINICIÓN DE MODELOS DE DATOS (PYDANTIC SCHEMAS)
 # ==============================================================================
+# ==============================================================================
+# FUNCIÓN AUXILIAR: GENERACIÓN DE DATOS INICIALES DE KPIs
+# ==============================================================================
 
+async def generate_initial_kpis(conn):
+    """Genera datos iniciales de KPIs si la base de datos está vacía."""
+    from datetime import datetime, timedelta
+    import random
+    
+    logger.info("📊 Generando datos iniciales de KPIs...")
+    
+    try:
+        # Verificar si ya hay datos
+        count = await conn.fetchval("SELECT COUNT(*) FROM kpis")
+        if count > 10:
+            logger.info(f"✅ Ya existen {count} registros de KPIs, omitiendo generación inicial.")
+            return
+        
+        # Generar datos de las últimas 24 horas
+        now = datetime.now()
+        units = ["CDU-101", "FCC-201", "HT-305", "ALK-400"]
+        
+        # Generar 24 puntos de datos (uno por hora)
+        for i in range(24):
+            timestamp = now - timedelta(hours=i)
+            
+            for unit_id in units:
+                # Valores realistas con cierta variación
+                energy_efficiency = random.uniform(85.0, 97.0)
+                throughput = random.uniform(10000, 15000)
+                quality_score = random.uniform(98.5, 99.9)
+                maintenance_score = random.uniform(90.0, 99.0)
+                
+                await conn.execute("""
+                    INSERT INTO kpis (timestamp, unit_id, energy_efficiency, throughput, quality_score, maintenance_score)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                """, timestamp, unit_id, energy_efficiency, throughput, quality_score, maintenance_score)
+        
+        logger.info(f"✅ Generados {24 * len(units)} registros iniciales de KPIs.")
+        
+    except Exception as e:
+        logger.error(f"❌ Error generando datos iniciales de KPIs: {e}")
 class UserLogin(BaseModel):
     """Esquema para recepción de credenciales de login."""
     username: str
@@ -524,42 +565,63 @@ async def get_dashboard_history():
         return []
     
     try:
+        # Verificar si hay datos, si no, generar algunos
+        count = await conn.fetchval("SELECT COUNT(*) FROM kpis WHERE timestamp >= NOW() - INTERVAL '24 HOURS'")
+        
+        if count < 10:
+            logger.info("📊 Generando datos históricos iniciales para dashboard...")
+            await generate_initial_kpis(conn)
+        
         rows = await conn.fetch("""
-            SELECT to_char(date_trunc('hour', timestamp), 'HH24:00') as time_label,
-            ROUND(AVG(energy_efficiency)::numeric, 1) as efficiency,
-            ROUND(AVG(throughput)::numeric, 0) as production
-            FROM kpis WHERE timestamp >= NOW() - INTERVAL '24 HOURS'
-            GROUP BY 1 ORDER BY 1 ASC
+            SELECT 
+                to_char(date_trunc('hour', timestamp), 'HH24:00') as time_label,
+                ROUND(AVG(energy_efficiency)::numeric, 1) as efficiency,
+                ROUND(AVG(throughput)::numeric, 0) as production
+            FROM kpis 
+            WHERE timestamp >= NOW() - INTERVAL '24 HOURS'
+            GROUP BY 1 
+            ORDER BY 1 ASC
         """)
+        
+        # Si no hay resultados, crear algunos datos de ejemplo
+        if not rows:
+            logger.warning("⚠️ No hay datos históricos, generando datos de ejemplo...")
+            example_data = []
+            now = datetime.now()
+            for i in range(24, 0, -1):
+                hour = (now - timedelta(hours=i)).strftime('%H:00')
+                production = 12000 + random.randint(-1000, 1000)
+                example_data.append({
+                    "time_label": hour,
+                    "efficiency": random.uniform(85, 95),
+                    "production": production
+                })
+            return example_data
+        
+        logger.info(f"📈 Historial obtenido: {len(rows)} puntos de datos")
         return [dict(r) for r in rows]
     except Exception as e:
         logger.error(f"History Fetch Error: {e}")
         return []
     finally: 
         await conn.close()
-
-
 @app.get("/api/stats/advanced")
 async def get_advanced_stats():
     """Estadísticas avanzadas para OEE y Radar Chart."""
     conn = await get_db_conn()
     
     # Primero, verificar si hay datos
-    check_query = "SELECT COUNT(*) as count FROM kpis WHERE timestamp > NOW() - INTERVAL '24 hours'"
-    
     try:
         if conn:
-            count_result = await conn.fetchrow(check_query)
-            record_count = int(count_result['count'] or 0) if count_result else 0
-            
-            # Si no hay datos, generar algunos automáticamente
-            if record_count < 5:
+            # Generar datos iniciales si no existen
+            count_result = await conn.fetchval("SELECT COUNT(*) FROM kpis WHERE timestamp > NOW() - INTERVAL '24 hours'")
+            if not count_result or count_result < 5:
                 logger.info("📊 Generando datos de KPIs iniciales para estadísticas...")
                 await generate_initial_kpis(conn)
     except Exception as e:
         logger.error(f"Error verificando datos: {e}")
     
-    # Valores por defecto más realistas
+    # Valores por defecto que se usarán si hay error
     default = {
         "oee": {
             "score": 87.5, 
@@ -572,7 +634,7 @@ async def get_advanced_stats():
             "trend": "stable"
         },
         "financial": {
-            "daily_loss_usd": 4350  # Valor fijo por defecto
+            "daily_loss_usd": 4350
         }
     }
     
@@ -585,6 +647,7 @@ async def get_advanced_stats():
             SELECT 
                 AVG(energy_efficiency) as avg_efficiency,
                 AVG(throughput) as avg_throughput,
+                AVG(quality_score) as avg_quality,
                 COUNT(*) as record_count
             FROM kpis 
             WHERE timestamp > NOW() - INTERVAL '24 hours'
@@ -592,16 +655,18 @@ async def get_advanced_stats():
         
         kpis_result = await conn.fetchrow(kpis_query)
         
-        if kpis_result and kpis_result['record_count'] > 0:
-            avg_efficiency = float(kpis_result['avg_efficiency'] or 88.0)
-            avg_throughput = float(kpis_result['avg_throughput'] or 12000)
-            record_count = int(kpis_result['record_count'] or 1)
-        else:
-            # Si no hay datos, usar valores simulados
-            avg_efficiency = 88.0
-            avg_throughput = 12000
-            record_count = 1
-            
+        # Si no hay datos, usar los valores por defecto
+        if not kpis_result or kpis_result['record_count'] == 0:
+            logger.warning("⚠️ No se encontraron datos de KPIs, usando valores por defecto")
+            return default
+        
+        avg_efficiency = float(kpis_result['avg_efficiency'] or 88.0)
+        avg_throughput = float(kpis_result['avg_throughput'] or 12000)
+        avg_quality = float(kpis_result['avg_quality'] or 99.0)
+        record_count = int(kpis_result['record_count'] or 1)
+        
+        logger.info(f"📈 Datos reales encontrados: {record_count} registros, eficiencia: {avg_efficiency:.2f}%")
+        
         # 2. Obtener alertas activas para calcular estabilidad
         alerts_query = """
             SELECT COUNT(*) as active_alerts
@@ -616,38 +681,34 @@ async def get_advanced_stats():
         # 3. Calcular OEE (Overall Equipment Effectiveness)
         # OEE = Disponibilidad × Rendimiento × Calidad
         availability = max(70, min(100, 100 - (active_alerts * 2)))  # Cada alerta reduce disponibilidad
-        performance = avg_efficiency  # Usamos la eficiencia como rendimiento
-        quality = 99.2  # Valor fijo de calidad (podría venir de quality_score)
+        performance = avg_efficiency
+        quality = avg_quality
         
         oee_score = round((availability/100) * (performance/100) * (quality/100) * 100, 1)
         
         # 4. Calcular estabilidad
-        # Menos alertas = más estabilidad
         stability_score = max(0, min(100, 100 - (active_alerts * 3)))
         
         # 5. Calcular impacto financiero
-        # Pérdida = (100 - eficiencia) × factor de costo
         efficiency_factor = max(0, 100 - avg_efficiency)
-        
-        # Base de pérdida: $50 por cada 1% de ineficiencia
         base_loss = efficiency_factor * 50
-        
-        # Penalización por alertas: $100 por cada alerta activa
         alerts_penalty = active_alerts * 100
-        
-        # Penalización por baja producción: si throughput < 11500
         throughput_penalty = 0
+        
         if avg_throughput < 11500:
             throughput_penalty = (11500 - avg_throughput) * 0.1
             
         daily_loss = round(base_loss + alerts_penalty + throughput_penalty, 0)
         
         # 6. Determinar tendencia
-        trend = "improving"
         if active_alerts > 5:
             trend = "deteriorating"
         elif active_alerts > 2:
             trend = "stable"
+        else:
+            trend = "improving"
+        
+        logger.info(f"📊 Estadísticas calculadas: OEE={oee_score}%, Estabilidad={stability_score}%, Pérdida=${daily_loss}")
             
         return {
             "oee": {
@@ -671,7 +732,6 @@ async def get_advanced_stats():
     finally: 
         if conn:
             await conn.close()
-
 # ==============================================================================
 # 9. ENDPOINTS: SUPPLY & INVENTORY (BLINDAJE TOTAL)
 # ==============================================================================
