@@ -13,8 +13,7 @@ import '../App.css';
 
 /**
  * COMPONENTE DASHBOARD PRINCIPAL
- * Versión: 3.5 Ultimate (Cloud Adapted)
- * Características: Auto-IP, Silent Refresh, Custom Tooltips, Full UI
+ * Versión: 3.6 - Corregido para producción en Render
  */
 const Dashboard = () => {
   const HOST = APP_HOST;
@@ -46,38 +45,72 @@ const Dashboard = () => {
 
       console.log(`📡 Sincronizando telemetría con ${API_URL}...`);
       
-      // Hacer peticiones secuenciales para evitar sobrecarga
-      const [alertsRes, historyRes] = await Promise.all([
-        axios.get(`${API_URL}/api/alerts`).catch(() => ({ data: [] })),
-        axios.get(`${API_URL}/api/dashboard/history`).catch(() => ({ data: [] }))
+      // Hacer peticiones en paralelo a TODOS los endpoints necesarios
+      const [advancedRes, historyRes, alertsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/stats/advanced`).catch(err => {
+          console.error("❌ Error en stats/advanced:", err.response?.status || err.message);
+          return { data: null };
+        }),
+        axios.get(`${API_URL}/api/dashboard/history`).catch(err => {
+          console.error("❌ Error en dashboard/history:", err.response?.status || err.message);
+          return { data: [] };
+        }),
+        axios.get(`${API_URL}/api/alerts`).catch(err => {
+          console.error("❌ Error en alerts:", err.response?.status || err.message);
+          return { data: [] };
+        })
       ]);
 
-      // Procesar datos
-      const activeAlerts = alertsRes.data.filter ? 
-        alertsRes.data.filter(a => !a.acknowledged).length : 0;
-      
-      // Datos por defecto para advanced
-      const defaultAdvanced = {
-        oee: { score: 85, quality: 99.5, availability: 98.0, performance: 85 },
-        stability: { index: 90, trend: "stable" },
-        financial: { daily_loss_usd: 0 }
-      };
-
-      setStats({
-        active_alerts: activeAlerts,
-        efficiency: 88.5, // Valor por defecto
-        predictions_count: 0
+      console.log("📊 Respuestas recibidas:", {
+        advanced: advancedRes.data ? "✅" : "❌",
+        history: historyRes.data?.length || 0,
+        alerts: alertsRes.data?.length || 0
       });
 
-      setHistory(historyRes.data || []);
-      setAdvanced(defaultAdvanced);
+      // Procesar datos avanzados (OEE, impacto financiero, estabilidad)
+      if (advancedRes.data) {
+        console.log("📈 Datos avanzados:", advancedRes.data);
+        setAdvanced(advancedRes.data);
+        
+        // Extraer eficiencia de los datos avanzados
+        const efficiency = advancedRes.data.oee?.score || 88.5;
+        
+        setStats({
+          active_alerts: alertsRes.data?.filter(a => !a.acknowledged).length || 0,
+          efficiency: efficiency,
+          predictions_count: 0
+        });
+      } else {
+        console.warn("⚠️ No hay datos avanzados, usando valores por defecto");
+        // Datos de respaldo si falla la API
+        const defaultAdvanced = {
+          oee: { score: 85, quality: 99.5, availability: 98.0, performance: 85 },
+          stability: { index: 90, trend: "stable" },
+          financial: { daily_loss_usd: 4350 }
+        };
+        setAdvanced(defaultAdvanced);
+        setStats({
+          active_alerts: 0,
+          efficiency: 85,
+          predictions_count: 0
+        });
+      }
+
+      // Historial para gráficos
+      if (historyRes.data && historyRes.data.length > 0) {
+        console.log(`📊 Historial recibido: ${historyRes.data.length} puntos`);
+        setHistory(historyRes.data);
+      } else {
+        console.warn("⚠️ No hay datos de historial");
+        setHistory([]);
+      }
       
       setLoading(false);
       setRefreshing(false);
       setError(null);
 
     } catch (err) { 
-      console.error("❌ Error de conexión:", err);
+      console.error("❌ Error crítico en loadData:", err);
       if (!isBackground) {
         setError("No se pudo establecer conexión con el servidor de planta.");
       }
@@ -179,11 +212,11 @@ const Dashboard = () => {
   }
 
   const oeeChartData = advanced ? [
-    { subject: 'Calidad', A: advanced.oee.quality, fullMark: 100 },
-    { subject: 'Disp.', A: advanced.oee.availability, fullMark: 100 },
-    { subject: 'Rendim.', A: advanced.oee.performance, fullMark: 100 },
-    { subject: 'Salud Activos', A: Math.max(0, 100 - (stats.active_alerts * 10)), fullMark: 100 },
-    { subject: 'Energía', A: parseFloat(stats.efficiency || 0), fullMark: 100 },
+    { subject: 'Calidad', A: advanced.oee?.quality || 99.2, fullMark: 100 },
+    { subject: 'Disp.', A: advanced.oee?.availability || 96.8, fullMark: 100 },
+    { subject: 'Rendim.', A: advanced.oee?.performance || 89.3, fullMark: 100 },
+    { subject: 'Salud Activos', A: Math.max(0, 100 - ((stats.active_alerts || 0) * 10)), fullMark: 100 },
+    { subject: 'Energía', A: stats.efficiency || 0, fullMark: 100 },
   ] : [];
 
   return (
@@ -221,6 +254,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid-4">
+        {/* OEE DE PLANTA */}
         <div className="card" style={{borderLeft: '4px solid var(--accent)', position: 'relative', overflow:'hidden'}}>
           <div style={{position:'absolute', right:10, top:10, opacity:0.1}}>
             <FiActivity size={80} color="var(--accent)"/>
@@ -242,8 +276,8 @@ const Dashboard = () => {
             alignItems:'center', 
             gap:'10px'
           }}>
-            {advanced?.oee.score || 85}%
-            {advanced?.oee.score > 85 ? 
+            {advanced?.oee?.score || 85}%
+            {advanced?.oee?.score > 85 ? 
               <FiArrowUp size={20} color="var(--success)"/> : 
               <FiArrowDown size={20} color="var(--warning)"/>
             }
@@ -252,16 +286,17 @@ const Dashboard = () => {
             fontSize: '0.85rem', 
             marginTop: '4px', 
             fontWeight: 600, 
-            color: advanced?.oee.score > 85 ? 'var(--success)' : 'var(--warning)', 
+            color: advanced?.oee?.score > 85 ? 'var(--success)' : 'var(--warning)', 
             display: 'flex', 
             alignItems: 'center', 
             gap: '5px'
           }}>
-            {advanced?.oee.score > 85 ? <FiCheckCircle /> : <FiAlertCircle />}
-            {advanced?.oee.score > 85 ? 'Rendimiento Óptimo' : 'Requiere Optimización'}
+            {advanced?.oee?.score > 85 ? <FiCheckCircle /> : <FiAlertCircle />}
+            {advanced?.oee?.score > 85 ? 'Rendimiento Óptimo' : 'Requiere Optimización'}
           </div>
         </div>
 
+        {/* IMPACTO FINANCIERO (24H) */}
         <div className="card" style={{borderLeft: '4px solid var(--danger)'}}>
           <div style={{
             color: 'var(--text-secondary)', 
@@ -273,13 +308,14 @@ const Dashboard = () => {
             IMPACTO FINANCIERO (24H)
           </div>
           <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)'}}>
-            ${advanced?.financial.daily_loss_usd || 0}
+            ${(advanced?.financial?.daily_loss_usd || 0).toLocaleString()}
           </div>
           <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px'}}>
             Pérdida estimada por ineficiencia
           </div>
         </div>
 
+        {/* ÍNDICE DE ESTABILIDAD */}
         <div className="card" style={{borderLeft: '4px solid var(--success)'}}>
           <div style={{
             color: 'var(--text-secondary)', 
@@ -291,13 +327,21 @@ const Dashboard = () => {
             ÍNDICE DE ESTABILIDAD
           </div>
           <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)'}}>
-            {advanced?.stability.index || 90}/100
+            {advanced?.stability?.index || 90}/100
           </div>
-          <div style={{fontSize: '0.85rem', color: 'var(--success)', marginTop: '4px', fontWeight: 600}}>
-            Variabilidad de proceso baja
+          <div style={{
+            fontSize: '0.85rem', 
+            color: advanced?.stability?.trend === 'improving' ? 'var(--success)' : 
+                   advanced?.stability?.trend === 'stable' ? 'var(--warning)' : 'var(--danger)', 
+            marginTop: '4px', 
+            fontWeight: 600
+          }}>
+            {advanced?.stability?.trend === 'improving' ? 'Tendencia positiva' :
+             advanced?.stability?.trend === 'stable' ? 'Estable' : 'Requiere atención'}
           </div>
         </div>
 
+        {/* PRODUCCIÓN VOLUMÉTRICA */}
         <div className="card" style={{borderLeft: '4px solid #6366f1'}}>
           <div style={{
             color: 'var(--text-secondary)', 
@@ -309,7 +353,10 @@ const Dashboard = () => {
             PRODUCCIÓN VOLUMÉTRICA
           </div>
           <div style={{fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-main)'}}>
-            {history.length > 0 ? (history[history.length-1].production / 1000).toFixed(1) : 0}k
+            {history.length > 0 ? 
+              ((history[history.length-1]?.production || 0) / 1000).toFixed(1) + 'k' : 
+              '0k'
+            }
           </div>
           <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px'}}>
             Barriles por día (BPD)
@@ -326,47 +373,56 @@ const Dashboard = () => {
               color:'#1d4ed8', 
               border:'1px solid #dbeafe'
             }}>
-              Datos Reales
+              {history.length > 0 ? `${history.length} puntos` : 'Sin datos'}
             </span>
           </div>
           <div style={{height: '380px', width: '100%'}}>
-            <ResponsiveContainer>
-              <AreaChart 
-                data={history} 
-                margin={{top:20, right:10, left:0, bottom:0}}
-              >
-                <defs>
-                  <linearGradient id="colorProd" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="time_label" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 11, fill: '#6b7280', fontWeight: 500}} 
-                  interval={history.length > 6 ? Math.floor(history.length / 6) : 1} 
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 11, fill: '#6b7280', fontWeight: 500}} 
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area 
-                  type="monotone" 
-                  dataKey="production" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3} 
-                  fill="url(#colorProd)" 
-                  animationDuration={1500} 
-                  activeDot={{r: 6, strokeWidth: 0}}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {history.length > 0 ? (
+              <ResponsiveContainer>
+                <AreaChart 
+                  data={history} 
+                  margin={{top:20, right:10, left:0, bottom:0}}
+                >
+                  <defs>
+                    <linearGradient id="colorProd" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="time_label" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 11, fill: '#6b7280', fontWeight: 500}} 
+                    interval={history.length > 6 ? Math.floor(history.length / 6) : 1} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 11, fill: '#6b7280', fontWeight: 500}} 
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area 
+                    type="monotone" 
+                    dataKey="production" 
+                    stroke="#3b82f6" 
+                    strokeWidth={3} 
+                    fill="url(#colorProd)" 
+                    animationDuration={1500} 
+                    activeDot={{r: 6, strokeWidth: 0}}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>
+                <div style={{textAlign:'center'}}>
+                  <FiTrendingUp size={40} style={{marginBottom:'10px', opacity:0.5}}/>
+                  <p>No hay datos de tendencia disponibles</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -381,31 +437,40 @@ const Dashboard = () => {
               <h3 className="card-title"><FiPieChart /> Análisis Multidimensional</h3>
             </div>
             <div style={{flex: 1, width: '100%', minHeight: '250px'}}>
-              <ResponsiveContainer>
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={oeeChartData}>
-                  <PolarGrid stroke="#e5e7eb" />
-                  <PolarAngleAxis 
-                    dataKey="subject" 
-                    tick={{fill: '#4b5563', fontSize: 11, fontWeight: 700}} 
-                  />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar 
-                    name="Performance Planta" 
-                    dataKey="A" 
-                    stroke="#8b5cf6" 
-                    strokeWidth={3} 
-                    fill="#8b5cf6" 
-                    fillOpacity={0.3} 
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      borderRadius: '8px', 
-                      border: 'none', 
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+              {oeeChartData.length > 0 ? (
+                <ResponsiveContainer>
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={oeeChartData}>
+                    <PolarGrid stroke="#e5e7eb" />
+                    <PolarAngleAxis 
+                      dataKey="subject" 
+                      tick={{fill: '#4b5563', fontSize: 11, fontWeight: 700}} 
+                    />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                    <Radar 
+                      name="Performance Planta" 
+                      dataKey="A" 
+                      stroke="#8b5cf6" 
+                      strokeWidth={3} 
+                      fill="#8b5cf6" 
+                      fillOpacity={0.3} 
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8'}}>
+                  <div style={{textAlign:'center'}}>
+                    <FiPieChart size={40} style={{marginBottom:'10px', opacity:0.5}}/>
+                    <p>No hay datos para análisis multidimensional</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
