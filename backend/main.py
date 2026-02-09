@@ -799,7 +799,191 @@ async def get_supplies_data():
         return get_mock_supplies()
     finally: 
         await conn.close()
-
+@app.get("/api/inventory")
+async def get_inventory():
+    """Obtiene todo el inventario para el panel de administración."""
+    conn = await get_db_conn()
+    if not conn: 
+        return []
+    
+    try:
+        rows = await conn.fetch("""
+            SELECT id, item, sku, quantity, unit, status, location, 
+                   TO_CHAR(last_updated, 'YYYY-MM-DD HH24:MI:SS') as last_updated
+            FROM inventory 
+            ORDER BY id
+        """)
+        return [dict(r) for r in rows]
+    except Exception as e:
+        logger.error(f"Inventory fetch error: {e}")
+        return []
+    finally: 
+        await conn.close()
+@app.post("/api/inventory")
+async def create_inventory_item(item_data: InventoryCreate):
+    """Crea un nuevo ítem en el inventario."""
+    conn = await get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection error")
+    
+    try:
+        # Verificar si el SKU ya existe
+        existing = await conn.fetchrow(
+            "SELECT id FROM inventory WHERE sku = $1", 
+            item_data.sku
+        )
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="SKU already exists")
+        
+        # Insertar nuevo ítem
+        result = await conn.fetchrow("""
+            INSERT INTO inventory (item, sku, quantity, unit, status, location, last_updated)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            RETURNING id, item, sku, quantity, unit, status, location, last_updated
+        """, 
+            item_data.item, 
+            item_data.sku, 
+            item_data.quantity, 
+            item_data.unit, 
+            item_data.status, 
+            item_data.location
+        )
+        
+        return dict(result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Inventory create error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
+@app.put("/api/inventory/{item_id}")
+async def update_inventory_item(item_id: int, item_data: InventoryUpdate):
+    """Actualiza un ítem del inventario."""
+    conn = await get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection error")
+    
+    try:
+        # Construir la consulta de actualización dinámicamente
+        update_fields = []
+        values = []
+        param_count = 1
+        
+        if item_data.item is not None:
+            update_fields.append(f"item = ${param_count}")
+            values.append(item_data.item)
+            param_count += 1
+        
+        if item_data.sku is not None:
+            update_fields.append(f"sku = ${param_count}")
+            values.append(item_data.sku)
+            param_count += 1
+        
+        if item_data.quantity is not None:
+            update_fields.append(f"quantity = ${param_count}")
+            values.append(item_data.quantity)
+            param_count += 1
+        
+        if item_data.unit is not None:
+            update_fields.append(f"unit = ${param_count}")
+            values.append(item_data.unit)
+            param_count += 1
+        
+        if item_data.status is not None:
+            update_fields.append(f"status = ${param_count}")
+            values.append(item_data.status)
+            param_count += 1
+        
+        if item_data.location is not None:
+            update_fields.append(f"location = ${param_count}")
+            values.append(item_data.location)
+            param_count += 1
+        
+        # Si no hay campos para actualizar, lanzar error
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        # Agregar actualización de timestamp
+        update_fields.append("last_updated = NOW()")
+        
+        # Agregar el ID al final de los valores
+        values.append(item_id)
+        
+        query = f"""
+            UPDATE inventory 
+            SET {', '.join(update_fields)}
+            WHERE id = ${param_count}
+            RETURNING id, item, sku, quantity, unit, status, location, last_updated
+        """
+        
+        updated = await conn.fetchrow(query, *values)
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        return dict(updated)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Inventory update error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
+@app.delete("/api/inventory/{item_id}")
+async def delete_inventory_item(item_id: int):
+    """Elimina un ítem del inventario."""
+    conn = await get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection error")
+    
+    try:
+        # Verificar si el ítem existe
+        existing = await conn.fetchrow(
+            "SELECT id FROM inventory WHERE id = $1", 
+            item_id
+        )
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        # Eliminar el ítem
+        await conn.execute("DELETE FROM inventory WHERE id = $1", item_id)
+        
+        return {"status": "success", "message": f"Item {item_id} deleted"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Inventory delete error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
+@app.get("/api/inventory/{item_id}")
+async def get_inventory_item(item_id: int):
+    """Obtiene un ítem específico del inventario."""
+    conn = await get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection error")
+    
+    try:
+        row = await conn.fetchrow("""
+            SELECT id, item, sku, quantity, unit, status, location, 
+                   TO_CHAR(last_updated, 'YYYY-MM-DD HH24:MI:SS') as last_updated
+            FROM inventory 
+            WHERE id = $1
+        """, item_id)
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Item not found")
+        
+        return dict(row)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
 # ==============================================================================
 # 10. ENDPOINTS: ASSETS & SENSORS
 # ==============================================================================
