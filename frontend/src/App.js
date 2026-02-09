@@ -11,7 +11,7 @@ import Assets from './views/Assets';
 import Supply from './views/Supply';
 import Login from './views/Login';
 import NormalizedDataViewer from './components/NormalizedDataViewer';
-
+import AdminInventory from './views/AdminInventory';
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState(() => {
@@ -60,6 +60,7 @@ function App() {
             <Route path="/energy" element={<Energy />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/normalized" element={<div className="page-container"><NormalizedDataViewer /></div>} />
+            <Route path="/admin-inventory" element={<div className="page-container"><AdminInventory /></div>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
