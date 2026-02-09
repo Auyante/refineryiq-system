@@ -423,7 +423,127 @@ def manage_alerts_lifecycle(conn):
             "sev": alert[0], 
             "msg": alert[1]
         })
-
+def simulate_inventory_changes(conn):
+    """
+    Simula el consumo y reposición de inventario de forma realista.
+    Cada ciclo, algunos items se consumen y otros se reponen.
+    """
+    logger.info("📦 Simulando dinámica de inventario...")
+    
+    try:
+        # Obtener todo el inventario actual
+        inventory_items = conn.execute(text("SELECT * FROM inventory")).fetchall()
+        
+        for item in inventory_items:
+            item_id, item_name, sku, quantity, unit, status, location, last_updated = item
+            
+            # Diferentes tasas de consumo según el tipo de item
+            consumption_rate = 0
+            
+            if "Catalizador" in item_name:
+                consumption_rate = random.uniform(0.5, 2.0)  # Se consume rápido
+            elif "Inhibidor" in item_name or "Sosa" in item_name:
+                consumption_rate = random.uniform(1.0, 3.0)  # Consumo medio
+            elif "Aceite" in item_name:
+                consumption_rate = random.uniform(0.1, 0.5)  # Consumo lento
+            elif "Válvula" in item_name or "Empaque" in item_name:
+                consumption_rate = random.uniform(0, 0.1)    # Consumo muy lento
+            else:
+                consumption_rate = random.uniform(0.5, 1.5)  # Consumo general
+            
+            # Nueva lógica con mayor variabilidad
+            rand_choice = random.random()
+            
+            if rand_choice < 0.7:  # 70% de probabilidad de consumir
+                # A veces consumo grande, a veces pequeño
+                if random.random() < 0.2:  # 20% de probabilidad de consumo grande
+                    consumption_multiplier = random.uniform(3, 10)
+                else:
+                    consumption_multiplier = random.uniform(0.5, 2)
+                
+                new_quantity = max(0, quantity - (consumption_rate * consumption_multiplier))
+            elif rand_choice < 0.9:  # 20% de probabilidad de reposición (0.7 a 0.9)
+                # Reposición
+                new_quantity = quantity + random.uniform(10, 50)
+            else:  # 10% de probabilidad de sin cambios (0.9 a 1.0)
+                new_quantity = quantity
+            
+            # Actualizar estado según la cantidad
+            new_status = "OK"
+            if new_quantity <= 0:
+                new_status = "CRITICAL"
+                new_quantity = 0  # No permitir negativos
+            elif new_quantity < 10:
+                new_status = "LOW"
+            elif new_quantity > 100:
+                new_status = "OK"
+            
+            # Actualizar en la base de datos
+            conn.execute(text("""
+                UPDATE inventory 
+                SET quantity = :qty, status = :status, last_updated = NOW() 
+                WHERE id = :id
+            """), {
+                "qty": round(new_quantity, 2), 
+                "status": new_status, 
+                "id": item_id
+            })
+            
+            # Registrar reposiciones automáticas si el stock está muy bajo
+            if new_status == "CRITICAL" and random.random() < 0.3:
+                reposicion = random.uniform(50, 100)
+                conn.execute(text("""
+                    UPDATE inventory 
+                    SET quantity = :qty, status = 'LOW', last_updated = NOW() 
+                    WHERE id = :id
+                """), {
+                    "qty": reposicion, 
+                    "id": item_id
+                })
+                logger.info(f"   ↳ Reposición automática: {item_name} +{reposicion:.0f} {unit}")
+    
+    except Exception as e:
+        logger.error(f"Error en simulación de inventario: {e}")
+def generate_new_inventory_items(conn):
+    """
+    Genera nuevos items de inventario aleatoriamente ocasionalmente.
+    Esto simula nuevas compras o adquisiciones.
+    """
+    # 15% de probabilidad de agregar un nuevo item en cada ciclo
+    if random.random() > 0.15:
+        return
+    
+    # Lista de posibles nuevos items
+    possible_items = [
+        {"item": "Filtro de Aire HEPA", "sku": "FILT-HEPA-01", "quantity": random.randint(5, 20), "unit": "pza", "status": "OK"},
+        {"item": "Sensor de Presión 4-20mA", "sku": f"SENS-P-{random.randint(100, 999)}", "quantity": random.randint(2, 8), "unit": "pza", "status": "OK"},
+        {"item": "Juego de Juntas Espirales", "sku": f"JGTA-{random.randint(10, 99)}", "quantity": random.randint(10, 30), "unit": "juego", "status": "OK"},
+        {"item": "Aceite Hidráulico ISO-46", "sku": f"ACE-HID-{random.randint(1, 9)}", "quantity": random.randint(100, 300), "unit": "L", "status": "OK"},
+        {"item": "Kit de Mantenimiento Bombas", "sku": f"KIT-PMP-{random.randint(1, 5)}", "quantity": random.randint(1, 5), "unit": "kit", "status": "LOW"},
+        {"item": "Reactivo de Prueba pH", "sku": f"REACT-PH-{random.randint(1, 9)}", "quantity": random.randint(50, 150), "unit": "L", "status": "OK"},
+    ]
+    
+    new_item = random.choice(possible_items)
+    
+    try:
+        # Verificar si el SKU ya existe
+        existing = conn.execute(text("SELECT id FROM inventory WHERE sku = :sku"), 
+                               {"sku": new_item["sku"]}).fetchone()
+        
+        if not existing:
+            conn.execute(text("""
+                INSERT INTO inventory (item, sku, quantity, unit, status, location, last_updated)
+                VALUES (:item, :sku, :qty, :unit, :status, 'Almacén Central', NOW())
+            """), {
+                "item": new_item["item"],
+                "sku": new_item["sku"],
+                "qty": new_item["quantity"],
+                "unit": new_item["unit"],
+                "status": new_item["status"]
+            })
+            logger.info(f"🆕 Nuevo item agregado: {new_item['item']} (SKU: {new_item['sku']})")
+    except Exception as e:
+        logger.error(f"Error agregando nuevo item: {e}")
 def backfill_missing_history(conn):
     """
     Viaje en el tiempo: Si no hay datos de ayer, los crea.
@@ -492,6 +612,8 @@ def run_simulation_cycle():
             seed_master_data(conn)
             backfill_missing_history(conn)
             simulate_process_dynamics(conn)
+            simulate_inventory_changes(conn)  # <-- AÑADIR ESTA LÍNEA
+            generate_new_inventory_items(conn)  # <-- AÑADIR ESTA LÍNEA
             manage_alerts_lifecycle(conn)
             update_energy_and_maintenance(conn)
             
