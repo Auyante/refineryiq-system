@@ -171,7 +171,25 @@ class EquipmentResponse(BaseModel):
     unit_id: str
     unit_name: Optional[str] = None
     sensors: List[Dict[str, Any]] = []
+# ... después del último modelo existente ...
 
+class InventoryUpdate(BaseModel):
+    """Esquema para actualizar un ítem del inventario."""
+    item: Optional[str] = None
+    sku: Optional[str] = None
+    quantity: Optional[float] = None
+    unit: Optional[str] = None
+    status: Optional[str] = None
+    location: Optional[str] = None
+
+class InventoryCreate(BaseModel):
+    """Esquema para crear un nuevo ítem en el inventario."""
+    item: str
+    sku: str
+    quantity: float
+    unit: str
+    status: str = "OK"
+    location: str = "Almacén Central"
 # ==============================================================================
 # 3. GESTIÓN DE BASE DE DATOS (CONEXIÓN Y MIGRACIÓN)
 # ==============================================================================
@@ -951,7 +969,40 @@ async def get_energy_analysis():
         logger.error(f"Energy Analysis Error: {e}")
     
     return await energy_system.get_recent_analysis(None)
+# ==============================================================================
+# ==============================================================================
+# ==============================================================================
+# ==============================================================================
+# ==============================================================================
+# ==============================================================================
 
+# ==============================================================================
+@app.post("/api/fix-inventory-table")
+async def fix_inventory_table():
+    """Endpoint temporal para arreglar la tabla inventory si falta la columna 'item'."""
+    conn = await get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection error")
+    
+    try:
+        # Agregar columna 'item' si no existe
+        await conn.execute("""
+            ALTER TABLE inventory 
+            ADD COLUMN IF NOT EXISTS item TEXT;
+        """)
+        
+        # Si hay registros sin 'item', actualízalos con un valor por defecto
+        await conn.execute("""
+            UPDATE inventory 
+            SET item = 'Ítem sin nombre' 
+            WHERE item IS NULL OR item = '';
+        """)
+        
+        return {"status": "success", "message": "Inventory table fixed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        await conn.close()
 # ==============================================================================
 # 12. ENDPOINTS: NORMALIZACIÓN Y DB VIEWER
 # ==============================================================================
