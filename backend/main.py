@@ -6,6 +6,7 @@ import random
 import asyncio
 import logging
 import threading
+from ml_optimization import optimizer
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
@@ -190,6 +191,12 @@ class InventoryCreate(BaseModel):
     unit: str
     status: str = "OK"
     location: str = "Almacén Central"
+
+class OptimizationRequest(BaseModel):
+    unit_id: str
+    current_temperature: float
+    current_pressure: float
+    current_flow: float
 # ==============================================================================
 # 3. GESTIÓN DE BASE DE DATOS (CONEXIÓN Y MIGRACIÓN)
 # ==============================================================================
@@ -1305,7 +1312,29 @@ async def get_norm_equipment():
         return []
     finally: 
         await conn.close()
+@app.post("/api/optimization/run")
+async def run_process_optimization(request: OptimizationRequest):
+    """
+    Ejecuta el motor de IA para encontrar los setpoints óptimos
+    basados en las condiciones actuales.
+    """
+    try:
+        current_vals = {
+            'temperature': request.current_temperature,
+            'pressure': request.current_pressure,
+            'flow_rate': request.current_flow
+        }
+        
+        result = await optimizer.find_optimal_parameters(request.unit_id, current_vals)
+        return result
+    except Exception as e:
+        logger.error(f"Error en optimización: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/optimization/train/{unit_id}")
+async def train_optimization(unit_id: str):
+    """Fuerza el re-entrenamiento del modelo de la unidad."""
+    return await optimizer.train_optimization_model(unit_id)
 # ==============================================================================
 # 13. GENERADOR DE REPORTES (PDF/HTML MEJORADO)
 # ==============================================================================
