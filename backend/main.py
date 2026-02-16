@@ -470,9 +470,9 @@ async def lifespan(app: FastAPI):
 
         threading.Thread(target=delayed_start, daemon=True).start()
     if ML_OPTIMIZER_AVAILABLE:
-        # Entrena el modelo en segundo plano al iniciar
-        import asyncio
-        asyncio.create_task(optimizer.train_optimization_model("CDU-101"))        
+        logger.info("🧠 Inicializando motor de IA con datos de DB...")
+        # Lanza el entrenamiento en background sin esperar (fire-and-forget)
+        asyncio.create_task(optimizer.train_optimization_model("CDU-101"))       
     yield # Servidor corre aquí
     
     # --- APAGADO DEL SERVIDOR ---
@@ -1323,44 +1323,51 @@ async def get_norm_equipment():
 @app.post("/api/optimization/run")
 async def run_process_optimization(request: OptimizationRequest):
     """
-    Uso Real: Recibe datos del frontend y devuelve setpoints óptimos.
+    Ejecuta la optimización utilizando el modelo entrenado con datos reales.
     """
     if not ML_OPTIMIZER_AVAILABLE:
-        raise HTTPException(status_code=503, detail="Módulo ML no disponible")
+        raise HTTPException(status_code=503, detail="Motor ML no disponible")
     
-    # Preparar datos
-    current_vals = {
-        'temperature': request.current_temperature,
-        'pressure': request.current_pressure,
-        'flow_rate': request.current_flow
-    }
-    
-    # Ejecutar optimización
-    return await optimizer.find_optimal_parameters(request.unit_id, current_vals)
+    try:
+        # Mapeamos los inputs a un diccionario simple
+        current_vals = {
+            'temperature': request.current_temperature,
+            'pressure': request.current_pressure,
+            'flow_rate': request.current_flow
+        }
+        
+        # Llamada asíncrona al optimizador
+        result = await optimizer.find_optimal_parameters(request.unit_id, current_vals)
+        return result
 
+    except Exception as e:
+        logger.error(f"Error optimización: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 @app.get("/api/optimization/test")
 async def test_process_optimization_browser(unit_id: str = "CDU-101"):
     """
-    Uso Navegador: Simula datos para probar que la IA funciona entrando al link.
+    Prueba rápida desde navegador. Simula valores típicos de la unidad CDU-101.
     """
     if not ML_OPTIMIZER_AVAILABLE:
-        return {"error": "Módulo ML no disponible"}
+        return {"error": "ML no disponible"}
 
-    # Datos falsos para probar
-    import random
+    # Valores típicos simulados para CDU-101 (basados en auto_generator)
     mock_vals = {
-        'temperature': random.uniform(340, 360),
-        'pressure': random.uniform(10, 15),
-        'flow_rate': random.uniform(90, 110)
+        'temperature': 350.5, # Típico entre 340-360
+        'pressure': 20.0,     # Típico entre 15-25
+        'flow_rate': 10050.0  # Típico ~10,000 bpd
     }
     
-    result = await optimizer.find_optimal_parameters(unit_id, mock_vals)
-    return {
-        "mensaje": "✅ Prueba desde Navegador Exitosa",
-        "entrada_simulada": mock_vals,
-        "resultado_ia": result
-    }
-
+    try:
+        result = await optimizer.find_optimal_parameters(unit_id, mock_vals)
+        return {
+            "status": "OK",
+            "mode": "BROWSER_TEST",
+            "input_simulado": mock_vals,
+            "resultado_ia": result
+        }
+    except Exception as e:
+        return {"error": str(e)}
 @app.post("/api/optimization/train/{unit_id}")
 async def force_train_model(unit_id: str):
     """Fuerza el re-entrenamiento del modelo manualmente"""
