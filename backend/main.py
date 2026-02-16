@@ -440,44 +440,50 @@ def scheduled_job():
             run_simulation_cycle()
         except Exception as e:
             logger.error(f"Error en tarea programada: {e}")
-
+async def train_ml_models():
+    """Entrena los modelos de Machine Learning con los datos más recientes."""
+    if ML_OPTIMIZER_AVAILABLE:
+        try:
+            logger.info("🧠 Ejecutando entrenamiento programado de modelos ML...")
+            result = await optimizer.train_optimization_model("CDU-101")
+            logger.info(f"✅ Entrenamiento completado: {result}")
+        except Exception as e:
+            logger.error(f"❌ Error en entrenamiento ML: {e}")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- INICIO DEL SERVIDOR ---
     logger.info("==================================================")
     logger.info("🚀 REFINERYIQ SYSTEM V12.0 FINAL - INICIANDO")
     logger.info("==================================================")
     
-    # 1. Crear tablas (Operación rápida)
+    # 1. Crear tablas
     create_tables_if_not_exist()
     
-    # 2. Iniciar Scheduler
+    # 2. Programar tareas (sin iniciar aún)
     if SIMULATOR_AVAILABLE:
-        logger.info("🤖 Scheduler activado.")
-        scheduler.start()
-        
-        # 3. ANTI-FREEZE + SAFE BOOT:
-        # Ejecutamos la simulación inicial en un hilo separado con un delay de 15s.
-        # Esto permite que la API arranque instantáneamente y responda 'Live' a Render.
-        # Además, da tiempo a que la DB esté lista.
+        # Tareas del simulador (ej. la que ya tenías)
+        scheduler.add_job(scheduled_job, 'interval', minutes=5)
+        # Simulación inicial en hilo (esto no es del scheduler, es un thread aparte)
         def delayed_start():
-            time.sleep(15) 
-            logger.info("⏰ Ejecutando simulación inicial (Delayed)...")
-            try:
-                run_simulation_cycle()
-            except Exception as e:
-                logger.error(f"Error en simulación inicial: {e}")
-
+            time.sleep(15)
+            run_simulation_cycle()
         threading.Thread(target=delayed_start, daemon=True).start()
-    if ML_OPTIMIZER_AVAILABLE:
-        logger.info("🧠 Inicializando motor de IA con datos de DB...")
-        # Lanza el entrenamiento en background sin esperar (fire-and-forget)
-        asyncio.create_task(optimizer.train_optimization_model("CDU-101"))       
-    yield # Servidor corre aquí
     
-    # --- APAGADO DEL SERVIDOR ---
-    logger.info("🛑 Deteniendo servicios del sistema...")
-    if SIMULATOR_AVAILABLE:
+    if ML_OPTIMIZER_AVAILABLE:
+        scheduler.add_job(train_ml_models, 'interval', hours=1, id='train_ml_hourly')
+        scheduler.add_job(train_ml_models, 'date', 
+                          run_date=datetime.now() + timedelta(seconds=60), 
+                          id='train_ml_initial')
+    
+    # 3. Iniciar el scheduler (solo si hay trabajos)
+    if scheduler.get_jobs():
+        scheduler.start()
+        logger.info("🤖 Scheduler iniciado.")
+    
+    yield
+    
+    # Apagado
+    logger.info("🛑 Deteniendo servicios...")
+    if scheduler.running:
         scheduler.shutdown()
 
 # ==============================================================================
