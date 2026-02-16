@@ -6,7 +6,6 @@ import random
 import asyncio
 import logging
 import threading
-from ml_optimization import optimizer
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
@@ -25,7 +24,12 @@ from sqlalchemy.exc import SQLAlchemyError, ProgrammingError, OperationalError
 
 # --- LIBRERÍAS DE TAREAS Y ML ---
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
+try:
+    from ml_optimization import optimizer
+    ML_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    print("⚠️ Advertencia: No se encontró ml_optimization.py")
+    ML_OPTIMIZER_AVAILABLE = False
 # ==============================================================================
 # 1. CONFIGURACIÓN PROFESIONAL DE LOGGING Y ENTORNO
 # ==============================================================================
@@ -465,7 +469,10 @@ async def lifespan(app: FastAPI):
                 logger.error(f"Error en simulación inicial: {e}")
 
         threading.Thread(target=delayed_start, daemon=True).start()
-            
+    if ML_OPTIMIZER_AVAILABLE:
+        # Entrena el modelo en segundo plano al iniciar
+        import asyncio
+        asyncio.create_task(optimizer.train_optimization_model("CDU-101"))        
     yield # Servidor corre aquí
     
     # --- APAGADO DEL SERVIDOR ---
@@ -1312,28 +1319,53 @@ async def get_norm_equipment():
         return []
     finally: 
         await conn.close()
+
 @app.post("/api/optimization/run")
 async def run_process_optimization(request: OptimizationRequest):
     """
-    Ejecuta el motor de IA para encontrar los setpoints óptimos
-    basados en las condiciones actuales.
+    Uso Real: Recibe datos del frontend y devuelve setpoints óptimos.
     """
-    try:
-        current_vals = {
-            'temperature': request.current_temperature,
-            'pressure': request.current_pressure,
-            'flow_rate': request.current_flow
-        }
-        
-        result = await optimizer.find_optimal_parameters(request.unit_id, current_vals)
-        return result
-    except Exception as e:
-        logger.error(f"Error en optimización: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    if not ML_OPTIMIZER_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Módulo ML no disponible")
+    
+    # Preparar datos
+    current_vals = {
+        'temperature': request.current_temperature,
+        'pressure': request.current_pressure,
+        'flow_rate': request.current_flow
+    }
+    
+    # Ejecutar optimización
+    return await optimizer.find_optimal_parameters(request.unit_id, current_vals)
+
+@app.get("/api/optimization/test")
+async def test_process_optimization_browser(unit_id: str = "CDU-101"):
+    """
+    Uso Navegador: Simula datos para probar que la IA funciona entrando al link.
+    """
+    if not ML_OPTIMIZER_AVAILABLE:
+        return {"error": "Módulo ML no disponible"}
+
+    # Datos falsos para probar
+    import random
+    mock_vals = {
+        'temperature': random.uniform(340, 360),
+        'pressure': random.uniform(10, 15),
+        'flow_rate': random.uniform(90, 110)
+    }
+    
+    result = await optimizer.find_optimal_parameters(unit_id, mock_vals)
+    return {
+        "mensaje": "✅ Prueba desde Navegador Exitosa",
+        "entrada_simulada": mock_vals,
+        "resultado_ia": result
+    }
 
 @app.post("/api/optimization/train/{unit_id}")
-async def train_optimization(unit_id: str):
-    """Fuerza el re-entrenamiento del modelo de la unidad."""
+async def force_train_model(unit_id: str):
+    """Fuerza el re-entrenamiento del modelo manualmente"""
+    if not ML_OPTIMIZER_AVAILABLE:
+        raise HTTPException(503, "ML no disponible")
     return await optimizer.train_optimization_model(unit_id)
 # ==============================================================================
 # 13. GENERADOR DE REPORTES (PDF/HTML MEJORADO)
