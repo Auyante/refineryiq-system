@@ -69,16 +69,21 @@ class ProcessOptimizer:
 
         logger.info(f"📡 Consultando historial de DB para {unit_id}...")
         
-        query_tags = tuple(v for v in tags_map.values() if v)
-        
+        # Filtrar tags que no sean None
+        tag_ids = [v for v in tags_map.values() if v]
+        if not tag_ids:
+            logger.warning("⚠️ No hay tags configurados para esta unidad.")
+            return None
+
         # 1. Traer datos de sensores (Formato Largo)
+        # CORRECCIÓN: Cambiar 'time' por 'timestamp' en SELECT y condiciones
         query_sensors = text("""
-            SELECT time as timestamp, tag_id, value 
+            SELECT timestamp, tag_id, value 
             FROM process_data 
             WHERE unit_id = :uid 
-            AND tag_id IN :tags
-            AND time > NOW() - INTERVAL '7 days'
-            ORDER BY time ASC
+            AND tag_id = ANY(:tags)
+            AND timestamp > NOW() - INTERVAL '7 days'
+            ORDER BY timestamp ASC
         """)
         
         # 2. Traer KPIs (Target)
@@ -90,16 +95,19 @@ class ProcessOptimizer:
             ORDER BY timestamp ASC
         """)
 
-        with engine.connect() as conn:
-            df_sensors = pd.read_sql(query_sensors, conn, params={"uid": unit_id, "tags": query_tags})
-            df_kpis = pd.read_sql(query_kpis, conn, params={"uid": unit_id})
+        try:
+            with engine.connect() as conn:
+                df_sensors = pd.read_sql(query_sensors, conn, params={"uid": unit_id, "tags": tag_ids})
+                df_kpis = pd.read_sql(query_kpis, conn, params={"uid": unit_id})
+        except Exception as e:
+            logger.error(f"Error al leer de la base de datos: {e}")
+            return None
 
         if df_sensors.empty or df_kpis.empty:
             logger.warning("⚠️ Base de datos vacía. Usando datos sintéticos para evitar crash.")
             return None
 
         # 3. Pivotar Sensores (De filas a columnas)
-        # Convertir timestamps a datetime para asegurar coincidencia
         df_sensors['timestamp'] = pd.to_datetime(df_sensors['timestamp'])
         df_kpis['timestamp'] = pd.to_datetime(df_kpis['timestamp'])
 
@@ -183,17 +191,26 @@ class ProcessOptimizer:
 
     def _train_synthetic(self, unit_id: str):
         """Generador de respaldo (Tu código anterior)"""
-        # ... (Lógica simplificada para cuando no hay DB) ...
-        # Se mantiene la estructura para robustez
         logger.info("🤖 Iniciando entrenamiento sintético de respaldo...")
-        X = np.random.rand(100, 3)
-        y = np.random.rand(100) * 100
+        # Generar datos sintéticos (puramente para que el sistema no falle)
+        np.random.seed(42)
+        X = np.random.rand(100, 3) * 10  # Valores aleatorios
+        y = 100 - (X[:, 0] * 2 + X[:, 1] * 0.5 + X[:, 2] * 0.1) + np.random.randn(100) * 2
+        
         scaler = StandardScaler()
-        model = RandomForestRegressor()
-        model.fit(X, y)
+        X_scaled = scaler.fit_transform(X)
+        
+        model = RandomForestRegressor(n_estimators=50, random_state=42)
+        model.fit(X_scaled, y)
+        
         self.models[unit_id] = model
         self.scalers[unit_id] = scaler
-        return {"status": "trained_synthetic", "reason": "No DB data"}
+        
+        # Guardar modelos sintéticos también
+        joblib.dump(model, f"{self.model_path}{unit_id}_opt_model.pkl")
+        joblib.dump(scaler, f"{self.model_path}{unit_id}_opt_scaler.pkl")
+        
+        return {"status": "trained_synthetic", "reason": "No DB data or error"}
 
     def _objective_function(self, x, model, scaler):
         x_reshaped = x.reshape(1, -1)
@@ -209,14 +226,28 @@ class ProcessOptimizer:
             try:
                 self.models[unit_id] = joblib.load(f"{self.model_path}{unit_id}_opt_model.pkl")
                 self.scalers[unit_id] = joblib.load(f"{self.model_path}{unit_id}_opt_scaler.pkl")
-            except:
+                logger.info(f"✅ Modelo cargado desde archivo para {unit_id}")
+            except FileNotFoundError:
+                logger.info(f"⚠️ No se encontró modelo guardado para {unit_id}. Entrenando...")
                 await self.train_optimization_model(unit_id)
+            except Exception as e:
+                logger.error(f"Error cargando modelo: {e}")
+                await self.train_optimization_model(unit_id)
+
+        # Verificar que el modelo esté disponible
+        if unit_id not in self.models:
+            raise RuntimeError(f"No se pudo obtener un modelo para {unit_id}")
 
         model = self.models[unit_id]
         scaler = self.scalers[unit_id]
         
         # Límites operativos de seguridad
-        constraints = self.constraints.get(unit_id, self.constraints['CDU-101'])
+        constraints = self.constraints.get(unit_id, self.constraints.get('CDU-101', {
+            'temperature': (300, 400),
+            'pressure': (10, 30),
+            'flow_rate': (8000, 12000)
+        }))
+        
         bounds = [constraints['temperature'], constraints['pressure'], constraints['flow_rate']]
         
         # Valores iniciales (Setpoints actuales)
@@ -244,7 +275,7 @@ class ProcessOptimizer:
         return {
             "unit_id": unit_id,
             "timestamp": datetime.now().isoformat(),
-            "optimization_source": "REAL_DB_MODEL" if "trained_real" else "SYNTHETIC",
+            "optimization_source": "real_data" if hasattr(self, '_last_train_source') and self._last_train_source == 'real' else "synthetic",
             "metrics": {
                 "current_efficiency": round(float(current_eff), 2),
                 "potential_efficiency": round(float(optimal_eff), 2),
