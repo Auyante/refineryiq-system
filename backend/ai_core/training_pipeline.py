@@ -11,6 +11,7 @@ Usage::
 """
 
 import logging
+import gc
 import os
 import time
 import numpy as np
@@ -33,6 +34,9 @@ from ai_core.config import (
     AE_EPOCHS,
     AE_LEARNING_RATE,
     AE_ANOMALY_SIGMA,
+    AE_NORMAL_SAMPLES,
+    DEFAULT_N_CYCLES,
+    MEMORY_CONSTRAINED,
 )
 from ai_core.data_generator import DigitalTwinGenerator
 from ai_core.models import LSTMRULModel, AsymmetricRULLoss, ConvAutoencoder
@@ -57,7 +61,8 @@ class TrainingPipeline:
         self.mlflow = MLflowManager()
         os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)
 
-        logger.info(f"🔧 Training pipeline initialised on device: {self.device}")
+        mode = "LITE (memory-constrained)" if MEMORY_CONSTRAINED else "FULL"
+        logger.info(f"🔧 Training pipeline initialised on device: {self.device} [{mode}]")
 
     # ================================================================== #
     #  Sliding-Window Preprocessor                                        #
@@ -317,7 +322,7 @@ class TrainingPipeline:
     def train_anomaly_detector(
         self,
         equipment_type: str,
-        n_normal_samples: int = 8000,
+        n_normal_samples: int = AE_NORMAL_SAMPLES,
     ) -> Dict:
         """
         Train the Convolutional Autoencoder on normal-only data.
@@ -466,7 +471,7 @@ class TrainingPipeline:
     def train_all(
         self,
         equipment_types: Optional[List[str]] = None,
-        n_cycles: int = 15,
+        n_cycles: int = DEFAULT_N_CYCLES,
     ) -> Dict:
         """
         Train both RUL and anomaly models for all equipment types.
@@ -485,12 +490,21 @@ class TrainingPipeline:
                 logger.error(f"❌ Error training RUL for {eq_type}: {e}")
                 results["rul_models"][eq_type] = {"status": "error", "error": str(e)}
 
+            # Free memory before next model
+            gc.collect()
+            torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
             try:
                 ae_result = self.train_anomaly_detector(eq_type)
                 results["anomaly_models"][eq_type] = ae_result
             except Exception as e:
                 logger.error(f"❌ Error training AE for {eq_type}: {e}")
                 results["anomaly_models"][eq_type] = {"status": "error", "error": str(e)}
+
+            # Free memory between equipment types
+            gc.collect()
+            torch.cuda.empty_cache() if torch.cuda.is_available() else None
+            logger.info(f"🧹 Memory cleaned after {eq_type}")
 
         elapsed = time.time() - total_start
         results["total_training_time_sec"] = round(elapsed, 1)

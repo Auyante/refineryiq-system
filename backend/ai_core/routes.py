@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from ai_core.config import EQUIPMENT_PROFILES
+from ai_core.config import EQUIPMENT_PROFILES, DEFAULT_N_CYCLES, MEMORY_CONSTRAINED
 from ai_core.inference_engine import PredictiveMaintenanceEngine
 from ai_core.training_pipeline import TrainingPipeline
 
@@ -54,7 +54,7 @@ class BatchPredictionRequest(BaseModel):
 
 class TrainRequest(BaseModel):
     equipment_types: Optional[List[str]] = None
-    n_cycles: int = 15
+    n_cycles: int = DEFAULT_N_CYCLES
 
 
 class SensorReading(BaseModel):
@@ -162,10 +162,13 @@ async def trigger_training(
     async def _run_training():
         global _training_status
         try:
+            n_cycles = min(request.n_cycles, DEFAULT_N_CYCLES) if MEMORY_CONSTRAINED else request.n_cycles
+            if n_cycles != request.n_cycles:
+                logger.warning(f"⚠️ n_cycles capped from {request.n_cycles} to {n_cycles} (memory-constrained)")
             pipeline = TrainingPipeline()
             results = pipeline.train_all(
                 equipment_types=request.equipment_types,
-                n_cycles=request.n_cycles,
+                n_cycles=n_cycles,
             )
             _training_status = {
                 "status": "completed",

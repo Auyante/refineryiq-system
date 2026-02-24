@@ -6,8 +6,20 @@ constants for the Tier-1 predictive maintenance system.
 """
 
 import os
+import psutil
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
+
+# =============================================================================
+# Environment Detection — auto-tune for memory-constrained servers
+# =============================================================================
+IS_RENDER = bool(os.getenv("RENDER") or os.getenv("RENDER_EXTERNAL_HOSTNAME"))
+try:
+    AVAILABLE_RAM_MB = psutil.virtual_memory().total / (1024 * 1024)
+except Exception:
+    AVAILABLE_RAM_MB = 512 if IS_RENDER else 4096
+
+MEMORY_CONSTRAINED = IS_RENDER or AVAILABLE_RAM_MB < 1024
 
 # =============================================================================
 # MLflow Configuration
@@ -25,18 +37,32 @@ STRIDE = 1               # Sliding window stride
 # =============================================================================
 # LSTM Model Hyperparameters
 # =============================================================================
-LSTM_HIDDEN_DIM = 128
-LSTM_NUM_LAYERS = 2
-LSTM_DROPOUT = 0.3
-LSTM_BIDIRECTIONAL = True
-ATTENTION_HEADS = 4
-
-# Training
-LEARNING_RATE = 1e-3
-BATCH_SIZE = 64
-MAX_EPOCHS = 100
-EARLY_STOPPING_PATIENCE = 10
-WEIGHT_DECAY = 1e-5
+if MEMORY_CONSTRAINED:
+    # --- LITE MODE (Render / <1GB RAM) ---
+    LSTM_HIDDEN_DIM = 64
+    LSTM_NUM_LAYERS = 1
+    LSTM_DROPOUT = 0.2
+    LSTM_BIDIRECTIONAL = False
+    ATTENTION_HEADS = 2
+    LEARNING_RATE = 2e-3
+    BATCH_SIZE = 32
+    MAX_EPOCHS = 30
+    EARLY_STOPPING_PATIENCE = 7
+    WEIGHT_DECAY = 1e-5
+    DEFAULT_N_CYCLES = 5
+else:
+    # --- FULL MODE (>=1GB RAM) ---
+    LSTM_HIDDEN_DIM = 128
+    LSTM_NUM_LAYERS = 2
+    LSTM_DROPOUT = 0.3
+    LSTM_BIDIRECTIONAL = True
+    ATTENTION_HEADS = 4
+    LEARNING_RATE = 1e-3
+    BATCH_SIZE = 64
+    MAX_EPOCHS = 100
+    EARLY_STOPPING_PATIENCE = 10
+    WEIGHT_DECAY = 1e-5
+    DEFAULT_N_CYCLES = 15
 
 # Asymmetric loss: penalize late predictions (under-estimating RUL) more
 LATE_PENALTY_FACTOR = 2.0   # multiplier for under-estimated RUL
@@ -45,9 +71,10 @@ EARLY_PENALTY_FACTOR = 1.0  # multiplier for over-estimated RUL
 # =============================================================================
 # Autoencoder Hyperparameters
 # =============================================================================
-AE_LATENT_DIM = 16
+AE_LATENT_DIM = 8 if MEMORY_CONSTRAINED else 16
 AE_LEARNING_RATE = 1e-3
-AE_EPOCHS = 80
+AE_EPOCHS = 30 if MEMORY_CONSTRAINED else 80
+AE_NORMAL_SAMPLES = 3000 if MEMORY_CONSTRAINED else 8000
 AE_ANOMALY_SIGMA = 3.0  # threshold = mean + N*sigma of reconstruction error
 
 # =============================================================================
