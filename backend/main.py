@@ -30,6 +30,16 @@ try:
 except ImportError:
     print("⚠️ Advertencia: No se encontró ml_optimization.py")
     ML_OPTIMIZER_AVAILABLE = False
+
+# --- AI CORE: Motor de IA Tier-1 ---
+try:
+    from ai_core.routes import router as ai_router, engine as ai_engine
+    AI_CORE_AVAILABLE = True
+    print("✅ AI Core v2.0 cargado correctamente")
+except ImportError as e:
+    AI_CORE_AVAILABLE = False
+    ai_engine = None
+    print(f"⚠️ AI Core no disponible: {e}")
 # ==============================================================================
 # 1. CONFIGURACIÓN PROFESIONAL DE LOGGING Y ENTORNO
 # ==============================================================================
@@ -419,14 +429,19 @@ except ImportError as e:
     def run_simulation_cycle():
         logger.info("Simulador no disponible - modo dummy")
 
-# Módulos IA Dummy
+# Módulos IA — Usa AI Core si está disponible, sino fallback a Dummy
 class DummyML:
     async def get_recent_predictions(self, *args, **kwargs): 
         return []
     async def get_recent_analysis(self, *args, **kwargs): 
         return []
 
-pm_system = DummyML()
+if AI_CORE_AVAILABLE and ai_engine is not None:
+    pm_system = ai_engine  # PredictiveMaintenanceEngine tiene stubs compatibles
+    logger.info("🧠 AI Core Engine asignado como sistema de mantenimiento predictivo")
+else:
+    pm_system = DummyML()
+    logger.warning("⚠️ Usando DummyML como fallback para mantenimiento predictivo")
 energy_system = DummyML()
 
 scheduler = AsyncIOScheduler()
@@ -452,13 +467,21 @@ async def train_ml_models():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("==================================================")
-    logger.info("🚀 REFINERYIQ SYSTEM V12.0 FINAL - INICIANDO")
+    logger.info("🚀 REFINERYIQ SYSTEM V13.0 AI-POWERED - INICIANDO")
     logger.info("==================================================")
     
     # 1. Crear tablas
     create_tables_if_not_exist()
     
-    # 2. Programar tareas (sin iniciar aún)
+    # 2. Inicializar AI Core Engine
+    if AI_CORE_AVAILABLE and ai_engine is not None:
+        try:
+            await ai_engine.initialize()
+            logger.info("🧠 AI Core Engine inicializado correctamente")
+        except Exception as e:
+            logger.warning(f"⚠️ AI Core Engine init parcial: {e}")
+    
+    # 3. Programar tareas (sin iniciar aún)
     if SIMULATOR_AVAILABLE:
         # Tareas del simulador (ej. la que ya tenías)
         scheduler.add_job(scheduled_job, 'interval', minutes=5)
@@ -474,7 +497,7 @@ async def lifespan(app: FastAPI):
                           run_date=datetime.now() + timedelta(seconds=60), 
                           id='train_ml_initial')
     
-    # 3. Iniciar el scheduler (solo si hay trabajos)
+    # 4. Iniciar el scheduler (solo si hay trabajos)
     if scheduler.get_jobs():
         scheduler.start()
         logger.info("🤖 Scheduler iniciado.")
@@ -492,10 +515,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RefineryIQ Enterprise API",
-    description="Backend industrial Full-Stack V12.0. Gestión integral de refinería.",
-    version="12.0.0",
+    description="Backend industrial Full-Stack V13.0 AI-Powered. Gestión integral de refinería con IA predictiva Tier-1.",
+    version="13.0.0",
     lifespan=lifespan
 )
+
+# --- Montar Router AI Core ---
+if AI_CORE_AVAILABLE:
+    app.include_router(ai_router)
+    logger.info("🧠 AI Core Router montado en /api/ai")
 
 # Configuración CORS EXTREMADAMENTE PERMISIVA para Render
 # Configuración CORS para dominio personalizado
@@ -1152,6 +1180,68 @@ async def get_maintenance_predictions():
                 return [dict(r) for r in rows]
     except Exception as e:
         logger.error(f"Maintenance Predictions Error: {e}")
+    
+    # --- AI Core: predicciones en tiempo real ---
+    if AI_CORE_AVAILABLE and ai_engine is not None:
+        try:
+            if not ai_engine._initialized:
+                await ai_engine.initialize()
+            
+            default_equipment = [
+                {"equipment_id": "PUMP-101", "equipment_type": "PUMP"},
+                {"equipment_id": "PUMP-102", "equipment_type": "PUMP"},
+                {"equipment_id": "COMP-201", "equipment_type": "COMPRESSOR"},
+                {"equipment_id": "COMP-202", "equipment_type": "COMPRESSOR"},
+                {"equipment_id": "VALVE-301", "equipment_type": "VALVE"},
+                {"equipment_id": "HX-401", "equipment_type": "EXCHANGER"},
+            ]
+            
+            results = await ai_engine.predict_batch(default_equipment)
+            
+            # Formatear para el frontend existente
+            formatted = []
+            eq_names = {
+                "PUMP-101": "Bomba Centrífuga P-101",
+                "PUMP-102": "Bomba de Alimentación P-102", 
+                "COMP-201": "Compresor Gas C-201",
+                "COMP-202": "Compresor Reciclo C-202",
+                "VALVE-301": "Válvula Control V-301",
+                "HX-401": "Intercambiador Calor E-401",
+            }
+            
+            for r in results:
+                rul = r.get("rul_hours")
+                fp = r.get("failure_probability", 5.0) or 5.0
+                
+                if rul is not None and rul < 48:
+                    prediction = "FALLO INMINENTE"
+                elif rul is not None and rul < 168:
+                    prediction = "MANTENIMIENTO REQUERIDO"
+                elif r.get("is_anomaly"):
+                    prediction = "ANOMALÍA DETECTADA"
+                else:
+                    prediction = "OPERACIÓN NORMAL"
+                
+                formatted.append({
+                    "equipment_id": r["equipment_id"],
+                    "equipment_name": eq_names.get(r["equipment_id"], r["equipment_id"]),
+                    "equipment_type": r["equipment_type"],
+                    "failure_probability": round(fp, 1),
+                    "rul_hours": rul,
+                    "anomaly_score": r.get("anomaly_score"),
+                    "is_anomaly": r.get("is_anomaly", False),
+                    "recommendation": r.get("recommendation", ""),
+                    "narrative": r.get("narrative"),
+                    "confidence": r.get("confidence", 75.0) or 75.0,
+                    "prediction": prediction,
+                    "model_source": r.get("model_source", "ai_core_v2"),
+                    "shap_explanation": r.get("shap_explanation"),
+                    "timestamp": r.get("timestamp"),
+                })
+            
+            return formatted
+        except Exception as e:
+            logger.error(f"AI Core prediction error: {e}")
     
     return await pm_system.get_recent_predictions(None)
 

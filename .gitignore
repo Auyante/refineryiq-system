@@ -12,6 +12,8 @@ venv/
 backend/__pycache__/
 backend/venv312/
 backend/.env
+backend/mlruns/
+backend/ml_models_v2/
 
 # Frontend
 frontend/node_modules/

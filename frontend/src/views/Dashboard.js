@@ -545,7 +545,7 @@ const Dashboard = () => {
                     Motor IA: ONLINE
                   </strong>
                   <div style={{ fontSize: '0.8rem', color: '#166534' }}>
-                    Modelo Random Forest v2.1 Operativo
+                    AI Core v2.0 — LSTM + Autoencoder Operativo
                   </div>
                 </div>
               </div>
