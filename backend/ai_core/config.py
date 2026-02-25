@@ -30,26 +30,31 @@ MLFLOW_EXPERIMENT_NAME = "RefineryIQ_PredictiveMaintenance"
 # =============================================================================
 # Sliding Window Configuration
 # =============================================================================
-WINDOW_SIZE = 50          # Number of timesteps per input window
+if MEMORY_CONSTRAINED:
+    WINDOW_SIZE = 20          # Smaller windows for fast training
+    STRIDE = 10               # Larger stride = fewer windows
+else:
+    WINDOW_SIZE = 50          # Number of timesteps per input window
+    STRIDE = 1                # Sliding window stride
+
 PREDICTION_HORIZON = 1    # Predict RUL at next step
-STRIDE = 1               # Sliding window stride
 
 # =============================================================================
 # LSTM Model Hyperparameters
 # =============================================================================
 if MEMORY_CONSTRAINED:
     # --- LITE MODE (Render / <1GB RAM) ---
-    LSTM_HIDDEN_DIM = 64
+    LSTM_HIDDEN_DIM = 32
     LSTM_NUM_LAYERS = 1
-    LSTM_DROPOUT = 0.2
+    LSTM_DROPOUT = 0.1
     LSTM_BIDIRECTIONAL = False
-    ATTENTION_HEADS = 2
-    LEARNING_RATE = 2e-3
-    BATCH_SIZE = 32
-    MAX_EPOCHS = 30
-    EARLY_STOPPING_PATIENCE = 7
+    ATTENTION_HEADS = 1
+    LEARNING_RATE = 5e-3
+    BATCH_SIZE = 64
+    MAX_EPOCHS = 10
+    EARLY_STOPPING_PATIENCE = 5
     WEIGHT_DECAY = 1e-5
-    DEFAULT_N_CYCLES = 5
+    DEFAULT_N_CYCLES = 3
 else:
     # --- FULL MODE (>=1GB RAM) ---
     LSTM_HIDDEN_DIM = 128
@@ -71,10 +76,10 @@ EARLY_PENALTY_FACTOR = 1.0  # multiplier for over-estimated RUL
 # =============================================================================
 # Autoencoder Hyperparameters
 # =============================================================================
-AE_LATENT_DIM = 8 if MEMORY_CONSTRAINED else 16
+AE_LATENT_DIM = 4 if MEMORY_CONSTRAINED else 16
 AE_LEARNING_RATE = 1e-3
-AE_EPOCHS = 30 if MEMORY_CONSTRAINED else 80
-AE_NORMAL_SAMPLES = 3000 if MEMORY_CONSTRAINED else 8000
+AE_EPOCHS = 10 if MEMORY_CONSTRAINED else 80
+AE_NORMAL_SAMPLES = 1000 if MEMORY_CONSTRAINED else 8000
 AE_ANOMALY_SIGMA = 3.0  # threshold = mean + N*sigma of reconstruction error
 
 # =============================================================================
