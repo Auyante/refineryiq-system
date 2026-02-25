@@ -296,27 +296,29 @@ const Maintenance = () => {
                     </div>
                   )}
 
-                  {/* Click hint */}
-                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  {/* Toggle details */}
+                  <div style={{
+                    textAlign: 'center', marginTop: '10px', paddingTop: '8px',
+                    borderTop: '1px solid #f1f5f9'
+                  }}>
                     <span style={{
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      color: '#ffffff',
-                      background: selectedEquipment === idx
-                        ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-                        : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                      padding: '8px 22px',
-                      borderRadius: '25px',
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      color: selectedEquipment === idx ? '#94a3b8' : '#6366f1',
+                      background: selectedEquipment === idx ? '#f8fafc' : '#f5f3ff',
+                      padding: '5px 14px',
+                      borderRadius: '6px',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: selectedEquipment === idx
-                        ? '0 3px 10px rgba(239,68,68,0.35)'
-                        : '0 3px 10px rgba(99,102,241,0.35)',
-                      letterSpacing: '0.02em'
+                      gap: '5px',
+                      border: `1px solid ${selectedEquipment === idx ? '#e2e8f0' : '#e0e7ff'}`,
+                      letterSpacing: '0.03em',
+                      textTransform: 'uppercase'
                     }}>
-                      {selectedEquipment === idx ? '✕ Cerrar Detalle' : '🧠 Ver Explicación IA'}
+                      {selectedEquipment === idx
+                        ? <><FiActivity size={12} /> Cerrar detalle</>
+                        : <><FiCpu size={12} /> Ver explicación IA</>}
                     </span>
                   </div>
                 </div>
