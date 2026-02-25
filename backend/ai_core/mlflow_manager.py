@@ -162,16 +162,43 @@ class MLflowManager:
     # ------------------------------------------------------------------ #
     #  Model Registry: load production models                              #
     # ------------------------------------------------------------------ #
-    def load_production_model(self, model_name: str) -> Optional[torch.nn.Module]:
+    def load_production_model(
+        self, model_name: str, metadata_only: bool = False
+    ) -> Optional[torch.nn.Module]:
         """
         Load the latest production-stage model from the registry.
 
         Falls back to latest version if no production alias is found.
+
+        Parameters
+        ----------
+        model_name : str
+            Registered model name, e.g. "RefineryIQ_RUL_PUMP".
+        metadata_only : bool
+            If True, only check whether a model version exists in the
+            registry and return ``True`` (truthy) without loading it
+            into memory.  Useful for lazy-loading initialization.
         """
         if not self._available:
             return None
         try:
             client = self._mlflow.tracking.MlflowClient()
+
+            # Check if any version exists
+            try:
+                versions = client.search_model_versions(f"name='{model_name}'")
+                if not versions:
+                    if not metadata_only:
+                        logger.warning(f"⚠️ No model found in registry: {model_name}")
+                    return None
+            except Exception:
+                if not metadata_only:
+                    logger.warning(f"⚠️ No model found in registry: {model_name}")
+                return None
+
+            # Metadata-only: just confirm existence
+            if metadata_only:
+                return True  # truthy sentinel
 
             # Try to load by alias "production" first
             try:
@@ -183,21 +210,13 @@ class MLflowManager:
                 pass
 
             # Fallback: load latest version
-            try:
-                versions = client.search_model_versions(f"name='{model_name}'")
-                if versions:
-                    latest = max(versions, key=lambda v: int(v.version))
-                    model_uri = f"models:/{model_name}/{latest.version}"
-                    model = self._pytorch.load_model(model_uri)
-                    logger.info(
-                        f"✅ Loaded model: {model_name} v{latest.version}"
-                    )
-                    return model
-            except Exception:
-                pass
-
-            logger.warning(f"⚠️ No model found in registry: {model_name}")
-            return None
+            latest = max(versions, key=lambda v: int(v.version))
+            model_uri = f"models:/{model_name}/{latest.version}"
+            model = self._pytorch.load_model(model_uri)
+            logger.info(
+                f"✅ Loaded model: {model_name} v{latest.version}"
+            )
+            return model
 
         except Exception as e:
             logger.warning(f"MLflow load_model error: {e}")

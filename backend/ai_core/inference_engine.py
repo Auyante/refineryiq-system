@@ -3,13 +3,15 @@ RefineryIQ AI Core — Real-Time Inference Engine
 =================================================
 Production-grade inference pipeline with:
   • Per-equipment sliding window buffers (ready for MQTT/Kafka)
-  • Model loading from MLflow registry (with local fallback)
+  • Lazy model loading from MLflow registry (with local fallback)
   • Combined RUL + anomaly score output
   • SHAP explanations and human-readable narratives
   • Async-compatible (heavy inference offloaded to thread pool)
+  • Memory-safe: loads one model at a time on constrained environments
 """
 
 import asyncio
+import gc
 import logging
 import os
 import time
@@ -26,6 +28,7 @@ from ai_core.config import (
     RUL_CRITICAL,
     RUL_WARNING,
     RUL_CAUTION,
+    MEMORY_CONSTRAINED,
 )
 from ai_core.models import LSTMRULModel, ConvAutoencoder
 from ai_core.explainability import SHAPExplainer
@@ -43,13 +46,16 @@ class PredictiveMaintenanceEngine:
     Manages per-equipment sliding window buffers, loads the latest
     production models from MLflow (with local fallback), and produces
     predictions enriched with SHAP explanations.
+
+    On memory-constrained environments, models are loaded lazily (one at
+    a time) and unloaded after use to keep RAM usage low.
     """
 
     def __init__(self):
         self.device = torch.device("cpu")  # Inference always on CPU for latency
         self.mlflow = MLflowManager()
 
-        # Models indexed by equipment_type
+        # Models indexed by equipment_type (may be empty on constrained envs)
         self.rul_models: Dict[str, torch.nn.Module] = {}
         self.ae_models: Dict[str, ConvAutoencoder] = {}
         self.explainers: Dict[str, SHAPExplainer] = {}
@@ -63,36 +69,76 @@ class PredictiveMaintenanceEngine:
         # Background data for SHAP (small sample per equipment_type)
         self.background_data: Dict[str, np.ndarray] = {}
 
+        # Track which model types are available (registered in MLflow/local)
+        self._available_rul: set = set()
+        self._available_ae: set = set()
+
+        # Track the last loaded model type (for lazy unloading)
+        self._last_loaded_type: Optional[str] = None
+
         self._initialized = False
 
     # ================================================================== #
     #  Initialization                                                      #
     # ================================================================== #
     async def initialize(self):
-        """Load all available models. Safe to call multiple times."""
+        """
+        Initialise the engine.
+
+        On memory-constrained environments, only *checks* which models
+        exist without loading them.  On full-memory environments, loads
+        all models eagerly (original behaviour).
+        """
         if self._initialized:
             return
 
         logger.info("🔄 Initialising Predictive Maintenance Engine...")
 
         for eq_type, profile in EQUIPMENT_PROFILES.items():
-            # --- RUL Model ---
-            rul_model = await self._load_rul_model(eq_type, profile)
-            if rul_model is not None:
-                self.rul_models[eq_type] = rul_model
-                self.explainers[eq_type] = SHAPExplainer(profile.features)
+            if MEMORY_CONSTRAINED:
+                # --- LAZY MODE: just check availability ---
+                rul_name = f"RefineryIQ_RUL_{eq_type}"
+                ae_name = f"RefineryIQ_AE_{eq_type}"
 
-            # --- Anomaly Detector ---
-            ae_model = await self._load_ae_model(eq_type, profile)
-            if ae_model is not None:
-                self.ae_models[eq_type] = ae_model
+                if self.mlflow.load_production_model(rul_name, metadata_only=True):
+                    self._available_rul.add(eq_type)
+                else:
+                    local_path = os.path.join(LOCAL_MODEL_DIR, f"{eq_type}_rul_model.pt")
+                    if os.path.exists(local_path):
+                        self._available_rul.add(eq_type)
 
-        n_rul = len(self.rul_models)
-        n_ae = len(self.ae_models)
+                if self.mlflow.load_production_model(ae_name, metadata_only=True):
+                    self._available_ae.add(eq_type)
+                else:
+                    local_path = os.path.join(LOCAL_MODEL_DIR, f"{eq_type}_ae_model.pt")
+                    if os.path.exists(local_path):
+                        self._available_ae.add(eq_type)
+            else:
+                # --- EAGER MODE: load all models ---
+                rul_model = await self._load_rul_model(eq_type, profile)
+                if rul_model is not None:
+                    self.rul_models[eq_type] = rul_model
+                    self.explainers[eq_type] = SHAPExplainer(profile.features)
+
+                ae_model = await self._load_ae_model(eq_type, profile)
+                if ae_model is not None:
+                    self.ae_models[eq_type] = ae_model
+
+        if MEMORY_CONSTRAINED:
+            n_rul = len(self._available_rul)
+            n_ae = len(self._available_ae)
+            logger.info(
+                f"✅ Engine initialised (LAZY): {n_rul} RUL models, "
+                f"{n_ae} anomaly detectors available (loaded on-demand)"
+            )
+        else:
+            n_rul = len(self.rul_models)
+            n_ae = len(self.ae_models)
+            logger.info(
+                f"✅ Engine initialised: {n_rul} RUL models, {n_ae} anomaly detectors"
+            )
+
         self._initialized = True
-        logger.info(
-            f"✅ Engine initialised: {n_rul} RUL models, {n_ae} anomaly detectors"
-        )
 
     async def _load_rul_model(
         self, eq_type: str, profile
@@ -163,6 +209,87 @@ class PredictiveMaintenanceEngine:
                 logger.warning(f"⚠️ Error loading local AE model {eq_type}: {e}")
 
         return None
+
+    def _lazy_load_for_type(self, equipment_type: str):
+        """
+        On memory-constrained envs, load only the models for the given
+        equipment type, unloading any previously loaded models first.
+        """
+        if not MEMORY_CONSTRAINED:
+            return  # Eager mode — models already loaded
+
+        # If already loaded, skip
+        if self._last_loaded_type == equipment_type:
+            return
+
+        # Unload previous models
+        if self._last_loaded_type is not None:
+            prev = self._last_loaded_type
+            if prev in self.rul_models:
+                del self.rul_models[prev]
+            if prev in self.ae_models:
+                del self.ae_models[prev]
+            if prev in self.explainers:
+                del self.explainers[prev]
+            gc.collect()
+
+        # Load models for this equipment type
+        profile = EQUIPMENT_PROFILES.get(equipment_type)
+        if profile is None:
+            return
+
+        if equipment_type in self._available_rul:
+            model_name = f"RefineryIQ_RUL_{equipment_type}"
+            model = self.mlflow.load_production_model(model_name)
+            if model is not None:
+                model.eval()
+                self.rul_models[equipment_type] = model
+                self.explainers[equipment_type] = SHAPExplainer(profile.features)
+            else:
+                # Local fallback
+                local_path = os.path.join(LOCAL_MODEL_DIR, f"{equipment_type}_rul_model.pt")
+                if os.path.exists(local_path):
+                    try:
+                        checkpoint = torch.load(local_path, map_location="cpu", weights_only=False)
+                        m = LSTMRULModel(n_features=len(profile.features))
+                        m.load_state_dict(checkpoint["model_state_dict"])
+                        m.eval()
+                        self.rul_models[equipment_type] = m
+                        self.explainers[equipment_type] = SHAPExplainer(profile.features)
+                        self.norm_stats[equipment_type] = {
+                            "means": checkpoint.get("means"),
+                            "stds": checkpoint.get("stds"),
+                        }
+                    except Exception as e:
+                        logger.warning(f"⚠️ Lazy load RUL {equipment_type}: {e}")
+
+        if equipment_type in self._available_ae:
+            model_name = f"RefineryIQ_AE_{equipment_type}"
+            model = self.mlflow.load_production_model(model_name)
+            if model is not None:
+                model.eval()
+                self.ae_models[equipment_type] = model
+            else:
+                local_path = os.path.join(LOCAL_MODEL_DIR, f"{equipment_type}_ae_model.pt")
+                if os.path.exists(local_path):
+                    try:
+                        checkpoint = torch.load(local_path, map_location="cpu", weights_only=False)
+                        m = ConvAutoencoder(n_features=len(profile.features), seq_len=WINDOW_SIZE)
+                        m.load_state_dict(checkpoint["model_state_dict"])
+                        m.threshold = torch.tensor(checkpoint["threshold"])
+                        m.recon_mean = torch.tensor(checkpoint["recon_mean"])
+                        m.recon_std = torch.tensor(checkpoint["recon_std"])
+                        m.eval()
+                        self.ae_models[equipment_type] = m
+                        if equipment_type not in self.norm_stats:
+                            self.norm_stats[equipment_type] = {
+                                "means": checkpoint.get("means"),
+                                "stds": checkpoint.get("stds"),
+                            }
+                    except Exception as e:
+                        logger.warning(f"⚠️ Lazy load AE {equipment_type}: {e}")
+
+        self._last_loaded_type = equipment_type
 
     # ================================================================== #
     #  Data Ingestion (Sliding Window Buffer)                              #
@@ -286,6 +413,9 @@ class PredictiveMaintenanceEngine:
             result["recommendation"] = "DATOS INSUFICIENTES — Esperando lecturas de sensores"
             return result
 
+        # Lazy-load models for this equipment type (memory-constrained envs)
+        self._lazy_load_for_type(equipment_type)
+
         # Run inference in thread pool (non-blocking)
         return await asyncio.get_event_loop().run_in_executor(
             None, self._predict_sync, equipment_id, equipment_type, window, result
@@ -375,6 +505,15 @@ class PredictiveMaintenanceEngine:
         ----------
         equipment_list : list of {"equipment_id": str, "equipment_type": str}
         """
+        # On constrained envs, run sequentially to avoid loading multiple models
+        if MEMORY_CONSTRAINED:
+            results = []
+            for eq in equipment_list:
+                r = await self.predict(eq["equipment_id"], eq["equipment_type"])
+                results.append(r)
+            return results
+
+        # Full mode: concurrent predictions
         tasks = [
             self.predict(eq["equipment_id"], eq["equipment_type"])
             for eq in equipment_list
@@ -427,6 +566,9 @@ class PredictiveMaintenanceEngine:
             "initialized": self._initialized,
             "rul_models_loaded": list(self.rul_models.keys()),
             "ae_models_loaded": list(self.ae_models.keys()),
+            "rul_models_available": list(self._available_rul),
+            "ae_models_available": list(self._available_ae),
+            "lazy_mode": MEMORY_CONSTRAINED,
             "active_buffers": {
                 eid: len(buf) for eid, buf in self.buffers.items()
             },
