@@ -297,22 +297,26 @@ const Maintenance = () => {
                   )}
 
                   {/* Click hint */}
-                  <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
                     <span style={{
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      color: selectedEquipment === idx ? '#ef4444' : '#6366f1',
-                      background: selectedEquipment === idx ? '#fef2f2' : '#eef2ff',
-                      padding: '6px 16px',
-                      borderRadius: '20px',
-                      border: `1px solid ${selectedEquipment === idx ? '#fecaca' : '#c7d2fe'}`,
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      background: selectedEquipment === idx
+                        ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                        : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      padding: '8px 22px',
+                      borderRadius: '25px',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px'
+                      gap: '6px',
+                      boxShadow: selectedEquipment === idx
+                        ? '0 3px 10px rgba(239,68,68,0.35)'
+                        : '0 3px 10px rgba(99,102,241,0.35)',
+                      letterSpacing: '0.02em'
                     }}>
-                      {selectedEquipment === idx ? '✕ Cerrar detalle' : '🧠 Ver explicación IA'}
+                      {selectedEquipment === idx ? '✕ Cerrar Detalle' : '🧠 Ver Explicación IA'}
                     </span>
                   </div>
                 </div>
