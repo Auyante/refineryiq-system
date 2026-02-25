@@ -526,8 +526,7 @@ if AI_CORE_AVAILABLE:
     logger.info("🧠 AI Core Router montado en /api/ai")
 
 # Configuración CORS EXTREMADAMENTE PERMISIVA para Render
-# Configuración CORS para dominio personalizado
-# Configuración CORS para todos los dominios
+# IMPORTANTE: "*" NO funciona con allow_credentials=True — el browser lo rechaza.
 origins = [
     # Desarrollo local
     "http://localhost:3000",
@@ -543,18 +542,16 @@ origins = [
     "https://www.refineryiq.dev",
     "https://api.refineryiq.dev",
     "https://system.refineryiq.dev",
-    
-    # Para permitir desde cualquier origen en desarrollo
-    "*"  # Solo para desarrollo, en producción es mejor especificar
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.refineryiq\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
 )
 # Middleware de Logging y Manejo de Errores Global
 @app.middleware("http")
